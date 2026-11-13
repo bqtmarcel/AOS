@@ -1,0 +1,1872 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="theme-color" content="#1d5c43">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AOS">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>AOS – Athlete Operating System</title>
+<style>
+:root{
+  --bg:#f4f3ef; --surface:#ffffff; --surface2:#ecebe6; --text:#1b1f24; --muted:#5b636e;
+  --line:#d9d7d0; --accent:#1d5c43; --accent-ink:#ffffff; --accent-soft:#dcebe3;
+  --warn:#8a5a00; --warn-soft:#fbefd2; --bad:#9b2c2c; --bad-soft:#f8dede; --info-soft:#e3ebf6; --info:#24477a;
+  --radius:10px; --font: system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#14171b; --surface:#1c2026; --surface2:#252a31; --text:#e8eaed; --muted:#a2a9b3; --line:#323842;
+    --accent:#5fbf8f; --accent-ink:#0d1a13; --accent-soft:#1f3a2d; --warn:#f0c060; --warn-soft:#3a3020;
+    --bad:#f08a8a; --bad-soft:#3d2224; --info-soft:#1f2a3a; --info:#9cc0f0; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{-webkit-tap-highlight-color:transparent;background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%}
+a{color:var(--accent)}
+header.top{padding-top:env(safe-area-inset-top);position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-inner{max-width:980px;margin:0 auto;display:flex;align-items:center;gap:16px;padding:10px 16px;flex-wrap:wrap}
+.brand{font-weight:800;letter-spacing:.06em;font-size:1.15rem}
+.brand small{font-weight:500;letter-spacing:0;color:var(--muted);margin-left:6px;font-size:.8rem}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+nav.tabs button{background:none;border:0;padding:8px 12px;border-radius:8px;font:inherit;font-size:.95rem;color:var(--muted);cursor:pointer}
+nav.tabs button[aria-current="page"]{background:var(--accent-soft);color:var(--text);font-weight:600}
+nav.tabs button:hover{color:var(--text)}
+main{max-width:980px;margin:0 auto;padding:18px 16px 96px}
+h1{font-size:1.45rem;margin:4px 0 14px}
+h2{font-size:1.15rem;margin:22px 0 10px}
+h3{font-size:1rem;margin:14px 0 6px}
+p{margin:6px 0}
+.muted{color:var(--muted)}
+.small{font-size:.875rem}
+.section{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin:12px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row.between{justify-content:space-between}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.badge{display:inline-block;font-size:.78rem;padding:2px 8px;border-radius:99px;background:var(--surface2);color:var(--text);white-space:nowrap;border:1px solid var(--line)}
+.badge.ok{background:var(--accent-soft);border-color:transparent}
+.badge.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.badge.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+.badge.info{background:var(--info-soft);color:var(--info);border-color:transparent}
+.cap{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:.85rem;background:var(--warn-soft);color:var(--warn);padding:3px 10px;border-radius:99px}
+.note{border-left:4px solid var(--info);background:var(--info-soft);padding:8px 12px;border-radius:6px;margin:10px 0;font-size:.92rem}
+.note.warn{border-color:var(--warn);background:var(--warn-soft)}
+.note.bad{border-color:var(--bad);background:var(--bad-soft)}
+.empty{border:1px dashed var(--line);border-radius:var(--radius);padding:16px;color:var(--muted);text-align:left;margin:10px 0}
+button,.btn{font:inherit;font-size:.95rem;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);padding:9px 14px;cursor:pointer;min-height:42px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.danger{color:var(--bad);border-color:var(--bad)}
+button.link{border:0;background:none;color:var(--accent);padding:4px 6px;min-height:auto;text-decoration:underline}
+button.small{padding:5px 10px;min-height:34px;font-size:.875rem}
+button:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+label{display:block;font-size:.88rem;color:var(--muted);margin-bottom:3px}
+input,select,textarea{font:inherit;font-size:16px;width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);min-height:42px}
+textarea{min-height:70px;resize:vertical}
+input[type=checkbox]{width:auto;min-height:auto;transform:scale(1.25);margin-right:8px}
+.field{margin:8px 0;min-width:0}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 12px}
+table{width:100%;border-collapse:collapse;font-size:.93rem}
+th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:.83rem}
+.table-wrap{overflow-x:auto}
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.day{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px;min-height:110px;font-size:.88rem}
+.day.unavail{background:repeating-linear-gradient(45deg,var(--surface2),var(--surface2) 6px,var(--surface) 6px,var(--surface) 12px)}
+.day.today{border-color:var(--accent);border-width:2px}
+.day h4{margin:0 0 6px;font-size:.85rem;display:flex;justify-content:space-between;gap:4px;flex-wrap:wrap}
+.sess{display:block;width:100%;text-align:left;border-radius:6px;padding:6px 8px;margin:4px 0;font-size:.85rem;border:1px solid var(--line);background:var(--surface2);min-height:auto}
+.sess.st-absolviert{background:var(--accent-soft);border-color:transparent}
+.sess.st-teilweise{background:var(--info-soft);border-color:transparent}
+.sess.st-ausgelassen{background:var(--surface);text-decoration:line-through;color:var(--muted)}
+.sess.overdue{border-color:var(--warn);border-width:2px}
+button.chip{display:inline-block;min-height:38px;padding:6px 12px;margin:3px 4px 3px 0;border-radius:99px;font-size:.9rem;background:var(--surface)}
+button.chip.pref-favorit{border-color:var(--accent)}
+button.chip.pref-nicht{color:var(--muted);border-style:dashed}
+button.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.chip[aria-pressed="true"] .muted{color:inherit}
+@media (max-width:760px){
+  .week{grid-template-columns:1fr}
+  .day{min-height:auto}
+  nav.tabs{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--line);margin:0;padding:4px 4px calc(4px + env(safe-area-inset-bottom));justify-content:space-around;flex-wrap:nowrap;z-index:30}
+  nav.tabs button{font-size:.7rem;padding:8px 2px;flex:1;min-height:48px}
+  .top-inner{padding:8px 12px;flex-wrap:nowrap}
+  .brand small,#topinfo .muted{display:none}
+  #topinfo{margin-left:auto}
+  main{padding:14px max(12px,env(safe-area-inset-right)) calc(110px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+}
+.ex{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:8px 0;background:var(--surface)}
+.ex-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.ex-name{font-weight:600}
+.setrow{display:grid;grid-template-columns:52px repeat(3,minmax(0,1fr));gap:6px;align-items:end;margin:4px 0}
+.setrow .lbl{font-size:.8rem;color:var(--muted);padding-bottom:12px}
+.plan-hint{font-size:.8rem;color:var(--muted)}
+pre.out{white-space:pre-wrap;font-family:var(--mono);font-size:.88rem;background:var(--surface2);border-radius:8px;padding:12px;border:1px solid var(--line);max-height:60vh;overflow:auto}
+dialog{border:1px solid var(--line);border-radius:12px;padding:0;max-width:720px;width:calc(100% - 24px);background:var(--surface);color:var(--text)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:2}
+.dlg-head h2{margin:0;font-size:1.05rem}
+.dlg-body{padding:12px 16px;max-height:75vh;overflow:auto}
+.dlg-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--line)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:var(--text);color:var(--bg);padding:10px 16px;border-radius:8px;z-index:100;font-size:.92rem;max-width:90vw}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-size:11px;font-family:var(--font)}
+.chart .ln{fill:none;stroke:var(--accent);stroke-width:2.5}
+.chart .pt{fill:var(--accent)}
+.chart .gl{stroke:var(--line);stroke-width:1}
+.chart .goal{stroke:var(--warn);stroke-dasharray:5 4;stroke-width:1.5}
+.sugg{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:8px 0;background:var(--surface)}
+.sugg ul{margin:6px 0;padding-left:20px;font-size:.9rem}
+.pos-bar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--surface2);margin:6px 0}
+.pos-bar span{display:block;height:100%}
+details summary{cursor:pointer;color:var(--accent);margin:6px 0}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.print-only{display:none}
+@media print{
+  header.top,nav.tabs,.no-print,button{display:none!important}
+  .print-only{display:block}
+  body{background:#fff;color:#000;font-size:12pt}
+  main{padding:0;max-width:none}
+  .section{border:0;padding:0;margin:0 0 10pt}
+  .ex{break-inside:avoid;border:1px solid #999}
+}
+
+</style>
+</head>
+<body>
+<a href="#main" class="sr-only">Zum Inhalt springen</a>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">AOS<small>Athlete Operating System</small></div>
+    <div id="topinfo"></div>
+    <nav class="tabs" id="nav" aria-label="Hauptbereiche"></nav>
+  </div>
+</header>
+<main id="main" tabindex="-1"></main>
+<dialog id="dlg"></dialog>
+<noscript><p style="padding:20px">AOS benötigt JavaScript. Bitte im Browser aktivieren.</p></noscript>
+<script>
+'use strict';
+/* ===== AOS – Kern: Hilfsfunktionen, Datenmodell, Speicherung ===== */
+const AOS_KEY = 'aos-data-v1';
+const SCHEMA_VERSION = 3;
+const SEED_TIME = '1970-01-01T00:00:00.000Z'; /* Ausgangsdaten gelten als "nie geändert" */
+function slug(s){ return String(s).toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
+const WD = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+const WD_LONG = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+const STATUS_LABEL = {geplant:'geplant', absolviert:'absolviert', teilweise:'teilweise absolviert', ausgelassen:'ausgelassen'};
+const TEST_CATS = ['Kraft','Sprung & Power','Sprint','Körpergewicht','Sonstige Athletik'];
+const FORM_LABEL = {1:'1 – sehr schlecht',2:'2 – eher schlecht',3:'3 – normal',4:'4 – gut',5:'5 – sehr gut'};
+
+function uid(p){ return (p||'id') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function isoOf(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function todayISO(){ return isoOf(new Date()); }
+function parseISO(s){ if(!s) return null; const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function addDays(iso,n){ const d=parseISO(iso); d.setDate(d.getDate()+n); return isoOf(d); }
+function mondayOf(iso){ const d=parseISO(iso); const wd=(d.getDay()+6)%7; d.setDate(d.getDate()-wd); return isoOf(d); }
+function weekdayOf(iso){ return parseISO(iso).getDay(); }
+function fmtDate(iso){ if(!iso) return '—'; const d=parseISO(iso); return pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.'+d.getFullYear(); }
+function fmtDateShort(iso){ if(!iso) return '—'; const d=parseISO(iso); return WD[d.getDay()]+' '+pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.'; }
+function daysBetween(a,b){ return Math.round((parseISO(b)-parseISO(a))/86400000); }
+/* Zahlen mit Komma oder Punkt; leer => null (niemals schätzen) */
+function num(v){ if(v===null||v===undefined) return null; const s=String(v).trim().replace(',','.'); if(s==='') return null; const n=Number(s); return isFinite(n)?n:null; }
+function fmtNum(n){ if(n===null||n===undefined||n==='') return ''; return String(Math.round(n*100)/100).replace('.',','); }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+/* ---------- Ausgangsdaten (aus der Produktbeschreibung, klar gekennzeichnet) ---------- */
+function seedData(){
+  const now = new Date().toISOString();
+  const SRC = 'ausgangsdaten';
+  const t = (name, category, value, unit, extra) => Object.assign({
+    id: 'seed-test-'+slug(name)+'-'+(value==null?'x':value), name, category, date:null, value, unit, reps:null, detail:'', conditions:'', rpe:null, note:'', source:SRC, createdAt:SEED_TIME
+  }, extra||{});
+  const day = (n, weekday) => ({ id: 'seed-block-1-day-'+n, name:'Trainingstag '+n, order:n, weekday, location:'', focus:'', notes:'', exercises:[], version:1 });
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    meta: { createdAt: now, updatedAt: now, app:'AOS – Athlete Operating System' },
+    profile: {
+      name:'', sex:'männlich', age:33, birthYear:null, heightCm:182, targetWeightKg:null,
+      positions:[
+        { id: 'seed-pos-rb', code:'RB', name:'Running Back', weight:70 },
+        { id: 'seed-pos-de', code:'DE', name:'Defensive End', weight:30 }
+      ],
+      positionHistory:[
+        { replacedAt: '2026-11-13', note:'Frühere Gewichtung laut erster Produktbeschreibung, durch RB 70 % / DE 30 % ersetzt.',
+          positions:[{code:'DE',name:'Defensive End',weight:50},{code:'OLB',name:'Outside Linebacker',weight:30},{code:'3-Tech',name:'3-Tech Defensive Tackle',weight:20}] }
+      ],
+      locations:[
+        { id:'loc-own', name:'Eigenes Gym', equipment:['SSB (Safety Squat Bar)','Trap Bar','Floor Press'], note:'Ausgangsdaten: Liste unvollständig („unter anderem“).', source:SRC },
+        { id:'loc-public', name:'Public Gym', equipment:['Trap Bar','Belt Squat'], note:'Ausgangsdaten: Liste unvollständig („unter anderem“).', source:SRC }
+      ]
+    },
+    goals: [
+      ['Bankdrücken',120,'kg','Bankdrücken'],['Kniebeuge',200,'kg','High-Bar Squat'],['Kreuzheben',220,'kg','Trap-Bar-Kreuzheben'],
+      ['Klimmzüge',20,'Wdh','Klimmzüge'],['Liegestütze',80,'Wdh/min','Liegestütze'],['40-Yard-Sprint',4.8,'s','40-Yard-Sprint']
+    ].map(([name,target,unit,testName])=>({ id:'seed-goal-'+slug(name), name, target, unit, testName, status:'aktiv', note: name==='Kreuzheben'?'Bezugstest (Trap Bar oder Langhantel) bei Bedarf anpassen.':'', createdAt:SEED_TIME, source:SRC })),
+    tests: [
+      t('Broad Jump','Sprung & Power',220,'cm',{note:'Erster genannter Wert.'}),
+      t('Broad Jump','Sprung & Power',240,'cm',{note:'„Später“ genannt – Reihenfolge laut Beschreibung nach 220 cm.'}),
+      t('High-Bar Squat','Kraft',110,'kg',{reps:5,rpe:7}),
+      t('Bankdrücken','Kraft',70,'kg',{reps:5,note:'RPE nicht bekannt.'}),
+      t('Klimmzüge','Kraft',null,'Wdh',{detail:'5 / 5 / 3 Wdh (Satzverteilung)'}),
+      t('Trap-Bar-Kreuzheben','Kraft',120,'kg',{reps:5,rpe:7})
+    ],
+    bodyweight: [ { id:'seed-bw-1', date:null, kg:92, approx:true, note:'„ungefähr 92 kg“', source:SRC, createdAt:SEED_TIME } ],
+    blocks: [ {
+      id: 'seed-block-1', name:'Block 1 – Foundation / Re-Entry', goal:'Foundation / Re-Entry', start:null, end:null, status:'aktiv',
+      rhythm:'bis zu 4 Einheiten pro Woche (grundsätzlich Mo, Di, Mi, Fr); Verfügbarkeit variiert wöchentlich',
+      rpeCapMin:7, rpeCapMax:7.5, rules:'', source:SRC,
+      days:[ day(1,1), day(2,2), day(3,3), day(4,5) ],
+      changelog:[]
+    } ],
+    sessions: [],
+    unavailable: [],
+    suggestionDecisions: {},
+    nutrition: defaultNutrition(),
+    settings: { seededAt: now }
+  };
+}
+function freshData(){ const d=seedData(); syncStampAll(d, SEED_TIME); return d; }
+
+/* ---------- Speicher ---------- */
+let S = null;
+let storageOK = true;
+function storageAvailable(){ try{ const k='__aos_t'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; }catch(e){ return false; } }
+function load(){
+  storageOK = storageAvailable();
+  let raw = null;
+  if(storageOK){ try{ raw = localStorage.getItem(AOS_KEY); }catch(e){ raw=null; } }
+  if(raw){
+    try{ const d = JSON.parse(raw); const v = validateData(d); if(v.ok){ S = migrate(d); syncInit(); return; } console.warn('Ungültige gespeicherte Daten', v.errors); }
+    catch(e){ console.warn('Gespeicherte Daten nicht lesbar', e); }
+    // Defekte Daten nicht überschreiben: sichern
+    try{ localStorage.setItem(AOS_KEY+'-defekt-'+Date.now(), raw); }catch(e){}
+  }
+  S = freshData();
+  syncInit();
+  save(true);
+}
+function save(silent){
+  S.meta.updatedAt = new Date().toISOString();
+  syncTrack();
+  if(!storageOK) return false;
+  try{ localStorage.setItem(AOS_KEY, JSON.stringify(S)); return true; }
+  catch(e){ storageOK=false; if(!silent) toast('Speichern fehlgeschlagen – bitte jetzt eine JSON-Sicherung exportieren.'); return false; }
+}
+function migrate(d){
+  // Platz für künftige Schema-Änderungen; fehlende Bereiche ergänzen statt Daten zu verwerfen
+  d.unavailable = d.unavailable || [];
+  d.suggestionDecisions = d.suggestionDecisions || {};
+  if(!d.nutrition || !Array.isArray(d.nutrition.items)) d.nutrition = defaultNutrition();
+  const n=d.nutrition; n.combos=n.combos||[]; n.meals=n.meals||[]; n.dayOverrides=n.dayOverrides||{}; n.constraints=n.constraints||''; n.guides=n.guides||defaultNutrition().guides;
+  d.settings = d.settings || {};
+  d.profile.positionHistory = d.profile.positionHistory || [];
+  (d.blocks||[]).forEach(b=>{ b.changelog=b.changelog||[]; (b.days||[]).forEach(x=>{ x.version=x.version||1; x.exercises=x.exercises||[]; }); });
+  if(!d.sync) syncMigrateLegacy(d);
+  d.schemaVersion = SCHEMA_VERSION;
+  return d;
+}
+function validateData(d){
+  const errors=[];
+  if(!d || typeof d!=='object') return {ok:false, errors:['Die Datei enthält kein JSON-Objekt.']};
+  if(typeof d.schemaVersion!=='number') errors.push('Feld „schemaVersion“ fehlt – das ist vermutlich keine AOS-Sicherung.');
+  else if(d.schemaVersion>SCHEMA_VERSION) errors.push('Die Sicherung stammt aus einer neueren AOS-Version ('+d.schemaVersion+').');
+  if(!d.profile || typeof d.profile!=='object') errors.push('Bereich „profile“ fehlt.');
+  else if(!Array.isArray(d.profile.positions)) errors.push('Positionsliste fehlt im Profil.');
+  ['goals','tests','bodyweight','blocks','sessions'].forEach(k=>{ if(!Array.isArray(d[k])) errors.push('Bereich „'+k+'“ fehlt oder ist keine Liste.'); });
+  if(Array.isArray(d.blocks)) d.blocks.forEach((b,i)=>{ if(!b||!b.id||!Array.isArray(b.days)) errors.push('Trainingsblock '+(i+1)+' ist unvollständig.'); });
+  if(Array.isArray(d.sessions)) d.sessions.forEach((s,i)=>{ if(!s||!s.id||!STATUS_LABEL[s.status]) errors.push('Einheit '+(i+1)+' hat keinen gültigen Status.'); });
+  return {ok: errors.length===0, errors};
+}
+
+/* ---------- Abfragen ---------- */
+function activeBlock(){ return S.blocks.find(b=>b.status==='aktiv') || null; }
+function blockById(id){ return S.blocks.find(b=>b.id===id)||null; }
+function dayById(block,id){ return block ? (block.days.find(d=>d.id===id)||null) : null; }
+function locById(id){ return S.profile.locations.find(l=>l.id===id)||null; }
+function sessionById(id){ return S.sessions.find(s=>s.id===id)||null; }
+function capText(b){ if(!b) return ''; const a=b.rpeCapMin, z=b.rpeCapMax; if(a==null&&z==null) return ''; if(a!=null&&z!=null&&a!==z) return 'RPE ≤ '+fmtNum(a)+'–'+fmtNum(z); return 'RPE ≤ '+fmtNum(z!=null?z:a); }
+function capMax(b){ return b ? (b.rpeCapMax!=null?b.rpeCapMax:b.rpeCapMin) : null; }
+function blockWeek(b, iso){ if(!b||!b.start) return null; const d=daysBetween(mondayOf(b.start), mondayOf(iso)); return d<0?null:Math.floor(d/7)+1; }
+function latestBodyweight(){
+  const dated = S.bodyweight.filter(x=>x.date).sort((a,b)=>a.date<b.date?1:-1);
+  return dated[0] || S.bodyweight[S.bodyweight.length-1] || null;
+}
+function positionSum(){ return S.profile.positions.reduce((a,p)=>a+(Number(p.weight)||0),0); }
+function profileAge(){ const p=S.profile; if(p.birthYear) return new Date().getFullYear()-p.birthYear; return p.age; }
+
+/* Fehlende/unvollständige Angaben eines Testergebnisses – nichts wird ergänzt */
+function testGaps(t){
+  const g=[];
+  if(!t.date) g.push('Datum fehlt');
+  if(!t.conditions) g.push('Testbedingungen fehlen');
+  if(t.category==='Kraft' && t.rpe==null) g.push('RPE fehlt');
+  if(t.value==null && !t.detail) g.push('Messwert fehlt');
+  return g;
+}
+
+/* Liste aller Lücken für die Übersicht */
+function missingData(){
+  const out=[]; const p=S.profile; const b=activeBlock();
+  if(!p.name) out.push({where:'profil', text:'Name im Profil fehlt.'});
+  if(!p.birthYear) out.push({where:'profil', text:'Geburtsjahr fehlt (Alter 33 ist ein Ausgangswert und veraltet sonst).'});
+  const bw=latestBodyweight(); if(!bw || !bw.date) out.push({where:'tests', text:'Körpergewicht ohne Datum (Ausgangswert ~92 kg) – aktuelle Messung mit Datum eintragen.'});
+  if(Math.round(positionSum())!==100) out.push({where:'profil', text:'Positionsgewichtung ergibt nicht 100 %.'});
+  if(!b) out.push({where:'plan', text:'Kein aktiver Trainingsblock.'});
+  else {
+    if(!b.start||!b.end) out.push({where:'plan', text:'Start- und/oder Enddatum von „'+b.name+'“ fehlen.'});
+    const emptyDays=b.days.filter(d=>!d.exercises.length).length;
+    if(emptyDays) out.push({where:'plan', text: emptyDays+' von '+b.days.length+' Trainingstagen haben noch keine Übungen.'});
+    const noLoc=b.days.filter(d=>!d.location).length;
+    if(noLoc) out.push({where:'plan', text: noLoc+' Trainingstag(e) ohne Trainingsort.'});
+  }
+  const undated=S.tests.filter(t=>!t.date).length;
+  if(undated) out.push({where:'tests', text: undated+' Testergebnis(se) ohne Datum.'});
+  const nocond=S.tests.filter(t=>!t.conditions).length;
+  if(nocond) out.push({where:'tests', text: nocond+' Testergebnis(se) ohne Testbedingungen.'});
+  return out;
+}
+
+/* Plan-Vorgabe einer Übung als kompakter Text */
+function exPlanText(ex){
+  const parts=[]; let base='';
+  if(ex.sets||ex.reps) base=(ex.sets?ex.sets:'?')+' × '+(ex.reps||'?');
+  if(ex.loadKg!=null) base+=(base?' ':'')+'@ '+fmtNum(ex.loadKg)+' kg';
+  if(base) parts.push(base);
+  if(ex.loadNote) parts.push(ex.loadNote);
+  if(ex.rpeTarget) parts.push('RPE '+ex.rpeTarget);
+  if(ex.rest) parts.push('Pause '+ex.rest);
+  return parts.join(' · ');
+}
+function exTitle(ex){ return ex.name + (ex.variant?' ('+ex.variant+')':''); }
+function repMin(reps){ if(reps==null) return null; const m=String(reps).match(/\d+/); return m?Number(m[0]):null; }
+
+function newExercise(){
+  return { id:uid('ex'), name:'', variant:'', sets:null, reps:'', loadKg:null, loadNote:'', rpeTarget:'', rest:'', metric:'kraft', positionTag:'allgemein', equipment:[], alternatives:[], notes:'' };
+}
+function logBlock(b, text){ b.changelog.unshift({ at:new Date().toISOString(), text }); if(b.changelog.length>300) b.changelog.length=300; }
+
+/* ---------- Ernährung: Ausgangs-Bausteine (anpassbar, ohne Mengen- oder Kalorienangaben) ---------- */
+const NUT_CATS = [['protein','Proteinquellen'],['carb','Kohlenhydratquellen'],['veg','Obst & Gemüse'],['fat','Fettquellen'],['snack','Snacks & Ergänzungen']];
+const NUT_SLOTS = ['Frühstück','Mittagessen','Abendessen','Vor dem Training','Nach dem Training','Snack'];
+const DAY_TYPES = ['Trainingstag','Ruhetag','Spieltag'];
+function defaultNutrition(){
+  const L={
+    protein:['Hühnerbrust','Putenfleisch','Mageres Rindfleisch','Lachs','Thunfisch','Eier','Magertopfen','Skyr','Griechisches Joghurt','Hüttenkäse','Tofu','Linsen','Kichererbsen','Proteinpulver'],
+    carb:['Haferflocken','Reis','Nudeln','Kartoffeln','Süßkartoffeln','Vollkornbrot','Semmel','Couscous','Quinoa','Wraps'],
+    veg:['Banane','Äpfel','Beeren','Orangen','Brokkoli','Paprika','Karotten','Spinat','Tomaten','Gurke','Blattsalat','Tiefkühlgemüse'],
+    fat:['Olivenöl','Nüsse','Erdnussbutter','Avocado','Käse','Lein- oder Chiasamen'],
+    snack:['Reiswaffeln','Müsliriegel','Trockenfrüchte','Joghurt mit Obst','Kakao / Schokomilch','Brot mit Aufstrich']
+  };
+  const items=[]; Object.keys(L).forEach(cat=>L[cat].forEach(name=>items.push({id:'seed-food-'+cat+'-'+slug(name),name,cat,pref:'neutral',tags:[],source:'ausgangsdaten'})));
+  return {
+    status:'aktiv', items, combos:[], meals:[], dayOverrides:{}, constraints:'',
+    guides:{
+      'Trainingstag':'Mahlzeiten aus Protein-, Kohlenhydrat- und Obst-/Gemüsebausteinen zusammenstellen. Vor dem Training etwas, das du gut verträgst; danach eine Mahlzeit mit Protein und Kohlenhydraten. Ausreichend trinken.',
+      'Ruhetag':'Dieselben Bausteine, Kohlenhydrate eher nach Hunger und Appetit. Ein guter Tag für Gemüse, Obst und in Ruhe gekochte Mahlzeiten.',
+      'Spieltag':'Bewährtes essen und nichts Neues ausprobieren. Die letzte größere Mahlzeit mit genug Abstand zum Kick-off; danach Protein und Kohlenhydrate zur Erholung.'
+    },
+    guidesSource:'ausgangsdaten'
+  };
+}
+
+'use strict';
+/* ===== AOS – Änderungsverfolgung & Zusammenführen =====
+   Jeder Eintrag (Einheit, Test, Mahlzeit …) ist ein "Datensatz" mit Schlüssel <bereich>:<id>.
+   AOS merkt sich pro Datensatz, wann er zuletzt geändert (stamps) oder gelöscht (tombstones) wurde.
+   Beim Zusammenführen gewinnt pro Datensatz die jüngste Änderung bzw. Löschung. */
+
+const SYNC_ARRAYS = [
+  ['goals','Ziele', d=>d.goals, (d,v)=>d.goals=v],
+  ['tests','Testergebnisse', d=>d.tests, (d,v)=>d.tests=v],
+  ['bodyweight','Körpergewichtsmessungen', d=>d.bodyweight, (d,v)=>d.bodyweight=v],
+  ['blocks','Trainingsblöcke (inkl. Trainingstage & Übungen)', d=>d.blocks, (d,v)=>d.blocks=v],
+  ['sessions','Trainingseinheiten', d=>d.sessions, (d,v)=>d.sessions=v],
+  ['food','Ernährungsbausteine', d=>d.nutrition.items, (d,v)=>d.nutrition.items=v],
+  ['combo','Ernährungskombinationen', d=>d.nutrition.combos, (d,v)=>d.nutrition.combos=v],
+  ['meal','Mahlzeiten', d=>d.nutrition.meals, (d,v)=>d.nutrition.meals=v]
+];
+const SYNC_LABELS = Object.assign(Object.fromEntries(SYNC_ARRAYS.map(a=>[a[0],a[1]])),
+  { profile:'Profil', nutset:'Ernährungseinstellungen', unavail:'nicht verfügbare Tage', decision:'Entscheidungen zu Vorschlägen', dayov:'Tagesarten (Ernährung)' });
+
+function syncRecords(d){
+  const m=new Map();
+  SYNC_ARRAYS.forEach(([c,,get])=>(get(d)||[]).forEach(r=>m.set(c+':'+r.id, r)));
+  m.set('profile:_', d.profile);
+  const n=d.nutrition; m.set('nutset:_', {guides:n.guides, guidesSource:n.guidesSource||'', constraints:n.constraints||''});
+  (d.unavailable||[]).forEach(x=>m.set('unavail:'+x, true));
+  Object.entries(d.suggestionDecisions||{}).forEach(([k,v])=>m.set('decision:'+k, v));
+  Object.entries(n.dayOverrides||{}).forEach(([k,v])=>m.set('dayov:'+k, v));
+  return m;
+}
+function applyRecords(d, m){
+  SYNC_ARRAYS.forEach(([c,,,set])=>set(d, [...m].filter(([k])=>k.startsWith(c+':')).map(([,v])=>v)));
+  if(m.has('profile:_')) d.profile=m.get('profile:_');
+  if(m.has('nutset:_')){ const x=m.get('nutset:_'); d.nutrition.guides=x.guides; d.nutrition.guidesSource=x.guidesSource; d.nutrition.constraints=x.constraints; }
+  d.unavailable=[...m.keys()].filter(k=>k.startsWith('unavail:')).map(k=>k.slice(8)).sort();
+  d.suggestionDecisions=Object.fromEntries([...m].filter(([k])=>k.startsWith('decision:')).map(([k,v])=>[k.slice(9),v]));
+  d.nutrition.dayOverrides=Object.fromEntries([...m].filter(([k])=>k.startsWith('dayov:')).map(([k,v])=>[k.slice(6),v]));
+}
+function fp(v){ return JSON.stringify(v); }
+function newDeviceId(){ return 'dev-'+Math.random().toString(36).slice(2,10); }
+function syncStampAll(d, at){
+  d.sync = d.sync || { stamps:{}, tombstones:{}, deviceId:newDeviceId() };
+  syncRecords(d).forEach((v,k)=>{ d.sync.stamps[k]=at; });
+}
+
+/* Fingerabdrücke des zuletzt gespeicherten Stands (nur im Arbeitsspeicher) */
+let lastFP = new Map();
+function syncInit(){
+  if(!S.sync) syncStampAll(S, S.meta.updatedAt||SEED_TIME);
+  S.sync.stamps=S.sync.stamps||{}; S.sync.tombstones=S.sync.tombstones||{};
+  lastFP=new Map(); syncRecords(S).forEach((v,k)=>{ lastFP.set(k, fp(v)); if(!S.sync.stamps[k]) S.sync.stamps[k]=S.meta.updatedAt||SEED_TIME; });
+}
+function syncTrack(){
+  if(!S.sync) return;
+  const now=new Date().toISOString(); const cur=new Map();
+  syncRecords(S).forEach((v,k)=>{ const f=fp(v); cur.set(k,f);
+    if(lastFP.get(k)!==f){ S.sync.stamps[k]=now; delete S.sync.tombstones[k]; } });
+  lastFP.forEach((f,k)=>{ if(!cur.has(k)){ S.sync.tombstones[k]=now; delete S.sync.stamps[k]; } });
+  lastFP=cur;
+}
+
+/* Ältere Daten (vor Version 3): Ausgangsdaten auf feste IDs umstellen, damit sie geräteübergreifend gleich sind */
+function syncMigrateLegacy(d){
+  const seed=seedData(); const remap={};
+  const SRC='ausgangsdaten';
+  d.tests.forEach(t=>{ if(t.source===SRC){ const nid='seed-test-'+slug(t.name)+'-'+(t.value==null?'x':t.value); if(seed.tests.some(x=>x.id===nid) && !d.tests.some(x=>x.id===nid)){ t.id=nid; } } });
+  d.goals.forEach(g=>{ if(g.source===SRC){ const nid='seed-goal-'+slug(g.name); if(seed.goals.some(x=>x.id===nid) && !d.goals.some(x=>x.id===nid)) g.id=nid; } });
+  const bw=d.bodyweight.find(x=>x.source===SRC); if(bw && !d.bodyweight.some(x=>x.id==='seed-bw-1')) bw.id='seed-bw-1';
+  const b=d.blocks.find(x=>x.source===SRC);
+  if(b && !d.blocks.some(x=>x.id==='seed-block-1')){
+    remap[b.id]='seed-block-1'; b.id='seed-block-1';
+    b.days.slice(0,4).forEach((day,i)=>{ const nid='seed-block-1-day-'+(i+1); remap[day.id]=nid; day.id=nid; });
+  }
+  d.sessions.forEach(s=>{ if(remap[s.blockId]) s.blockId=remap[s.blockId]; if(remap[s.dayId]) s.dayId=remap[s.dayId]; });
+  const fr={};
+  d.nutrition.items.forEach(f=>{ if(f.source===SRC){ const nid='seed-food-'+f.cat+'-'+slug(f.name); if(!d.nutrition.items.some(x=>x.id===nid)){ fr[f.id]=nid; f.id=nid; } } });
+  const rm=a=>a.map(i=>fr[i]||i);
+  d.nutrition.meals.forEach(m=>m.items=rm(m.items)); d.nutrition.combos.forEach(c=>c.items=rm(c.items));
+  d.profile.positions.forEach(p=>{ if(p.code==='RB'&&!p.id.startsWith('seed')) p.id='seed-pos-rb'; if(p.code==='DE'&&!p.id.startsWith('seed')) p.id='seed-pos-de'; });
+  // Zeitstempel: unveränderte Ausgangsdaten gelten als "nie geändert", alles andere als zuletzt gespeichert
+  const norm=v=>JSON.stringify(v,(k,x)=>(k==='id'||k==='createdAt'||k==='replacedAt'||k==='version')?undefined:x);
+  const sr=syncRecords(seed); const at=(d.meta&&d.meta.updatedAt)||new Date().toISOString();
+  d.sync={ stamps:{}, tombstones:{}, deviceId:newDeviceId() };
+  const same=new Map();
+  syncRecords(d).forEach((v,k)=>{ const eq=sr.has(k) && norm(sr.get(k))===norm(v); if(eq) same.set(k, sr.get(k)); d.sync.stamps[k] = eq ? SEED_TIME : at; });
+  // unveränderte Ausgangsdaten exakt auf den Standardstand bringen (gleiche IDs/Zeitfelder auf allen Geräten)
+  if(same.size){ const m=syncRecords(d); same.forEach((v,k)=>m.set(k, clone(v))); applyRecords(d, m); }
+}
+
+/* Zusammenführen: lokaler Stand L + Datei R → neuer Stand + Bericht */
+function mergeData(L, R){
+  const lm=syncRecords(L), rm=syncRecords(R);
+  const ls=L.sync.stamps, lt=L.sync.tombstones, rs=R.sync.stamps, rt=R.sync.tombstones;
+  const keys=new Set([...lm.keys(), ...rm.keys(), ...Object.keys(lt), ...Object.keys(rt)]);
+  const out=new Map(); const stamps={}, tombs={};
+  const rep={ added:{}, updated:{}, deleted:{}, keptLocal:{}, total:0 };
+  const inc=(o,k)=>{ const c=k.split(':')[0]; o[c]=(o[c]||0)+1; rep.total++; };
+  // lokale Reihenfolge beibehalten, neue Einträge hinten anhängen
+  const order=[...lm.keys(), ...[...rm.keys()].filter(k=>!lm.has(k))];
+  const decide=k=>{
+    const c=[];
+    if(lm.has(k)) c.push({t:ls[k]||'', side:'L', del:false});
+    if(lt[k]) c.push({t:lt[k], side:'L', del:true});
+    if(rm.has(k)) c.push({t:rs[k]||'', side:'R', del:false});
+    if(rt[k]) c.push({t:rt[k], side:'R', del:true});
+    c.sort((a,b)=> a.t<b.t?1 : a.t>b.t?-1 : (a.side==='L'?-1:1));
+    return c[0];
+  };
+  keys.forEach(k=>{
+    const w=decide(k);
+    if(w.del){ tombs[k]=[lt[k]||'',rt[k]||''].sort().pop(); if(lm.has(k)) inc(rep.deleted,k); return; }
+    stamps[k]=w.t;
+    if(w.side==='R'){ if(!lm.has(k)) inc(rep.added,k); else if(fp(lm.get(k))!==fp(rm.get(k))) inc(rep.updated,k); }
+    else if(rm.has(k) && fp(lm.get(k))!==fp(rm.get(k))) inc(rep.keptLocal,k);
+  });
+  const m=new Map();
+  order.forEach(k=>{ if(stamps[k]===undefined) return; const w=decide(k); m.set(k, clone(w.side==='R'?rm.get(k):lm.get(k))); });
+  const res=clone(L); applyRecords(res, m);
+  res.sync={ stamps, tombstones:tombs, deviceId:L.sync.deviceId, lastMerge:{ at:new Date().toISOString(), from:R.sync.deviceId||'', fileUpdatedAt:(R.meta&&R.meta.updatedAt)||'' } };
+  return { data:res, report:rep };
+}
+function reportHTML(rep){
+  const sec=(title,o,cls)=>{ const e=Object.entries(o); if(!e.length) return ''; return '<h3>'+title+'</h3><ul class="small">'+e.map(([c,n])=>'<li>'+n+' × '+esc(SYNC_LABELS[c]||c)+'</li>').join('')+'</ul>'; };
+  if(!rep.total) return '<p>Die Datei enthält nichts Neues – beide Stände sind bereits gleich.</p>';
+  return sec('Neu aus der Datei',rep.added)+sec('Aus der Datei aktualisiert (dort neuer)',rep.updated)+sec('Gelöscht (in der Datei später gelöscht)',rep.deleted)+sec('Hier behalten (hier neuer geändert)',rep.keptLocal);
+}
+
+'use strict';
+/* ===== AOS – Auswertung & Anpassungsvorschläge =====
+   Regeln sind bewusst einfach und offen gelegt. Es wird nichts geschätzt:
+   fehlende Werte machen eine Beobachtung "unbekannt", nicht "erfüllt" oder "verfehlt".
+   Vorschläge ändern nie selbst den Plan – der Nutzer bestätigt, ändert oder lehnt ab. */
+
+const RULES_TEXT = [
+  ['Vorgabe wiederholt nicht erreicht','In mindestens 2 der letzten 3 auswertbaren Protokolle einer Übung wurden die geplanten Sätze × Wiederholungen (bzw. das geplante Gewicht) nicht erreicht.'],
+  ['Über der RPE-Obergrenze','In mindestens 2 der letzten 3 Protokolle einer Übung lag der höchste erfasste RPE über der Obergrenze des Blocks.'],
+  ['Mögliche Progression','Die letzten 2–3 Protokolle einer Übung erfüllen die Vorgabe vollständig, der RPE ist erfasst und liegt mindestens 0,5 unter der Obergrenze, und in den letzten 14 Tagen wurden keine Beschwerden eingetragen.'],
+  ['Beschwerden','Bei Beschwerden in den letzten 14 Tagen werden keine Steigerungen vorgeschlagen. AOS stellt keine Diagnose und gibt keine Trainingsfreigabe.'],
+  ['Häufig ausgelassen','In den letzten 28 Tagen wurden weniger als die Hälfte von mindestens 3 geplanten Einheiten absolviert.'],
+  ['Tagesform','Die letzten 3 protokollierten Einheiten hatten jeweils Tagesform 1 oder 2.'],
+  ['Positionsgewichtung','Die Übungen des aktiven Blocks sind nach Position markiert; weicht die Verteilung um mehr als 15 Prozentpunkte von der Profil-Gewichtung ab, gibt es einen Hinweis (ab 4 markierten Übungen).']
+];
+
+function sessionDate(s){ return s.plannedDate || (s.log && s.log.loggedAt ? s.log.loggedAt.slice(0,10) : null) || s.createdAt.slice(0,10); }
+function loggedSessions(){ return S.sessions.filter(s=>(s.status==='absolviert'||s.status==='teilweise') && s.log).sort((a,b)=>sessionDate(a)<sessionDate(b)?-1:1); }
+
+/* Bewertet ein Protokoll gegen die Vorgabe zum Zeitpunkt der Einheit */
+function evaluateEntry(planEx, logEx){
+  const r = { met:null, maxRpe:null, gaps:[], summary:'' };
+  const sets = (logEx.sets||[]).filter(x=>x.reps!=null||x.kg!=null||x.rpe!=null);
+  const rpes = sets.map(x=>x.rpe).filter(v=>v!=null);
+  r.maxRpe = rpes.length? Math.max(...rpes) : null;
+  if(!rpes.length) r.gaps.push('kein RPE erfasst');
+  r.summary = sets.length ? sets.map(x=>(x.reps!=null?x.reps:'?')+(x.kg!=null?' × '+fmtNum(x.kg)+' kg':'')+(x.rpe!=null?' @'+fmtNum(x.rpe):'')).join(' | ') : 'keine Satzdaten';
+  if(!planEx){ r.gaps.push('keine Vorgabe'); return r; }
+  const pSets=planEx.sets, min=repMin(planEx.reps), load=planEx.loadKg;
+  if(!pSets || min==null){ r.gaps.push('Vorgabe ohne Sätze/Wdh'); return r; }
+  let ok=0, unknown=0;
+  sets.forEach(x=>{
+    if(x.reps==null || (load!=null && x.kg==null)){ unknown++; return; }
+    if(x.reps>=min && (load==null || x.kg>=load)) ok++;
+  });
+  if(unknown) r.gaps.push(unknown+' Satz/Sätze unvollständig');
+  if(ok>=pSets) r.met=true;
+  else if(ok+unknown>=pSets) r.met=null;
+  else r.met=false;
+  return r;
+}
+
+/* Alle Protokolle zu einer Plan-Übung (über Einheiten hinweg) */
+function historyForExercise(exId){
+  const out=[];
+  loggedSessions().forEach(s=>{
+    const le=(s.log.exercises||[]).find(e=>e.planExId===exId); if(!le) return;
+    const pe=(s.plan||[]).find(p=>p.id===exId);
+    out.push({ session:s, date:sessionDate(s), planEx:pe, logEx:le, ev:evaluateEntry(pe,le), pain:!!(s.log.pain&&s.log.pain.trim()) });
+  });
+  return out;
+}
+function recentPain(days){
+  const from=addDays(todayISO(),-days);
+  return loggedSessions().filter(s=>sessionDate(s)>=from && s.log.pain && s.log.pain.trim());
+}
+function positionDistribution(b){
+  const codes=S.profile.positions.map(p=>p.code); const cnt={}; codes.forEach(c=>cnt[c]=0); let tagged=0;
+  if(!b) return {cnt,tagged};
+  b.days.forEach(d=>d.exercises.forEach(e=>{
+    if(e.positionTag==='beide'){ codes.forEach(c=>cnt[c]+=1/codes.length); tagged++; }
+    else if(cnt[e.positionTag]!==undefined){ cnt[e.positionTag]++; tagged++; }
+  }));
+  return {cnt,tagged};
+}
+
+function computeSuggestions(){
+  const out=[]; const b=activeBlock(); if(!b) return out;
+  const cap=capMax(b);
+  const pain=recentPain(14);
+  const basis=n=>({n, label: n<3?'gering – wenige Daten':'ausreichend für einen Hinweis'});
+  const evLine=h=>fmtDate(h.date)+': Plan '+(h.planEx?exPlanText(h.planEx)||'ohne Vorgabe':'—')+' → erfasst '+h.ev.summary+(h.ev.gaps.length?' ('+h.ev.gaps.join(', ')+')':'')+(h.pain?' · Beschwerden notiert':'');
+
+  if(pain.length){
+    out.push({ key:'pain|'+pain[pain.length-1].id, rule:'Beschwerden', kind:'info', title:'Beschwerden in den letzten 14 Tagen eingetragen',
+      text:'Solange Beschwerden notiert sind, schlägt AOS keine Steigerung vor. AOS stellt keine Diagnose und gibt keine Trainingsfreigabe. Wenn die Beschwerden anhalten oder unklar sind, kläre sie bitte mit einer qualifizierten Fachperson ab.',
+      evidence: pain.map(s=>fmtDate(sessionDate(s))+' ('+s.name+'): „'+s.log.pain.trim()+'“'), basis:basis(pain.length) });
+  }
+
+  b.days.forEach(d=>d.exercises.forEach(ex=>{
+    const hist=historyForExercise(ex.id); if(!hist.length) return;
+    const last3=hist.slice(-3); const lastId=last3[last3.length-1].session.id;
+    const evaluable=last3.filter(h=>h.ev.met!==null);
+    const missed=evaluable.filter(h=>h.ev.met===false);
+    if(missed.length>=2){
+      out.push({ key:'missed|'+ex.id+'|'+lastId, rule:'Vorgabe wiederholt nicht erreicht', kind:'plan', exId:ex.id, dayId:d.id,
+        title: exTitle(ex)+': Vorgabe wiederholt nicht erreicht',
+        text:'Prüfe, ob Sätze, Wiederholungen oder Gewicht für '+d.name+' angepasst werden sollen – oder ob die Vorgabe bewusst bleibt.',
+        evidence:last3.map(evLine), basis:basis(evaluable.length) });
+    }
+    if(cap!=null){
+      const over=last3.filter(h=>h.ev.maxRpe!=null && h.ev.maxRpe>cap);
+      if(over.length>=2){
+        out.push({ key:'rpe|'+ex.id+'|'+lastId, rule:'Über der RPE-Obergrenze', kind:'plan', exId:ex.id, dayId:d.id,
+          title: exTitle(ex)+': RPE wiederholt über '+capText(b),
+          text:'Die tatsächliche Belastung lag mehrfach über der Blockregel. Prüfe, ob die Vorgabe (z. B. Gewicht oder Wiederholungen) zur RPE-Obergrenze passt.',
+          evidence:last3.map(evLine), basis:basis(last3.length) });
+      }
+    }
+    const lastN=hist.slice(-3); const lastTwo=hist.slice(-2);
+    const cand = (lastN.length>=3 && lastN.every(h=>h.ev.met===true)) ? lastN : (lastTwo.length>=2 && lastTwo.every(h=>h.ev.met===true) ? lastTwo : null);
+    if(cand){
+      const rpeKnown=cand.every(h=>h.ev.maxRpe!=null);
+      const rpeLow = cap==null ? rpeKnown : (rpeKnown && cand.every(h=>h.ev.maxRpe<=cap-0.5));
+      if(pain.length){ /* bewusst keine Progression bei Beschwerden */ }
+      else if(!rpeKnown){
+        out.push({ key:'prog-norpe|'+ex.id+'|'+lastId, rule:'Mögliche Progression', kind:'info', exId:ex.id, dayId:d.id,
+          title: exTitle(ex)+': Vorgabe erfüllt, aber RPE nicht erfasst',
+          text:'Ohne RPE lässt sich nicht beurteilen, ob noch Spielraum unter der Obergrenze besteht. Trage beim nächsten Mal den RPE ein.',
+          evidence:cand.map(evLine), basis:basis(cand.length) });
+      } else if(rpeLow){
+        out.push({ key:'prog|'+ex.id+'|'+lastId, rule:'Mögliche Progression', kind:'plan', exId:ex.id, dayId:d.id,
+          title: exTitle(ex)+': Vorgabe erfüllt – Progression möglich',
+          text:'Die Vorgabe wurde '+cand.length+'× vollständig erreicht, der RPE lag unter der Obergrenze. Du entscheidest, ob und wie die Vorgabe angepasst wird; AOS setzt kein neues Gewicht selbst.',
+          evidence:cand.map(evLine), basis:basis(cand.length) });
+      }
+    }
+  }));
+
+  // Auslassquote (28 Tage)
+  const from=addDays(todayISO(),-28), today=todayISO();
+  const past=S.sessions.filter(s=>s.blockId===b.id && s.plannedDate && s.plannedDate>=from && s.plannedDate<today).sort((a,b)=>a.plannedDate<b.plannedDate?-1:1);
+  if(past.length>=3){
+    const done=past.filter(s=>s.status==='absolviert'||s.status==='teilweise').length;
+    if(done/past.length<0.5){
+      out.push({ key:'skip|'+past[past.length-1].id+'|'+done+'/'+past.length, rule:'Häufig ausgelassen', kind:'info',
+        title:'Viele geplante Einheiten nicht absolviert ('+done+' von '+past.length+' in 28 Tagen)',
+        text:'Prüfe, ob die Zahl der Einheiten pro Woche zur tatsächlichen Verfügbarkeit passt. Ausgelassene Einheiten werden nicht automatisch nachgeholt oder verschoben.',
+        evidence:past.map(s=>fmtDate(s.plannedDate)+' – '+s.name+': '+(s.status==='geplant'?'nicht erfasst':STATUS_LABEL[s.status])+(s.skipReason?' ('+s.skipReason+')':'')), basis:basis(past.length) });
+    }
+  }
+  // Tagesform
+  const ls=loggedSessions().slice(-3);
+  if(ls.length===3 && ls.every(s=>s.log.form!=null && s.log.form<=2)){
+    out.push({ key:'form|'+ls[2].id, rule:'Tagesform', kind:'info', title:'Tagesform in den letzten 3 Einheiten niedrig',
+      text:'Das ist nur eine Beobachtung aus deinen Einträgen. Berücksichtige sie bei der nächsten Planung (z. B. Erholung, Zeitpunkt).',
+      evidence:ls.map(s=>fmtDate(sessionDate(s))+' – '+s.name+': Tagesform '+s.log.form), basis:basis(3) });
+  }
+  // Positionsgewichtung
+  const pd=positionDistribution(b);
+  if(pd.tagged>=4 && Math.round(positionSum())===100){
+    const total=Object.values(pd.cnt).reduce((a,c)=>a+c,0)||1;
+    const devs=S.profile.positions.map(p=>({p, share:Math.round(pd.cnt[p.code]/total*100)})).filter(x=>Math.abs(x.share-x.p.weight)>15);
+    if(devs.length){
+      out.push({ key:'pos|'+S.profile.positions.map(p=>p.code+p.weight+':'+Math.round(pd.cnt[p.code]*10)).join(','), rule:'Positionsgewichtung', kind:'info',
+        title:'Übungsauswahl weicht von der Positionsgewichtung ab',
+        text:'Die markierten Übungen im aktiven Block passen nicht zur Gewichtung im Profil. Prüfe bei der nächsten Planung, ob die Anforderungen aller Positionen entsprechend vertreten sind.',
+        evidence:S.profile.positions.map(p=>p.code+': Profil '+p.weight+' % · markierte Übungen '+Math.round(pd.cnt[p.code]/total*100)+' %'), basis:basis(pd.tagged) });
+    }
+  }
+  return out;
+}
+function openSuggestions(){ return computeSuggestions().filter(s=>!S.suggestionDecisions[s.key]); }
+function decideSuggestion(sg, status, note){
+  S.suggestionDecisions[sg.key] = { status, at:new Date().toISOString(), title:sg.title, rule:sg.rule, evidence:sg.evidence, note:note||'' };
+  save();
+}
+
+'use strict';
+/* ===== AOS – Ausgaben: Google Keep, Strong PRO, Markdown, JSON, CSV ===== */
+
+function keepText(s){
+  const b=blockById(s.blockId); const loc=locById(s.location);
+  const L=[];
+  L.push('AOS – '+(b?b.name:'Ohne Block')+' – '+s.name);
+  L.push('Datum: '+(s.plannedDate?WD_LONG[weekdayOf(s.plannedDate)]+', '+fmtDate(s.plannedDate):'___'));
+  L.push('Trainingsort: '+(loc?loc.name:'___'));
+  if(s.focus) L.push('Schwerpunkt: '+s.focus);
+  if(b && capText(b)) L.push('RPE-Obergrenze: '+capText(b).replace('RPE ≤ ',''));
+  L.push('');
+  const logged = s.log ? s.log.exercises : [];
+  const items = (s.plan||[]).map(pe=>({pe, le:logged.find(e=>e.planExId===pe.id)}));
+  logged.filter(e=>!e.planExId || !(s.plan||[]).some(p=>p.id===e.planExId)).forEach(le=>items.push({pe:null, le}));
+  if(!items.length) L.push('(Für diese Einheit sind noch keine Übungen eingetragen.)');
+  items.forEach(({pe,le})=>{
+    const done = le && (le.sets||[]).some(x=>x.reps!=null||x.kg!=null||x.time!=null||x.dist!=null||x.height!=null);
+    const title = pe ? exTitle(pe) : (le.name+(le.variant?' ('+le.variant+')':''));
+    const vor = pe ? exPlanText(pe) : 'ohne Vorgabe';
+    L.push((done?'☑ ':'☐ ')+title+(vor?' – '+vor:''));
+    const pSets = pe && pe.sets ? pe.sets : 0;
+    const lSets = le ? (le.sets||[]) : [];
+    const n = Math.max(pSets, lSets.length);
+    const sollTxt = pe ? sollOf(pe) : '';
+    if(n===0) L.push('   Sätze: ___');
+    for(let i=0;i<n;i++){
+      const x=lSets[i]; const ist = x ? istOf(x, pe?pe.metric:'kraft') : '';
+      L.push('   Satz '+(i+1)+': '+(i<pSets && sollTxt?'Soll '+sollTxt+' | ':'')+'Ist '+(ist||'___'));
+    }
+    if(pe && pe.alternatives && pe.alternatives.length) L.push('   Alternative (optional): '+pe.alternatives.map(a=>a.name).join(' / '));
+    if(pe && pe.notes) L.push('   Hinweis: '+pe.notes);
+    L.push('   Notiz / RPE: '+(le && le.note ? le.note : '___'));
+  });
+  L.push('');
+  const lg=s.log||{};
+  L.push('Tagesform (1–5): '+(lg.form!=null?lg.form:'___'));
+  L.push('Dauer: '+(lg.durationMin!=null?lg.durationMin+' min':'___'));
+  L.push('Beschwerden oder Notizen: '+([lg.pain,lg.notes].filter(Boolean).join(' · ')||'___'));
+  return L.join('\n');
+}
+function sollOf(pe){
+  const r = pe.reps ? pe.reps : '';
+  if(pe.metric==='kraft') return (r||'?')+(pe.loadKg!=null?' × '+fmtNum(pe.loadKg)+' kg':'')+(pe.loadNote?' ('+pe.loadNote+')':'');
+  return r || '';
+}
+function istOf(x, metric){
+  const p=[];
+  if(x.reps!=null) p.push(x.reps+' Wdh');
+  if(x.kg!=null) p.push(fmtNum(x.kg)+' kg');
+  if(x.time!=null) p.push(fmtNum(x.time)+' s');
+  if(x.dist!=null) p.push(fmtNum(x.dist)+' m');
+  if(x.height!=null) p.push(fmtNum(x.height)+' cm');
+  let s=p.join(' × ');
+  if(x.rpe!=null) s+=' @RPE '+fmtNum(x.rpe);
+  return s;
+}
+
+function strongText(block, day){
+  const L=[];
+  L.push('Strong-Template: AOS '+shortBlock(block)+' – '+day.name);
+  if(day.focus) L.push('Schwerpunkt: '+day.focus);
+  if(capText(block)) L.push('Blockregel: '+capText(block));
+  L.push('');
+  if(!day.exercises.length) L.push('(Noch keine Übungen eingetragen.)');
+  day.exercises.forEach((e,i)=>{
+    L.push((i+1)+'. '+exTitle(e));
+    const parts=[];
+    if(e.sets) parts.push(e.sets+' Sätze');
+    if(e.reps) parts.push(e.reps+' Wdh');
+    if(e.loadKg!=null) parts.push(fmtNum(e.loadKg)+' kg');
+    if(parts.length) L.push('   '+parts.join(' × '));
+    const notes=[e.rpeTarget?'RPE '+e.rpeTarget:'', e.rest?'Pause '+e.rest:'', e.loadNote, e.notes].filter(Boolean);
+    if(notes.length) L.push('   Notiz: '+notes.join(' · '));
+  });
+  return L.join('\n');
+}
+function shortBlock(b){ const m=(b.name||'').match(/Block\s*(\d+)/i); return m?'B'+m[1]:(b.name||'Block'); }
+
+function planMarkdown(block){
+  const L=[];
+  L.push('# '+block.name);
+  L.push('');
+  L.push('- **Ziel:** '+(block.goal||'—'));
+  L.push('- **Zeitraum:** '+(block.start?fmtDate(block.start):'Start fehlt')+' – '+(block.end?fmtDate(block.end):'Ende fehlt'));
+  L.push('- **Status:** '+block.status);
+  L.push('- **Rhythmus:** '+(block.rhythm||'—'));
+  if(capText(block)) L.push('- **RPE-Obergrenze:** '+capText(block).replace('RPE ≤ ',''));
+  if(block.rules) L.push('- **Regeln:** '+block.rules.replace(/\n/g,' '));
+  L.push('- **Positionsgewichtung:** '+S.profile.positions.map(p=>p.code+' '+p.weight+' %').join(', '));
+  L.push('');
+  block.days.slice().sort((a,b)=>a.order-b.order).forEach(d=>{
+    const loc=locById(d.location);
+    L.push('## '+d.name+' ('+(d.weekday!=null?WD_LONG[d.weekday]:'ohne festen Tag')+')');
+    if(loc) L.push('Ort: '+loc.name+'  ');
+    if(d.focus) L.push('Schwerpunkt: '+d.focus+'  ');
+    L.push('');
+    if(!d.exercises.length){ L.push('_Noch keine Übungen eingetragen._'); L.push(''); return; }
+    L.push('| # | Übung | Vorgabe | Position | Alternativen | Hinweis |');
+    L.push('|---|---|---|---|---|---|');
+    d.exercises.forEach((e,i)=>{
+      const cell=v=>String(v||'').replace(/\|/g,'/').replace(/\n/g,' ');
+      L.push('| '+(i+1)+' | '+cell(exTitle(e))+' | '+cell(exPlanText(e))+' | '+cell(e.positionTag)+' | '+cell((e.alternatives||[]).map(a=>a.name).join(', '))+' | '+cell(e.notes)+' |');
+    });
+    L.push('');
+  });
+  L.push('_Exportiert aus AOS am '+fmtDate(todayISO())+'._');
+  return L.join('\n');
+}
+
+/* ---------- Dateien & Zwischenablage ---------- */
+function isIOS(){ return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+function isStandalone(){ return window.navigator.standalone===true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); }
+function download(filename, content, mime){
+  const blob = new Blob([content], {type:(mime||'text/plain')+';charset=utf-8'});
+  if(isIOS() && navigator.canShare && typeof File==='function'){
+    try{ const file=new File([blob], filename, {type:blob.type});
+      if(navigator.canShare({files:[file]})){ navigator.share({files:[file], title:filename}).catch(e=>{ if(e && e.name!=='AbortError') toast('Teilen nicht möglich: '+e.message); }); return; } }catch(e){}
+  }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+async function copyText(text){
+  try{ if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); toast('In die Zwischenablage kopiert.'); return true; } }catch(e){}
+  const ta=document.createElement('textarea'); ta.value=text; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+  let ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
+  ta.remove();
+  toast(ok?'In die Zwischenablage kopiert.':'Kopieren nicht möglich – bitte den Text markieren und manuell kopieren.');
+  return ok;
+}
+function stamp(){ const d=new Date(); return isoOf(d)+'_'+pad(d.getHours())+pad(d.getMinutes()); }
+function exportJSON(){ download('aos-sicherung_'+stamp()+'.json', JSON.stringify(S,null,2), 'application/json'); S.settings.lastExport=new Date().toISOString(); save(); }
+
+function csvCell(v){ if(v===null||v===undefined) return ''; const s=String(v); return /[";\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+function toCSV(rows){ return '﻿'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n'); }
+function exportCSV(kind){
+  if(kind==='saetze'){
+    const rows=[['Datum','Block','Einheit','Status','Übung','Variante','Satz','Wdh','Gewicht kg','RPE','Zeit s','Distanz m','Höhe cm','Übungsnotiz','Tagesform','Beschwerden']];
+    S.sessions.filter(s=>s.log).forEach(s=>{ const b=blockById(s.blockId);
+      s.log.exercises.forEach(e=>(e.sets.length?e.sets:[{}]).forEach((x,i)=>rows.push([sessionDate(s), b?b.name:'', s.name, STATUS_LABEL[s.status], e.name, e.variant, e.sets.length?i+1:'', x.reps, fmtNum(x.kg), fmtNum(x.rpe), fmtNum(x.time), fmtNum(x.dist), fmtNum(x.height), e.note, s.log.form, s.log.pain])));
+    });
+    download('aos-trainingssaetze_'+stamp()+'.csv', toCSV(rows), 'text/csv');
+  } else if(kind==='tests'){
+    const rows=[['Test','Kategorie','Datum','Wert','Einheit','Wdh','Detail','RPE','Testbedingungen','Notiz','Herkunft','Fehlende Angaben']];
+    S.tests.forEach(t=>rows.push([t.name,t.category,t.date||'',fmtNum(t.value),t.unit,t.reps,t.detail,fmtNum(t.rpe),t.conditions,t.note,t.source==='ausgangsdaten'?'Ausgangsdaten':'Eingabe',testGaps(t).join(', ')]));
+    download('aos-tests_'+stamp()+'.csv', toCSV(rows), 'text/csv');
+  } else {
+    const rows=[['Datum','Körpergewicht kg','ungefähr','Notiz','Herkunft']];
+    S.bodyweight.forEach(x=>rows.push([x.date||'',fmtNum(x.kg),x.approx?'ja':'',x.note,x.source==='ausgangsdaten'?'Ausgangsdaten':'Eingabe']));
+    download('aos-koerpergewicht_'+stamp()+'.csv', toCSV(rows), 'text/csv');
+  }
+}
+
+'use strict';
+/* ===== AOS – Oberfläche: Grundgerüst, Dialoge, Übersicht ===== */
+const ui = { view:'uebersicht', weekStart:null, sessionId:null, draft:null, testName:null, exName:null, blockId:null, filterEquip:false, importData:null };
+const ACT = {};      // Klick-Aktionen
+const CHG = {};      // Änderungs-Aktionen
+const VIEWS = [['uebersicht','Übersicht'],['plan','Plan'],['training','Training'],['tests','Tests & Verlauf'],['ernaehrung','Ernährung'],['profil','Profil']];
+
+/* ---------- kleine Bausteine ---------- */
+function inp(id,label,value,attrs){ return '<div class="field"><label for="'+id+'">'+label+'</label><input id="'+id+'" value="'+esc(value==null?'':value)+'" '+(attrs||'')+'></div>'; }
+function sel(id,label,opts,value,attrs){ return '<div class="field"><label for="'+id+'">'+label+'</label><select id="'+id+'" '+(attrs||'')+'>'+opts.map(o=>'<option value="'+esc(o[0])+'"'+(String(o[0])===String(value==null?'':value)?' selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></div>'; }
+function ta(id,label,value,attrs){ return '<div class="field"><label for="'+id+'">'+label+'</label><textarea id="'+id+'" '+(attrs||'')+'>'+esc(value||'')+'</textarea></div>'; }
+function val(id){ const el=document.getElementById(id); return el?el.value.trim():''; }
+function badge(text,cls){ return '<span class="badge '+(cls||'')+'">'+esc(text)+'</span>'; }
+function statusBadge(s){ const ov = s.status==='geplant' && s.plannedDate && s.plannedDate<todayISO();
+  if(ov) return badge('nicht erfasst','warn');
+  return badge(STATUS_LABEL[s.status], s.status==='absolviert'?'ok':s.status==='teilweise'?'info':s.status==='ausgelassen'?'':''); }
+function srcBadge(o){ return o && o.source==='ausgangsdaten' ? badge('Ausgangsdaten','info') : ''; }
+function capBadge(b){ const t=capText(b); return t?'<span class="cap" title="RPE-Obergrenze dieses Blocks">'+esc(t)+'</span>':''; }
+function toast(msg){ document.querySelectorAll('.toast').forEach(x=>x.remove()); const t=document.createElement('div'); t.className='toast'; t.setAttribute('role','status'); t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3200); }
+const GLOSSAR = {
+  RPE:'RPE (Rate of Perceived Exertion): Anstrengung eines Satzes auf einer Skala bis 10. RPE 7 ≈ noch etwa 3 Wiederholungen „im Tank“.',
+  RB:'RB: Running Back – Ballträger im Angriff.',
+  DE:'DE: Defensive End – Verteidiger an der Außenseite der Defensive Line.',
+  OLB:'OLB: Outside Linebacker.',
+  '3-Tech':'3-Tech: Defensive Tackle, der außen an der Schulter des Guards steht.'
+};
+
+/* ---------- Dialog ---------- */
+function openDlg(title, body, foot){
+  let d=document.getElementById('dlg');
+  d.innerHTML='<div class="dlg-head"><h2 id="dlg-title">'+esc(title)+'</h2><button class="small" data-act="closeDlg" aria-label="Dialog schließen">✕</button></div><div class="dlg-body">'+body+'</div>'+(foot?'<div class="dlg-foot">'+foot+'</div>':'');
+  d.setAttribute('aria-labelledby','dlg-title');
+  if(!d.open) d.showModal();
+  const f=d.querySelector('.dlg-body input, .dlg-body select, .dlg-body textarea'); if(f) f.focus();
+}
+function closeDlg(){ const d=document.getElementById('dlg'); if(d.open) d.close(); }
+ACT.closeDlg = closeDlg;
+function confirmDlg(title, text, okLabel, onOk, danger){
+  ui._confirm = onOk;
+  openDlg(title, '<p>'+text+'</p>', '<button data-act="closeDlg">Abbrechen</button><button class="'+(danger?'danger':'primary')+'" data-act="confirmOk">'+esc(okLabel)+'</button>');
+}
+ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f(); };
+
+/* ---------- Gerüst ---------- */
+function renderShell(){
+  const b=activeBlock();
+  document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+'>'+t+'</button>').join('');
+  document.getElementById('topinfo').innerHTML = b ? '<span class="small muted">'+esc(b.name)+'</span> '+capBadge(b) : '';
+}
+function render(){
+  renderShell();
+  const m=document.getElementById('main');
+  const fn = {uebersicht:viewOverview, plan:viewPlan, training:viewTraining, tests:viewTests, profil:viewProfile, ernaehrung:viewNutrition, druck:viewPrint}[ui.view] || viewOverview;
+  m.innerHTML = (storageOK?'':'<div class="note bad"><strong>Lokaler Speicher nicht verfügbar.</strong> Der Browser erlaubt für diese Datei keine dauerhafte Speicherung (z. B. privater Modus oder blockierte Website-Daten). Eingaben gehen beim Schließen verloren – exportiere eine JSON-Sicherung oder öffne die Datei in einem normalen Browserfenster.</div>') + fn();
+}
+ACT.go = el=>{ ui.view=el.dataset.view; if(ui.view!=='training'){ ui.sessionId=null; ui.draft=null; } location.hash=ui.view; render(); window.scrollTo(0,0); };
+window.addEventListener('hashchange', ()=>{ const h=location.hash.slice(1); if(h && h!==ui.view && (VIEWS.some(v=>v[0]===h)||h==='druck')){ ui.view=h; render(); } });
+
+/* ---------- Übersicht ---------- */
+function viewOverview(){
+  const b=activeBlock(); const today=todayISO(); const mon=mondayOf(today);
+  let h='<h1>Übersicht</h1>';
+  if(isIOS() && !isStandalone() && location.protocol==='https:' && !S.settings.hideInstallHint)
+    h+='<div class="note warn"><strong>Als App installieren:</strong> In Safari unten auf <em>Teilen</em> (Quadrat mit Pfeil) tippen → <em>Zum Home-Bildschirm</em>. Öffne AOS danach immer über das neue Symbol. <strong>Wichtig:</strong> Die App auf dem Home-Bildschirm hat einen eigenen Speicher – trage deine Daten erst dort ein (oder importiere dort deine Sicherung). <button class="link small" data-act="hideInstall">Ausblenden</button></div>';
+  if(!b){
+    h+='<div class="empty">Kein aktiver Trainingsblock. Lege unter <button class="link" data-act="go" data-view="plan">Plan</button> einen Block an oder setze einen bestehenden auf „aktiv“.</div>';
+  } else {
+    const wk=blockWeek(b,today);
+    h+='<div class="section"><div class="row between"><div><div class="muted small">Aktueller Block</div><strong style="font-size:1.1rem">'+esc(b.name)+'</strong></div>'+capBadge(b)+'</div>';
+    h+='<p class="small">'+(wk?'Woche '+wk+(b.end?' · Block endet am '+fmtDate(b.end):''):'<span class="badge warn">Startdatum fehlt – Blockwoche unbekannt</span>')+'</p>';
+    if(b.rules) h+='<p class="small muted">Regeln: '+esc(b.rules)+'</p>';
+    h+='</div>';
+    // Woche
+    const week=S.sessions.filter(s=>s.blockId===b.id && (s.plannedDate?mondayOf(s.plannedDate)===mon:s.week===mon)).sort(bySessionDate);
+    h+='<h2>Diese Woche <span class="muted small">('+fmtDate(mon)+' – '+fmtDate(addDays(mon,6))+')</span></h2>';
+    if(!week.length) h+='<div class="empty">Für diese Woche sind noch keine Einheiten angelegt. <button class="link" data-act="go" data-view="plan">Woche im Plan anlegen</button></div>';
+    else {
+      const c=k=>week.filter(s=>s.status===k).length;
+      h+='<p class="small">'+c('absolviert')+' absolviert · '+c('teilweise')+' teilweise · '+c('ausgelassen')+' ausgelassen · '+c('geplant')+' geplant</p>';
+      h+='<div class="section" style="padding:6px 12px"><table><tbody>'+week.map(s=>'<tr><td>'+(s.plannedDate?fmtDateShort(s.plannedDate):'<em>ohne Termin</em>')+'</td><td><button class="link" data-act="openSession" data-id="'+s.id+'">'+esc(s.name)+'</button></td><td>'+statusBadge(s)+'</td></tr>').join('')+'</tbody></table></div>';
+    }
+    // Nächste
+    const overdue=S.sessions.filter(s=>s.status==='geplant' && s.plannedDate && s.plannedDate<today).sort(bySessionDate);
+    const next=S.sessions.filter(s=>s.status==='geplant' && s.plannedDate && s.plannedDate>=today).sort(bySessionDate)[0];
+    h+='<h2>Als Nächstes</h2>';
+    if(overdue.length) h+='<div class="note warn">'+overdue.length+' vergangene Einheit(en) ohne Eintrag. Sie werden <strong>nicht</strong> automatisch verschoben – erfasse sie, verschiebe sie oder markiere sie als ausgelassen. <button class="link" data-act="go" data-view="training">Zu Training</button></div>';
+    if(next) h+=sessionCard(next);
+    else h+='<div class="empty">Keine kommende Einheit geplant.</div>';
+  }
+  // Vorschläge
+  const sg=openSuggestions();
+  h+='<h2>Hinweise & Vorschläge</h2>';
+  if(!sg.length) h+='<p class="muted small">Keine offenen Vorschläge. Vorschläge entstehen nur aus protokollierten Einheiten und müssen von dir bestätigt werden.</p>';
+  else h+='<div class="section">'+sg.slice(0,3).map(s=>'<p>'+(s.kind==='plan'?badge('Vorschlag','info'):badge('Hinweis'))+' '+esc(s.title)+'</p>').join('')+'<button class="link" data-act="goSugg">Alle '+sg.length+' ansehen und entscheiden</button></div>';
+  // Entwicklung
+  h+='<h2>Entwicklung</h2><div class="grid2">';
+  const bw=latestBodyweight();
+  h+='<div class="section"><div class="muted small">Körpergewicht</div><strong>'+(bw?(bw.approx?'≈ ':'')+fmtNum(bw.kg)+' kg':'—')+'</strong> <span class="small muted">'+(bw?(bw.date?fmtDate(bw.date):'ohne Datum'):'')+'</span> '+srcBadge(bw)+'</div>';
+  h+='<div class="section"><div class="muted small">Positionsgewichtung</div>'+S.profile.positions.map(p=>'<strong>'+esc(p.code)+'</strong> '+p.weight+' %').join(' · ')+'</div>';
+  h+='</div>';
+  const goals=S.goals.filter(g=>g.status==='aktiv');
+  if(goals.length){
+    h+='<div class="section table-wrap"><table><thead><tr><th>Ziel</th><th>Zielmarke</th><th>Letzter Eintrag</th></tr></thead><tbody>';
+    goals.forEach(g=>{ const t=latestTest(g.testName);
+      h+='<tr><td>'+esc(g.name)+'</td><td>'+fmtNum(g.target)+' '+esc(g.unit)+'</td><td>'+(t?esc(testValueText(t))+' <span class="small muted">'+(t.date?fmtDate(t.date):'ohne Datum')+'</span>':'<span class="muted">noch kein Eintrag</span>')+'</td></tr>'; });
+    h+='</tbody></table><p class="small muted">Zielmarken sind persönliche Ziele und keine Vorgaben für das nächste Training.</p></div>';
+  }
+  // Fehlende Angaben
+  const md=missingData();
+  h+='<h2>Fehlende oder unvollständige Angaben</h2>';
+  h+= md.length ? '<div class="section"><ul style="margin:0;padding-left:20px">'+md.map(x=>'<li>'+esc(x.text)+' <button class="link small" data-act="go" data-view="'+x.where+'">ergänzen</button></li>').join('')+'</ul></div>' : '<p class="muted small">Alles Wesentliche ist eingetragen.</p>';
+  // Sicherung
+  const le=S.settings.lastExport;
+  if(!le || daysBetween(le.slice(0,10), today)>14) h+='<div class="note">'+(le?'Letzte JSON-Sicherung am '+fmtDate(le.slice(0,10))+'.':'Noch keine JSON-Sicherung erstellt.')+' Die Daten liegen nur in diesem Browser. <button class="link" data-act="exportJSON">Jetzt sichern</button></div>';
+  return h;
+}
+ACT.hideInstall = ()=>{ S.settings.hideInstallHint=true; save(); render(); };
+ACT.goSugg = ()=>{ ui.view='plan'; location.hash='plan'; render(); setTimeout(()=>{ const e=document.getElementById('vorschlaege'); if(e) e.scrollIntoView(); },30); };
+ACT.exportJSON = ()=>{ exportJSON(); toast('Sicherung wird heruntergeladen.'); render(); };
+function bySessionDate(a,b){ const x=a.plannedDate||'9999', y=b.plannedDate||'9999'; return x<y?-1:x>y?1:0; }
+function sessionCard(s){
+  const b=blockById(s.blockId); const loc=locById(s.location);
+  return '<div class="section"><div class="row between"><div><strong>'+esc(s.name)+'</strong> <span class="muted small">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+(loc?' · '+esc(loc.name):'')+'</span></div>'+capBadge(b)+'</div>'+
+    (s.plan.length?'<ul class="small" style="margin:8px 0;padding-left:20px">'+s.plan.map(e=>'<li>'+esc(exTitle(e))+(exPlanText(e)?' – '+esc(exPlanText(e)):'')+'</li>').join('')+'</ul>':'<p class="small muted">Für diesen Trainingstag sind noch keine Übungen eingetragen.</p>')+
+    '<div class="row"><button class="primary" data-act="startLog" data-id="'+s.id+'">Training erfassen</button><button data-act="keep" data-id="'+s.id+'">Für Google Keep kopieren</button><button data-act="openSession" data-id="'+s.id+'">Verschieben / Auslassen</button></div></div>';
+}
+function latestTest(name){ if(!name) return null; const l=S.tests.filter(t=>t.name===name); if(!l.length) return null;
+  const dated=l.filter(t=>t.date).sort((a,b)=>a.date<b.date?1:-1); return dated[0]||l[l.length-1]; }
+function testValueText(t){
+  let s = t.value!=null ? fmtNum(t.value)+' '+t.unit : '';
+  if(t.reps) s+=' × '+t.reps;
+  if(t.detail) s+=(s?' · ':'')+t.detail;
+  if(t.rpe!=null) s+=' @RPE '+fmtNum(t.rpe);
+  return s||'—';
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener('click', e=>{
+  const t=e.target.closest('[data-act]'); if(!t) return;
+  const f=ACT[t.dataset.act]; if(f){ e.preventDefault(); f(t,e); }
+});
+document.addEventListener('change', e=>{
+  const t=e.target.closest('[data-chg]'); if(t && CHG[t.dataset.chg]) CHG[t.dataset.chg](t,e);
+});
+document.addEventListener('input', e=>{
+  const t=e.target; if(t.dataset && t.dataset.log!==undefined) updateDraftFromInput(t);
+  if(t.id && t.id.startsWith('pos-w-')) updatePosSum();
+});
+
+'use strict';
+/* ===== AOS – Plan: Blöcke, Woche, Trainingstage, Übungen, Vorschläge ===== */
+function planBlock(){ return (ui.blockId && blockById(ui.blockId)) || activeBlock() || S.blocks[S.blocks.length-1] || null; }
+
+function viewPlan(){
+  const b=planBlock();
+  let h='<h1>Plan</h1>';
+  // Blockauswahl
+  h+='<div class="row no-print">'+(S.blocks.length>1?'<div style="flex:1;min-width:220px">'+sel('blk-pick','Trainingsblock',S.blocks.map(x=>[x.id,x.name+' ('+x.status+')']),b?b.id:'','data-chg="pickBlock"')+'</div>':'')+
+    '<button data-act="newBlock">Neuer Block</button></div>';
+  if(!b) return h+'<div class="empty">Noch kein Trainingsblock vorhanden. Lege einen Block mit Name, Ziel, Zeitraum und RPE-Obergrenze an.</div>';
+  h+='<div class="section"><div class="row between"><h2 style="margin:0">'+esc(b.name)+' '+srcBadge(b)+'</h2>'+capBadge(b)+'</div>'+
+    '<dl class="kv small" style="margin-top:10px">'+
+    '<dt>Ziel</dt><dd>'+esc(b.goal||'—')+'</dd>'+
+    '<dt>Zeitraum</dt><dd>'+(b.start?fmtDate(b.start):'<span class="badge warn">Start fehlt</span>')+' – '+(b.end?fmtDate(b.end):'<span class="badge warn">Ende fehlt</span>')+'</dd>'+
+    '<dt>Status</dt><dd>'+esc(b.status)+'</dd>'+
+    '<dt>Rhythmus</dt><dd>'+esc(b.rhythm||'—')+'</dd>'+
+    '<dt>Regeln</dt><dd>'+esc(b.rules||'—')+'</dd></dl>'+
+    '<p class="small muted">'+esc(GLOSSAR.RPE)+'</p>'+
+    '<div class="row"><button data-act="editBlock" data-id="'+b.id+'">Block bearbeiten</button><button data-act="printPlan">Druckansicht</button><button data-act="mdPlan">Als Markdown exportieren</button></div></div>';
+
+  h+=weekSection(b);
+  h+=daysSection(b);
+  h+=positionSection(b);
+  h+=suggestionSection();
+  if(b.changelog.length) h+='<details><summary>Änderungsprotokoll dieses Blocks ('+b.changelog.length+')</summary><div class="section small">'+b.changelog.slice(0,80).map(c=>'<div>'+fmtDate(c.at.slice(0,10))+' – '+esc(c.text)+'</div>').join('')+'</div></details>';
+  return h;
+}
+CHG.pickBlock = el=>{ ui.blockId=el.value; render(); };
+
+/* ---------- Woche ---------- */
+function weekSection(b){
+  if(!ui.weekStart) ui.weekStart=mondayOf(todayISO());
+  const mon=ui.weekStart; const today=todayISO();
+  const wk=blockWeek(b,mon);
+  const sess=S.sessions.filter(s=>s.blockId===b.id && (s.plannedDate?mondayOf(s.plannedDate)===mon:s.week===mon));
+  let h='<h2>Wochenplanung</h2><div class="row between no-print"><div class="row">'+
+    '<button class="small" data-act="weekNav" data-d="-7" aria-label="Vorherige Woche">← Woche</button>'+
+    '<button class="small" data-act="weekNav" data-d="0">Heute</button>'+
+    '<button class="small" data-act="weekNav" data-d="7" aria-label="Nächste Woche">Woche →</button></div>'+
+    '<strong>'+fmtDate(mon)+' – '+fmtDate(addDays(mon,6))+(wk?' · Blockwoche '+wk:'')+'</strong></div>';
+  if(b.start && mon<mondayOf(b.start)) h+='<p class="note small">Diese Woche liegt vor dem Blockstart.</p>';
+  if(b.end && mon>b.end) h+='<p class="note small">Diese Woche liegt nach dem Blockende.</p>';
+  if(!sess.length){
+    h+='<div class="empty">Für diese Woche sind keine Einheiten angelegt. Markiere zuerst Tage, an denen du nicht trainieren kannst, und lege dann die Woche aus den Trainingstagen an. Ist ein Standardtag nicht verfügbar, landet die Einheit unter „ohne Termin“ und du wählst selbst einen Tag – es wird nichts gestapelt.'+
+      '<div class="row" style="margin-top:8px"><button class="primary" data-act="createWeek">Woche aus Trainingstagen anlegen</button></div></div>';
+  }
+  h+='<div class="week">';
+  for(let i=0;i<7;i++){
+    const d=addDays(mon,i); const un=S.unavailable.includes(d);
+    const ds=sess.filter(s=>s.plannedDate===d).sort((a,c)=>a.createdAt<c.createdAt?-1:1);
+    h+='<div class="day'+(un?' unavail':'')+(d===today?' today':'')+'"><h4><span>'+fmtDateShort(d)+'</span>'+
+      '<button class="link small no-print" data-act="toggleUnavail" data-d="'+d+'" aria-pressed="'+un+'" title="Verfügbarkeit umschalten">'+(un?'nicht verfügbar':'verfügbar')+'</button></h4>'+
+      ds.map(s=>sessBtn(s,today)).join('')+
+      (ds.length>1?'<div class="small" style="color:var(--warn)">Mehrere Einheiten an einem Tag</div>':'')+
+      '<button class="link small no-print" data-act="addSession" data-d="'+d+'">+ Einheit</button></div>';
+  }
+  h+='</div>';
+  const nodate=sess.filter(s=>!s.plannedDate);
+  if(nodate.length) h+='<div class="section"><strong>Ohne Termin in dieser Woche</strong><p class="small muted">Standardtag war nicht verfügbar oder die Einheit wurde noch keinem Tag zugeordnet. Wähle einen Tag oder markiere sie als ausgelassen.</p>'+nodate.map(s=>sessBtn(s,today)).join('')+'</div>';
+  return h;
+}
+function sessBtn(s,today){
+  const ov=s.status==='geplant' && s.plannedDate && s.plannedDate<today;
+  return '<button class="sess st-'+s.status+(ov?' overdue':'')+'" data-act="openSession" data-id="'+s.id+'">'+esc(s.name)+'<br><span class="small">'+(ov?'nicht erfasst':STATUS_LABEL[s.status])+'</span></button>';
+}
+ACT.weekNav = el=>{ const d=Number(el.dataset.d); ui.weekStart = d===0?mondayOf(todayISO()):addDays(ui.weekStart,d); render(); };
+ACT.toggleUnavail = el=>{ const d=el.dataset.d; const i=S.unavailable.indexOf(d); if(i>=0) S.unavailable.splice(i,1); else S.unavailable.push(d); save(); render(); };
+function makeSession(b, day, date, week){
+  return { id:uid('ses'), blockId:b.id, dayId:day?day.id:null, name:day?day.name:'Freie Einheit', focus:day?day.focus:'', plannedDate:date||null, week:week||(date?mondayOf(date):null),
+    status:'geplant', location:day?day.location:'', plan:day?clone(day.exercises):[], dayVersion:day?day.version:null, log:null, skipReason:'', moves:[], createdAt:new Date().toISOString() };
+}
+ACT.createWeek = ()=>{
+  const b=planBlock(); const mon=ui.weekStart; let n=0, nod=0;
+  b.days.slice().sort((a,c)=>a.order-c.order).forEach(day=>{
+    let date=null;
+    if(day.weekday!=null){ const off=(day.weekday+6)%7; date=addDays(mon,off); if(S.unavailable.includes(date)){ date=null; nod++; } }
+    else nod++;
+    S.sessions.push(makeSession(b,day,date,mon)); n++;
+  });
+  save(); toast(n+' Einheit(en) angelegt'+(nod?', '+nod+' davon ohne Termin':'')+'.'); render();
+};
+ACT.addSession = el=>{
+  const b=planBlock(); const d=el.dataset.d;
+  const opts=b.days.map(x=>[x.id,x.name+(x.exercises.length?'':' (noch ohne Übungen)')]).concat([['__frei','Freie Einheit (ohne Vorgabe)']]);
+  openDlg('Einheit hinzufügen – '+fmtDateShort(d), (S.unavailable.includes(d)?'<p class="note warn">Dieser Tag ist als nicht verfügbar markiert.</p>':'')+sel('as-day','Trainingstag',opts,opts[0][0]),
+    '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="addSessionOk" data-d="'+d+'">Hinzufügen</button>');
+};
+ACT.addSessionOk = el=>{
+  const b=planBlock(); const v=val('as-day'); const day=v==='__frei'?null:dayById(b,v);
+  S.sessions.push(makeSession(b,day,el.dataset.d)); save(); closeDlg(); render();
+};
+
+/* ---------- Einheit: Details, verschieben, auslassen ---------- */
+ACT.openSession = el=>{
+  const s=sessionById(el.dataset.id); if(!s) return;
+  const b=blockById(s.blockId); const loc=locById(s.location);
+  let body='<p><strong>'+esc(s.name)+'</strong> · '+(s.plannedDate?WD_LONG[weekdayOf(s.plannedDate)]+', '+fmtDate(s.plannedDate):'ohne Termin')+' · '+statusBadge(s)+'</p>';
+  body+='<p class="small">'+(loc?'Ort: '+esc(loc.name)+' · ':'')+capBadge(b)+'</p>';
+  if(s.skipReason) body+='<p class="small">Grund fürs Auslassen: '+esc(s.skipReason)+'</p>';
+  if(s.moves && s.moves.length) body+='<p class="small muted">Verschoben: '+s.moves.map(m=>(m.from?fmtDate(m.from):'ohne Termin')+' → '+(m.to?fmtDate(m.to):'ohne Termin')).join('; ')+'</p>';
+  body+= s.plan.length ? '<ul class="small">'+s.plan.map(e=>'<li>'+esc(exTitle(e))+' – '+esc(exPlanText(e)||'ohne Vorgabe')+'</li>').join('')+'</ul>' : '<p class="small muted">Keine Übungen hinterlegt.</p>';
+  if(s.status!=='absolviert' && s.status!=='teilweise'){
+    body+='<h3>Verschieben</h3><div class="row"><div style="flex:1">'+inp('mv-date','Neues Datum',s.plannedDate||'','type="date"')+'</div></div>';
+    body+='<h3>Auslassen</h3>'+inp('sk-reason','Grund (optional)',s.skipReason||'','placeholder="z. B. Arbeit, Müdigkeit, Termin"');
+  }
+  let foot='<button data-act="closeDlg">Schließen</button><button data-act="keep" data-id="'+s.id+'">Keep-Text kopieren</button>';
+  if(s.status==='geplant'){
+    foot+='<button data-act="moveSession" data-id="'+s.id+'">Verschieben</button><button data-act="skipSession" data-id="'+s.id+'">Auslassen</button>';
+    if(!s.log) foot+='<button class="danger" data-act="deleteSession" data-id="'+s.id+'">Löschen</button>';
+  }
+  if(s.status==='ausgelassen') foot+='<button data-act="moveSession" data-id="'+s.id+'">Neu terminieren</button><button data-act="unskipSession" data-id="'+s.id+'">Wieder auf „geplant“</button>';
+  foot+='<button class="primary" data-act="startLog" data-id="'+s.id+'">'+(s.log?'Protokoll öffnen':'Training erfassen')+'</button>';
+  openDlg('Einheit', body, foot);
+};
+ACT.moveSession = el=>{
+  const s=sessionById(el.dataset.id); const to=val('mv-date');
+  if(!to){ toast('Bitte ein Datum wählen.'); return; }
+  const warn=[];
+  if(S.unavailable.includes(to)) warn.push('Der Tag ist als nicht verfügbar markiert.');
+  const other=S.sessions.filter(x=>x.id!==s.id && x.plannedDate===to && x.status!=='ausgelassen');
+  if(other.length) warn.push('An diesem Tag ist bereits „'+other.map(x=>x.name).join('“, „')+'“ eingetragen.');
+  const wk=s.week||(s.plannedDate?mondayOf(s.plannedDate):null);
+  if(wk && mondayOf(to)!==wk) warn.push('Das Datum liegt in einer anderen Woche.');
+  const doMove=()=>{ s.moves=s.moves||[]; s.moves.push({from:s.plannedDate,to,at:new Date().toISOString()}); s.plannedDate=to; s.week=mondayOf(to); if(s.status==='ausgelassen'){ s.status='geplant'; } save(); closeDlg(); toast('Einheit verschoben auf '+fmtDateShort(to)+'.'); render(); };
+  if(warn.length) confirmDlg('Trotzdem verschieben?', warn.map(esc).join('<br>'), 'Verschieben', doMove); else doMove();
+};
+ACT.skipSession = el=>{ const s=sessionById(el.dataset.id); s.status='ausgelassen'; s.skipReason=val('sk-reason'); save(); closeDlg(); toast('Als ausgelassen markiert. Es wird nichts automatisch nachgeholt.'); render(); };
+ACT.unskipSession = el=>{ const s=sessionById(el.dataset.id); s.status='geplant'; save(); closeDlg(); render(); };
+ACT.deleteSession = el=>{ const id=el.dataset.id; confirmDlg('Einheit löschen?','Die geplante Einheit wird entfernt (noch nichts protokolliert).','Löschen',()=>{ S.sessions=S.sessions.filter(x=>x.id!==id); save(); render(); }, true); };
+ACT.keep = el=>{ const s=sessionById(el.dataset.id); const txt=keepText(s);
+  openDlg('Text für Google Keep', '<p class="small muted">Kopieren, in Google Keep als neue Notiz einfügen und im Gym die „Ist“-Werte eintragen. Danach die Werte hier unter „Training“ erfassen.</p><pre class="out" id="keep-out">'+esc(txt)+'</pre>',
+    '<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="keep-out">Kopieren</button>');
+};
+ACT.copyPre = el=>{ copyText(document.getElementById(el.dataset.src).textContent); };
+
+/* ---------- Trainingstage & Übungen ---------- */
+function daysSection(b){
+  let h='<h2>Trainingstage und Vorgaben</h2><p class="small muted">Hier trägst du die Vorgaben ein, die du selbst oder dein Coach festgelegt hast. AOS erfindet keine Übungen, Sätze oder Gewichte.</p>';
+  h+='<label class="no-print" style="display:flex;align-items:center;color:var(--text)"><input type="checkbox" data-chg="filterEquip" '+(ui.filterEquip?'checked':'')+'> Nur Übungen anzeigen, deren Ausstattung am Trainingsort verfügbar ist</label>';
+  b.days.slice().sort((a,c)=>a.order-c.order).forEach(d=>{
+    const loc=locById(d.location);
+    h+='<div class="section"><div class="row between"><div><strong>'+esc(d.name)+'</strong> <span class="small muted">'+(d.weekday!=null?WD_LONG[d.weekday]:'kein fester Tag')+' · '+(loc?esc(loc.name):'<span class="badge warn">Ort fehlt</span>')+'</span></div>'+capBadge(b)+'</div>';
+    if(d.focus) h+='<p class="small">Schwerpunkt: '+esc(d.focus)+'</p>';
+    if(d.notes) h+='<p class="small muted">'+esc(d.notes)+'</p>';
+    let exs=d.exercises;
+    if(!exs.length) h+='<div class="empty">Noch keine Übungen. Füge die Übungen mit Sätzen, Wiederholungen und ggf. Gewicht hinzu.</div>';
+    exs.forEach((e,i)=>{
+      const miss = loc ? (e.equipment||[]).filter(q=>!loc.equipment.some(x=>x.toLowerCase()===q.toLowerCase())) : [];
+      if(ui.filterEquip && loc && miss.length) return;
+      h+='<div class="ex"><div class="ex-head"><span class="ex-name">'+esc(exTitle(e))+'</span><span class="small">'+badge(e.positionTag==='allgemein'?'allgemein':e.positionTag==='beide'?'alle Positionen':e.positionTag)+'</span></div>'+
+        '<div class="small">'+esc(exPlanText(e)||'Vorgabe unvollständig')+'</div>'+
+        ((e.equipment||[]).length?'<div class="small muted">Ausstattung: '+esc(e.equipment.join(', '))+(miss.length?' '+badge('am Ort nicht hinterlegt: '+miss.join(', '),'warn'):'')+'</div>':'')+
+        ((e.alternatives||[]).length?'<div class="small muted">Alternativen (vom Nutzer hinterlegt): '+esc(e.alternatives.map(a=>a.name+(a.note?' – '+a.note:'')).join('; '))+'</div>':'')+
+        (e.notes?'<div class="small muted">Hinweis: '+esc(e.notes)+'</div>':'')+
+        '<div class="row no-print" style="margin-top:6px"><button class="small" data-act="editEx" data-day="'+d.id+'" data-ex="'+e.id+'">Bearbeiten</button>'+
+        '<button class="small" data-act="moveEx" data-day="'+d.id+'" data-ex="'+e.id+'" data-d="-1" '+(i===0?'disabled':'')+' aria-label="Nach oben">↑</button>'+
+        '<button class="small" data-act="moveEx" data-day="'+d.id+'" data-ex="'+e.id+'" data-d="1" '+(i===exs.length-1?'disabled':'')+' aria-label="Nach unten">↓</button>'+
+        '<button class="small danger" data-act="delEx" data-day="'+d.id+'" data-ex="'+e.id+'">Entfernen</button></div></div>';
+    });
+    h+='<div class="row no-print"><button class="small primary" data-act="editEx" data-day="'+d.id+'">+ Übung</button><button class="small" data-act="editDay" data-day="'+d.id+'">Tag bearbeiten</button>'+
+      '<button class="small" data-act="strong" data-day="'+d.id+'">Für Strong PRO kopieren</button><button class="small" data-act="keepTpl" data-day="'+d.id+'">Keep-Vorlage</button></div></div>';
+  });
+  h+='<button class="no-print" data-act="editDay">+ Trainingstag hinzufügen</button>';
+  return h;
+}
+CHG.filterEquip = el=>{ ui.filterEquip=el.checked; render(); };
+ACT.editDay = el=>{
+  const b=planBlock(); const d=el.dataset.day?dayById(b,el.dataset.day):null;
+  const wdOpts=[['','kein fester Tag']].concat([1,2,3,4,5,6,0].map(i=>[i,WD_LONG[i]]));
+  const locOpts=[['','— nicht festgelegt —']].concat(S.profile.locations.map(l=>[l.id,l.name]));
+  openDlg(d?'Trainingstag bearbeiten':'Trainingstag hinzufügen',
+    inp('d-name','Name',d?d.name:'Trainingstag '+(b.days.length+1),'required')+
+    '<div class="fields">'+sel('d-wd','Standard-Wochentag',wdOpts,d&&d.weekday!=null?d.weekday:'')+sel('d-loc','Trainingsort',locOpts,d?d.location:'')+'</div>'+
+    inp('d-focus','Schwerpunkt (optional)',d?d.focus:'','placeholder="z. B. Unterkörper Kraft, Beschleunigung"')+ta('d-notes','Notizen (optional)',d?d.notes:''),
+    (d?'<button class="danger" data-act="delDay" data-day="'+d.id+'">Tag löschen</button>':'')+'<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="saveDay" data-day="'+(d?d.id:'')+'">Speichern</button>');
+};
+ACT.saveDay = el=>{
+  const b=planBlock(); const name=val('d-name'); if(!name){ toast('Bitte einen Namen eingeben.'); return; }
+  let d=el.dataset.day?dayById(b,el.dataset.day):null; const wd=val('d-wd');
+  if(!d){ d={id:uid('day'),name,order:b.days.length+1,weekday:null,location:'',focus:'',notes:'',exercises:[],version:1}; b.days.push(d); logBlock(b,'Trainingstag „'+name+'“ hinzugefügt.'); }
+  else logBlock(b,'Trainingstag „'+name+'“ bearbeitet.');
+  d.name=name; d.weekday=wd===''?null:Number(wd); d.location=val('d-loc'); d.focus=val('d-focus'); d.notes=val('d-notes'); d.version++;
+  save(); closeDlg(); render();
+};
+ACT.delDay = el=>{ const b=planBlock(); const d=dayById(b,el.dataset.day);
+  confirmDlg('Trainingstag löschen?','„'+esc(d.name)+'“ wird aus der Vorlage entfernt. Bereits angelegte oder protokollierte Einheiten bleiben erhalten.','Löschen',()=>{ b.days=b.days.filter(x=>x.id!==d.id); logBlock(b,'Trainingstag „'+d.name+'“ gelöscht.'); save(); render(); }, true); };
+ACT.editEx = el=>{
+  if(el.dataset.sugg && activeBlock()) ui.blockId=activeBlock().id;
+  const b=planBlock(); const d=dayById(b,el.dataset.day); const e=el.dataset.ex?d.exercises.find(x=>x.id===el.dataset.ex):newExercise();
+  ui._exCtx={dayId:d.id, exId:el.dataset.ex||null, sugg:el.dataset.sugg||null};
+  const posOpts=[['allgemein','allgemein / keine Zuordnung']].concat(S.profile.positions.map(p=>[p.code,p.code+' – '+p.name])).concat([['beide','alle Positionen']]);
+  const metOpts=[['kraft','Kraft (Wdh × Gewicht)'],['zeit','Zeit (Sprint, Intervalle)'],['distanz','Distanz'],['sprung','Sprung / Weite / Höhe']];
+  let body='';
+  if(ui._exCtx.sugg){ const sg=computeSuggestions().find(x=>x.key===ui._exCtx.sugg); if(sg) body+='<div class="note"><strong>Vorschlag:</strong> '+esc(sg.title)+'<ul class="small">'+sg.evidence.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>Die Vorgabe wird nur so geändert, wie du sie hier einträgst.</div>'; }
+  body+=inp('e-name','Übung *',e.name,'required placeholder="z. B. High-Bar Squat"')+inp('e-var','Variante (optional)',e.variant,'placeholder="z. B. Pause unten, Tempo 3-0-1"')+
+    '<div class="fields">'+sel('e-met','Messart',metOpts,e.metric)+inp('e-sets','Sätze',e.sets,'inputmode="numeric"')+inp('e-reps','Wdh / Vorgabe je Satz',e.reps,'placeholder="z. B. 5 oder 8–10 oder 20 m"')+'</div>'+
+    '<div class="fields">'+inp('e-kg','Gewicht (kg, optional)',fmtNum(e.loadKg),'inputmode="decimal"')+inp('e-ln','Gewichtshinweis (optional)',e.loadNote,'placeholder="z. B. nach RPE wählen"')+inp('e-rpe','RPE-Ziel (optional)',e.rpeTarget,'placeholder="z. B. 6–7"')+inp('e-rest','Pause (optional)',e.rest,'placeholder="z. B. 2–3 min"')+'</div>'+
+    sel('e-pos','Positionsbezug',posOpts,e.positionTag)+
+    inp('e-eq','Benötigte Ausstattung (kommagetrennt, optional)',(e.equipment||[]).join(', '),'placeholder="z. B. Trap Bar"')+
+    ta('e-alt','Alternativen (eine pro Zeile, optional: „Name – Hinweis“)',(e.alternatives||[]).map(a=>a.name+(a.note?' – '+a.note:'')).join('\n'))+
+    ta('e-notes','Hinweis (optional)',e.notes)+
+    '<p class="small muted">RPE-Obergrenze des Blocks: '+esc(capText(b)||'keine')+'. Alternativen werden nur angezeigt; AOS bewertet nicht, ob sie fachlich gleichwertig sind.</p>';
+  openDlg(el.dataset.ex?'Übung bearbeiten':'Übung hinzufügen', body, '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="saveEx">Speichern</button>');
+};
+ACT.saveEx = ()=>{
+  const b=planBlock(); const c=ui._exCtx; const d=dayById(b,c.dayId);
+  const name=val('e-name'); if(!name){ toast('Bitte einen Übungsnamen eingeben.'); return; }
+  const setsV=val('e-sets'); const sets=setsV===''?null:parseInt(setsV,10);
+  if(setsV!=='' && (!sets||sets<1||sets>20)){ toast('Sätze: bitte eine Zahl zwischen 1 und 20.'); return; }
+  const kgV=val('e-kg'); const kg=num(kgV); if(kgV!=='' && kg==null){ toast('Gewicht: bitte eine Zahl eingeben.'); return; }
+  let e=c.exId?d.exercises.find(x=>x.id===c.exId):null; const before=e?exTitle(e)+': '+exPlanText(e):'';
+  if(!e){ e=newExercise(); d.exercises.push(e); }
+  Object.assign(e,{ name, variant:val('e-var'), metric:val('e-met'), sets, reps:val('e-reps'), loadKg:kg, loadNote:val('e-ln'), rpeTarget:val('e-rpe'), rest:val('e-rest'),
+    positionTag:val('e-pos'), equipment:val('e-eq').split(',').map(x=>x.trim()).filter(Boolean),
+    alternatives:val('e-alt').split('\n').map(x=>x.trim()).filter(Boolean).map(x=>{ const p=x.split(/\s+[–-]\s+/); return {name:p[0].trim(), note:(p.slice(1).join(' – ')||'').trim()}; }),
+    notes:val('e-notes') });
+  d.version++;
+  const after=exTitle(e)+': '+exPlanText(e);
+  logBlock(b, c.exId ? d.name+' – Übung geändert: '+before+' → '+after+(c.sugg?' (nach Vorschlag)':'') : d.name+' – Übung hinzugefügt: '+after);
+  if(c.sugg){ const sg=computeSuggestions().find(x=>x.key===c.sugg); if(sg) decideSuggestion(sg, before===after?'bestätigt':'geändert', before===after?'':before+' → '+after); }
+  save(); closeDlg(); render();
+};
+ACT.moveEx = el=>{ const b=planBlock(); const d=dayById(b,el.dataset.day); const i=d.exercises.findIndex(x=>x.id===el.dataset.ex); const j=i+Number(el.dataset.d);
+  if(j<0||j>=d.exercises.length) return; const t=d.exercises[i]; d.exercises[i]=d.exercises[j]; d.exercises[j]=t; d.version++; save(); render(); };
+ACT.delEx = el=>{ const b=planBlock(); const d=dayById(b,el.dataset.day); const e=d.exercises.find(x=>x.id===el.dataset.ex);
+  confirmDlg('Übung entfernen?','„'+esc(exTitle(e))+'“ wird aus '+esc(d.name)+' entfernt. Bereits protokollierte Einheiten bleiben unverändert.','Entfernen',()=>{ d.exercises=d.exercises.filter(x=>x.id!==e.id); d.version++; logBlock(b,d.name+' – Übung entfernt: '+exTitle(e)); save(); render(); }, true); };
+ACT.strong = el=>{ const b=planBlock(); const d=dayById(b,el.dataset.day);
+  openDlg('Für Strong PRO', '<p class="small muted">AOS ist nicht mit Strong verbunden. Lege in Strong PRO ein neues Workout-Template an und übertrage die Übungen anhand dieses Textes. Den Text kannst du kopieren, um ihn z. B. in die Template-Notiz einzufügen.</p><pre class="out" id="strong-out">'+esc(strongText(b,d))+'</pre>',
+    '<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="strong-out">Kopieren</button>'); };
+ACT.keepTpl = el=>{ const b=planBlock(); const d=dayById(b,el.dataset.day); const s=makeSession(b,d,null);
+  openDlg('Keep-Vorlage: '+d.name, '<p class="small muted">Vorlage ohne Datum. Für eine konkrete Einheit nutze „Keep-Text kopieren“ in der Wochenplanung.</p><pre class="out" id="keep-out">'+esc(keepText(s))+'</pre>',
+    '<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="keep-out">Kopieren</button>'); };
+
+/* ---------- Positionsgewichtung im Plan ---------- */
+const POS_COLORS=['var(--accent)','#c9822b','#4a78b5','#9a5bb0','#5d8a8a'];
+function positionSection(b){
+  const pd=positionDistribution(b); const total=Object.values(pd.cnt).reduce((a,c)=>a+c,0);
+  let h='<h2>Positionsgewichtung im Plan</h2><div class="section">';
+  h+='<div class="small">Profil: '+S.profile.positions.map(p=>esc(p.code)+' '+p.weight+' %').join(' · ')+'</div>';
+  h+='<div class="pos-bar" aria-hidden="true">'+S.profile.positions.map((p,i)=>'<span style="width:'+p.weight+'%;background:'+POS_COLORS[i%5]+'"></span>').join('')+'</div>';
+  if(!total) h+='<p class="small muted">Noch keine Übungen einer Position zugeordnet. Markiere Übungen mit ihrem Positionsbezug, um die Verteilung mit der Gewichtung zu vergleichen.</p>';
+  else {
+    h+='<div class="small">Markierte Übungen im Block: '+S.profile.positions.map(p=>esc(p.code)+' '+Math.round(pd.cnt[p.code]/total*100)+' %').join(' · ')+' <span class="muted">('+pd.tagged+' Übungen)</span></div>';
+    h+='<div class="pos-bar" aria-hidden="true">'+S.profile.positions.map((p,i)=>'<span style="width:'+(pd.cnt[p.code]/total*100)+'%;background:'+POS_COLORS[i%5]+'"></span>').join('')+'</div>';
+    if(pd.tagged<4) h+='<p class="small muted">Weniger als 4 markierte Übungen – der Vergleich ist noch wenig aussagekräftig.</p>';
+  }
+  h+='<p class="small muted">Gezählt wird jede markierte Übung einmal; „alle Positionen“ wird gleichmäßig aufgeteilt. Das ist eine Orientierung für deine Planung, keine automatische Entscheidung.</p></div>';
+  return h;
+}
+
+/* ---------- Vorschläge ---------- */
+function suggestionSection(){
+  const open=openSuggestions(); const n=loggedSessions().length;
+  let h='<h2 id="vorschlaege">Anpassungsvorschläge</h2>';
+  h+='<p class="small muted">Grundlage: '+n+' protokollierte Einheit(en). AOS ändert den Plan nie selbst – jeder Vorschlag zeigt die gespeicherten Beobachtungen, und du entscheidest.</p>';
+  if(n<3) h+='<div class="note warn small">Wenige protokollierte Einheiten – Vorschläge sind eine unsichere Grundlage.</div>';
+  if(!open.length) h+='<div class="empty">Keine offenen Vorschläge.</div>';
+  open.forEach(sg=>{
+    h+='<div class="sugg"><div class="row between"><strong>'+esc(sg.title)+'</strong>'+(sg.kind==='plan'?badge('Vorschlag','info'):badge('Hinweis'))+'</div>'+
+      '<p class="small">'+esc(sg.text)+'</p><div class="small muted">Regel: '+esc(sg.rule)+' · Datenbasis: '+sg.basis.n+' Einträge ('+esc(sg.basis.label)+')</div>'+
+      '<details><summary class="small">Beobachtungen anzeigen</summary><ul>'+sg.evidence.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></details><div class="row">'+
+      (sg.exId?'<button class="small primary" data-act="editEx" data-day="'+sg.dayId+'" data-ex="'+sg.exId+'" data-sugg="'+esc(sg.key)+'">Vorgabe anpassen …</button>':'')+
+      '<button class="small" data-act="decide" data-k="'+esc(sg.key)+'" data-s="'+(sg.kind==='plan'?'bestätigt':'zur Kenntnis')+'">'+(sg.kind==='plan'?'Vorgabe beibehalten':'Zur Kenntnis genommen')+'</button>'+
+      (sg.kind==='plan'?'<button class="small" data-act="decide" data-k="'+esc(sg.key)+'" data-s="abgelehnt">Ablehnen</button>':'')+'</div></div>';
+  });
+  h+='<details><summary class="small">Wie entstehen Vorschläge?</summary><div class="section small">'+RULES_TEXT.map(r=>'<p><strong>'+esc(r[0])+':</strong> '+esc(r[1])+'</p>').join('')+'<p>Fehlende Werte werden nie geschätzt. Sätze ohne Wiederholungs- oder Gewichtsangabe gelten als „unbekannt“.</p></div></details>';
+  const dec=Object.entries(S.suggestionDecisions).sort((a,b)=>a[1].at<b[1].at?1:-1);
+  if(dec.length) h+='<details><summary class="small">Bisherige Entscheidungen ('+dec.length+')</summary><div class="section small">'+dec.slice(0,50).map(([k,d])=>'<p>'+fmtDate(d.at.slice(0,10))+' – '+esc(d.title)+': <strong>'+esc(d.status)+'</strong>'+(d.note?' ('+esc(d.note)+')':'')+'</p>').join('')+'</div></details>';
+  return h;
+}
+ACT.decide = el=>{ const sg=computeSuggestions().find(x=>x.key===el.dataset.k); if(sg){ decideSuggestion(sg, el.dataset.s); const b=activeBlock(); if(b){ logBlock(b,'Vorschlag „'+sg.title+'“: '+el.dataset.s); save(); } } render(); };
+
+/* ---------- Block anlegen / bearbeiten ---------- */
+function blockForm(b, isNew){
+  const stOpts=[['geplant','geplant'],['aktiv','aktiv'],['abgeschlossen','abgeschlossen']];
+  let h=inp('b-name','Name *',b.name,'required')+inp('b-goal','Trainingsziel',b.goal)+
+    '<div class="fields">'+inp('b-start','Startdatum',b.start||'','type="date"')+inp('b-end','Enddatum',b.end||'','type="date"')+sel('b-status','Status',stOpts,b.status)+'</div>'+
+    '<div class="fields">'+inp('b-capmin','RPE-Obergrenze von',fmtNum(b.rpeCapMin),'inputmode="decimal" placeholder="z. B. 7"')+inp('b-capmax','RPE-Obergrenze bis',fmtNum(b.rpeCapMax),'inputmode="decimal" placeholder="z. B. 7,5"')+'</div>'+
+    inp('b-rhythm','Wochenrhythmus',b.rhythm,'placeholder="z. B. bis zu 4 Einheiten pro Woche"')+ta('b-rules','Weitere Blockregeln',b.rules);
+  if(isNew && S.blocks.length){
+    h+=sel('b-copy','Trainingstage übernehmen',[['leer','Leer beginnen (4 Tage Mo/Di/Mi/Fr ohne Übungen)'],['tage','Tage aus „'+(planBlock()||{}).name+'“ übernehmen, ohne Übungen'],['alles','Tage und Übungen aus „'+(planBlock()||{}).name+'“ kopieren']],'leer');
+    h+='<p class="small muted">Ein neuer Block erzeugt keinen neuen Trainingsplan. Neue Vorgaben trägst du selbst ein – z. B. auf Basis der Tests am Blockende.</p>';
+  }
+  return h;
+}
+function readBlockForm(b){
+  const name=val('b-name'); if(!name){ toast('Bitte einen Namen eingeben.'); return false; }
+  const cmin=num(val('b-capmin')), cmax=num(val('b-capmax'));
+  if((val('b-capmin')!==''&&cmin==null)||(val('b-capmax')!==''&&cmax==null)){ toast('RPE-Obergrenze: bitte Zahlen eingeben.'); return false; }
+  if(cmin!=null&&cmax!=null&&cmin>cmax){ toast('RPE „von“ ist größer als „bis“.'); return false; }
+  const st=val('b-start'), en=val('b-end'); if(st&&en&&en<st){ toast('Das Enddatum liegt vor dem Startdatum.'); return false; }
+  Object.assign(b,{name, goal:val('b-goal'), start:st||null, end:en||null, rpeCapMin:cmin, rpeCapMax:cmax, rhythm:val('b-rhythm'), rules:val('b-rules')});
+  const newStatus=val('b-status');
+  if(newStatus==='aktiv') S.blocks.forEach(x=>{ if(x!==b && x.status==='aktiv'){ x.status='abgeschlossen'; logBlock(x,'Status auf „abgeschlossen“ gesetzt, weil „'+b.name+'“ aktiv wurde.'); toast('„'+x.name+'“ wurde auf abgeschlossen gesetzt.'); } });
+  b.status=newStatus; return true;
+}
+ACT.editBlock = el=>{ const b=blockById(el.dataset.id);
+  openDlg('Block bearbeiten', blockForm(b,false), '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="saveBlock" data-id="'+b.id+'">Speichern</button>'); };
+ACT.saveBlock = el=>{ const b=blockById(el.dataset.id); if(!readBlockForm(b)) return; logBlock(b,'Blockangaben bearbeitet.'); save(); closeDlg(); render(); };
+ACT.newBlock = ()=>{ const n=S.blocks.length+1;
+  openDlg('Neuer Trainingsblock', blockForm({name:'Block '+n+' – ',goal:'',start:null,end:null,status:'geplant',rpeCapMin:null,rpeCapMax:null,rhythm:'',rules:''},true),
+    '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="createBlock">Anlegen</button>'); };
+ACT.createBlock = ()=>{
+  const src=planBlock(); const mode=val('b-copy')||'leer';
+  const b={ id:uid('blk'), days:[], changelog:[], source:'eingabe' };
+  if(!readBlockForm(b)) return;
+  if(mode==='leer' || !src) b.days=[1,2,3,5].map((wd,i)=>({id:uid('day'),name:'Trainingstag '+(i+1),order:i+1,weekday:wd,location:'',focus:'',notes:'',exercises:[],version:1}));
+  else b.days=src.days.map(d=>({...clone(d), id:uid('day'), version:1, exercises: mode==='alles'?d.exercises.map(e=>({...clone(e), id:uid('ex')})):[] }));
+  logBlock(b,'Block angelegt'+(mode!=='leer'&&src?' (Tage'+(mode==='alles'?' und Übungen':'')+' aus „'+src.name+'“)':'')+'.');
+  S.blocks.push(b); ui.blockId=b.id; save(); closeDlg(); render();
+};
+
+/* ---------- Druck & Markdown ---------- */
+ACT.printPlan = ()=>{ ui.view='druck'; location.hash='druck'; render(); };
+ACT.mdPlan = ()=>{ const b=planBlock(); download('aos-plan_'+(b.name.replace(/[^\wäöüÄÖÜß-]+/g,'-'))+'.md', planMarkdown(b), 'text/markdown'); toast('Markdown wird heruntergeladen.'); };
+function viewPrint(){
+  const b=planBlock(); if(!b) return '<div class="empty">Kein Block.</div>';
+  let h='<div class="row no-print" style="margin-bottom:12px"><button data-act="go" data-view="plan">← Zurück zum Plan</button><button class="primary" data-act="doPrint">Drucken</button></div>';
+  h+='<h1>'+esc(b.name)+'</h1><p>Ziel: '+esc(b.goal||'—')+' · Zeitraum: '+(b.start?fmtDate(b.start):'—')+' – '+(b.end?fmtDate(b.end):'—')+' · <strong>'+esc(capText(b)||'')+'</strong></p>';
+  h+='<p class="small">Positionsgewichtung: '+S.profile.positions.map(p=>esc(p.code)+' '+p.weight+' %').join(', ')+(b.rules?' · Regeln: '+esc(b.rules):'')+'</p>';
+  b.days.slice().sort((a,c)=>a.order-c.order).forEach(d=>{ const loc=locById(d.location);
+    h+='<div class="section"><h2>'+esc(d.name)+' <span class="small muted">'+(d.weekday!=null?WD_LONG[d.weekday]:'')+(loc?' · '+esc(loc.name):'')+'</span></h2>'+(d.focus?'<p>Schwerpunkt: '+esc(d.focus)+'</p>':'');
+    if(!d.exercises.length) h+='<p class="muted">Noch keine Übungen.</p>';
+    else h+='<table><thead><tr><th>#</th><th>Übung</th><th>Vorgabe</th><th>Alternativen</th><th>Hinweis</th></tr></thead><tbody>'+d.exercises.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(exTitle(e))+'</td><td>'+esc(exPlanText(e))+'</td><td>'+esc((e.alternatives||[]).map(a=>a.name).join(', '))+'</td><td>'+esc(e.notes)+'</td></tr>').join('')+'</tbody></table>';
+    h+='</div>'; });
+  return h;
+}
+ACT.doPrint = ()=>window.print();
+
+'use strict';
+/* ===== AOS – Training protokollieren ===== */
+const METRIC_FIELDS = {
+  kraft:[['reps','Wdh','numeric'],['kg','kg','decimal'],['rpe','RPE','decimal']],
+  zeit:[['time','Zeit (s)','decimal'],['dist','Distanz (m)','decimal'],['rpe','RPE','decimal']],
+  distanz:[['dist','Distanz (m)','decimal'],['time','Zeit (s)','decimal'],['rpe','RPE','decimal']],
+  sprung:[['height','Weite/Höhe (cm)','decimal'],['reps','Wdh','numeric'],['rpe','RPE','decimal']]
+};
+function emptySet(){ return {reps:null,kg:null,rpe:null,time:null,dist:null,height:null}; }
+
+function viewTraining(){
+  if(ui.sessionId && sessionById(ui.sessionId)) return logForm();
+  const today=todayISO(); const b=activeBlock();
+  let h='<h1>Training</h1>';
+  const open=S.sessions.filter(s=>s.status==='geplant' && (!s.plannedDate || s.plannedDate<=addDays(today,6))).sort(bySessionDate);
+  h+='<h2>Offene Einheiten</h2>';
+  if(!open.length) h+='<div class="empty">Keine offenen Einheiten in den nächsten Tagen. Lege im <button class="link" data-act="go" data-view="plan">Plan</button> eine Woche an oder erfasse unten eine Einheit für heute.</div>';
+  open.forEach(s=>{ const ov=s.plannedDate&&s.plannedDate<today;
+    h+='<div class="section"><div class="row between"><div><strong>'+esc(s.name)+'</strong> <span class="small muted">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+'</span> '+(ov?badge('nicht erfasst','warn'):'')+'</div>'+capBadge(blockById(s.blockId))+'</div>'+
+      '<div class="row" style="margin-top:8px"><button class="primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button><button data-act="keep" data-id="'+s.id+'">Für Google Keep kopieren</button><button data-act="openSession" data-id="'+s.id+'">Verschieben / Auslassen</button></div></div>'; });
+  h+='<h2>Einheit für heute erfassen</h2><div class="section">';
+  if(b){
+    const opts=b.days.map(d=>[d.id,d.name]).concat([['__frei','Freie Einheit (ohne Vorgabe)']]);
+    h+='<div class="row"><div style="flex:1;min-width:200px">'+sel('tr-day','Trainingstag aus „'+b.name+'“',opts,opts[0][0])+'</div><button data-act="logToday" style="align-self:flex-end;margin-bottom:8px">Starten</button></div>';
+  } else h+='<p class="small muted">Kein aktiver Block – lege zuerst einen Block an.</p>';
+  h+='</div>';
+  const done=S.sessions.filter(s=>s.log && (s.status==='absolviert'||s.status==='teilweise')).sort((a,c)=>sessionDate(a)<sessionDate(c)?1:-1).slice(0,15);
+  h+='<h2>Zuletzt protokolliert</h2>';
+  if(!done.length) h+='<div class="empty">Noch keine Einheit protokolliert.</div>';
+  else h+='<div class="section table-wrap"><table><thead><tr><th>Datum</th><th>Einheit</th><th>Status</th><th>Tagesform</th><th>Beschwerden</th></tr></thead><tbody>'+
+    done.map(s=>'<tr><td>'+fmtDateShort(sessionDate(s))+'</td><td><button class="link" data-act="startLog" data-id="'+s.id+'">'+esc(s.name)+'</button></td><td>'+statusBadge(s)+'</td><td>'+(s.log.form!=null?s.log.form:'—')+'</td><td>'+(s.log.pain?badge('notiert','warn'):'—')+'</td></tr>').join('')+'</tbody></table></div>';
+  return h;
+}
+ACT.logToday = ()=>{ const b=activeBlock(); const v=val('tr-day'); const d=v==='__frei'?null:dayById(b,v);
+  const s=makeSession(b,d,todayISO()); S.sessions.push(s); save(); startLog(s.id); };
+ACT.startLog = el=>{ closeDlg(); startLog(el.dataset.id); };
+function startLog(id){
+  const s=sessionById(id); ui.sessionId=id; ui.view='training'; location.hash='training';
+  if(s.log) ui.draft=Object.assign(clone(s.log),{date:s.plannedDate||todayISO(), location:s.location||''});
+  else ui.draft={ date:s.plannedDate||todayISO(), location:s.location||'', form:null, durationMin:null, pain:'', notes:'',
+    exercises:s.plan.map(pe=>({planExId:pe.id, name:pe.name, variant:pe.variant, metric:pe.metric||'kraft', sets:Array.from({length:pe.sets||1},emptySet), note:''})) };
+  render(); window.scrollTo(0,0);
+}
+
+function logForm(){
+  const s=sessionById(ui.sessionId); const b=blockById(s.blockId); const dr=ui.draft; const cap=capMax(b);
+  const day=b?dayById(b,s.dayId):null;
+  let h='<div class="row no-print"><button data-act="logBack">← Zurück</button></div>';
+  h+='<h1>'+esc(s.name)+'</h1><div class="row">'+capBadge(b)+' '+statusBadge(s)+'</div>';
+  if(b && b.rules) h+='<p class="small muted">Blockregeln: '+esc(b.rules)+'</p>';
+  if(day && !s.log && day.version!==s.dayVersion) h+='<div class="note">Die Vorgaben von „'+esc(day.name)+'“ wurden seit dem Anlegen dieser Einheit geändert. <button class="link" data-act="refreshPlan">Aktuelle Vorgaben übernehmen</button></div>';
+  h+='<div class="fields">'+inp('lg-date','Datum',dr.date,'type="date" data-log="meta" data-f="date"')+
+    sel('lg-loc','Trainingsort',[['','— nicht angegeben —']].concat(S.profile.locations.map(l=>[l.id,l.name])),dr.location,'data-log="meta" data-f="location"')+'</div>';
+  if(!dr.exercises.length) h+='<div class="empty">Keine Übungen in dieser Einheit. Füge die Übungen hinzu, die du gemacht hast.</div>';
+  dr.exercises.forEach((e,i)=>{
+    const pe=(s.plan||[]).find(p=>p.id===e.planExId);
+    const F=METRIC_FIELDS[e.metric]||METRIC_FIELDS.kraft;
+    h+='<div class="ex"><div class="ex-head"><span class="ex-name">'+esc(e.name+(e.variant?' ('+e.variant+')':''))+'</span>'+(pe?'<span class="plan-hint">Soll: '+esc(exPlanText(pe)||'ohne Vorgabe')+'</span>':'<span class="plan-hint">ohne Vorgabe</span>')+'</div>';
+    if(pe && pe.alternatives && pe.alternatives.length) h+='<div class="small muted">Alternativen: '+esc(pe.alternatives.map(a=>a.name).join(' / '))+'</div>';
+    if(pe && pe.notes) h+='<div class="small muted">'+esc(pe.notes)+'</div>';
+    e.sets.forEach((x,j)=>{
+      h+='<div class="setrow"><span class="lbl">Satz '+(j+1)+'</span>'+F.map(([f,l,im])=>{
+        const id='s-'+i+'-'+j+'-'+f; const v=x[f];
+        const over = f==='rpe' && cap!=null && v!=null && v>cap;
+        return '<div><label for="'+id+'" class="small">'+l+'</label><input id="'+id+'" inputmode="'+im+'" value="'+(v==null?'':fmtNum(v))+'" data-log="set" data-e="'+i+'" data-s="'+j+'" data-f="'+f+'"'+(over?' style="border-color:var(--warn);border-width:2px" title="über der RPE-Obergrenze"':'')+'></div>';
+      }).join('')+'</div>';
+    });
+    h+='<div class="row" style="margin-top:4px"><button class="small" data-act="addSet" data-e="'+i+'">+ Satz</button><button class="small" data-act="delSet" data-e="'+i+'" '+(e.sets.length<=1?'disabled':'')+'>− Satz</button>'+
+      (pe && e.metric==='kraft' && (repMin(pe.reps)!=null||pe.loadKg!=null)?'<button class="small" data-act="sollToIst" data-e="'+i+'" title="Leere Wdh- und kg-Felder mit der Vorgabe füllen">Soll in leere Felder</button>':'')+
+      (!e.planExId?'<button class="small danger" data-act="delLogEx" data-e="'+i+'">Übung entfernen</button>':'')+'</div>';
+    h+=inp('en-'+i,'Notiz zur Übung (optional)',e.note,'data-log="exnote" data-e="'+i+'"')+'</div>';
+  });
+  h+='<button data-act="addLogEx">+ Übung hinzufügen</button>';
+  h+='<h2>Einheit</h2><div class="fields">'+sel('lg-form','Tagesform',[['','— nicht angegeben —']].concat([1,2,3,4,5].map(n=>[n,FORM_LABEL[n]])),dr.form,'data-log="meta" data-f="form"')+
+    inp('lg-dur','Dauer (min, optional)',dr.durationMin,'inputmode="numeric" data-log="meta" data-f="durationMin"')+'</div>';
+  h+=ta('lg-pain','Schmerzen oder Beschwerden (optional)',dr.pain,'data-log="meta" data-f="pain" placeholder="z. B. Ort, Art, wann aufgetreten"');
+  h+='<p class="small muted">Beschwerden werden nur protokolliert. AOS stellt keine Diagnose und gibt keine Trainingsfreigabe. Bei anhaltenden oder unklaren Beschwerden bitte mit einer qualifizierten Fachperson abklären.</p>';
+  h+=ta('lg-notes','Notizen (optional)',dr.notes,'data-log="meta" data-f="notes"');
+  h+='<p class="small muted">Nicht ausgefüllte Felder bleiben leer – AOS ergänzt oder schätzt nichts. Ein Abschluss erhöht keine Gewichte automatisch.</p>';
+  h+='<div class="row" style="margin-top:12px"><button class="primary" data-act="saveLog" data-st="absolviert">Als absolviert speichern</button><button data-act="saveLog" data-st="teilweise">Als teilweise absolviert speichern</button>'+
+    '<button data-act="keep" data-id="'+s.id+'">Keep-Text</button>'+(s.log?'<button class="danger" data-act="discardLog">Protokoll verwerfen</button>':'')+'</div>';
+  return h;
+}
+function updateDraftFromInput(t){
+  const dr=ui.draft; if(!dr) return; const k=t.dataset.log;
+  if(k==='set'){ const f=t.dataset.f; const v=t.value.trim(); const n = f==='reps' ? (v===''?null:(/^\d+$/.test(v)?parseInt(v,10):NaN)) : (v===''?null:(num(v)==null?NaN:num(v)));
+    dr.exercises[+t.dataset.e].sets[+t.dataset.s][f]=n;
+    if(f==='rpe'){ const s=sessionById(ui.sessionId); const cap=capMax(blockById(s.blockId)); const over=cap!=null&&typeof n==='number'&&n>cap; t.style.borderColor=over?'var(--warn)':''; t.style.borderWidth=over?'2px':''; t.title=over?'über der RPE-Obergrenze':''; } }
+  else if(k==='exnote') dr.exercises[+t.dataset.e].note=t.value;
+  else if(k==='meta'){ const f=t.dataset.f;
+    if(f==='form') dr.form=t.value===''?null:Number(t.value);
+    else if(f==='durationMin') dr.durationMin=t.value.trim()===''?null:(/^\d+$/.test(t.value.trim())?parseInt(t.value,10):NaN);
+    else dr[f]=t.value; }
+}
+ACT.logBack = ()=>{ ui.sessionId=null; ui.draft=null; render(); };
+ACT.addSet = el=>{ const e=ui.draft.exercises[+el.dataset.e]; e.sets.push(emptySet()); render(); };
+ACT.delSet = el=>{ const e=ui.draft.exercises[+el.dataset.e]; if(e.sets.length>1) e.sets.pop(); render(); };
+ACT.delLogEx = el=>{ ui.draft.exercises.splice(+el.dataset.e,1); render(); };
+ACT.sollToIst = el=>{ const s=sessionById(ui.sessionId); const e=ui.draft.exercises[+el.dataset.e]; const pe=s.plan.find(p=>p.id===e.planExId); if(!pe) return;
+  const r=repMin(pe.reps); e.sets.forEach(x=>{ if(x.reps==null && r!=null) x.reps=r; if(x.kg==null && pe.loadKg!=null) x.kg=pe.loadKg; }); render(); toast('Leere Felder mit der Vorgabe gefüllt – bitte bei Abweichungen korrigieren.'); };
+ACT.refreshPlan = ()=>{ const s=sessionById(ui.sessionId); const b=blockById(s.blockId); const d=dayById(b,s.dayId); s.plan=clone(d.exercises); s.dayVersion=d.version; save(); startLog(s.id); };
+ACT.addLogEx = ()=>{
+  openDlg('Übung hinzufügen', inp('le-name','Übung *','','required')+inp('le-var','Variante (optional)','')+sel('le-met','Messart',[['kraft','Kraft (Wdh × Gewicht)'],['zeit','Zeit'],['distanz','Distanz'],['sprung','Sprung / Weite / Höhe']],'kraft'),
+    '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="addLogExOk">Hinzufügen</button>'); };
+ACT.addLogExOk = ()=>{ const n=val('le-name'); if(!n){ toast('Bitte einen Namen eingeben.'); return; }
+  ui.draft.exercises.push({planExId:null,name:n,variant:val('le-var'),metric:val('le-met'),sets:[emptySet()],note:''}); closeDlg(); render(); };
+ACT.saveLog = el=>{
+  const s=sessionById(ui.sessionId); const dr=ui.draft;
+  const bad=[]; dr.exercises.forEach(e=>e.sets.forEach((x,j)=>Object.keys(x).forEach(k=>{ if(Number.isNaN(x[k])) bad.push(e.name+' Satz '+(j+1)); })));
+  if(Number.isNaN(dr.durationMin)) bad.push('Dauer');
+  if(bad.length){ toast('Bitte nur Zahlen eintragen: '+bad.slice(0,3).join(', ')); return; }
+  if(!dr.date){ toast('Bitte ein Datum angeben.'); return; }
+  if(dr.date!==s.plannedDate){ s.moves=s.moves||[]; s.moves.push({from:s.plannedDate,to:dr.date,at:new Date().toISOString(),note:'bei Erfassung'}); s.plannedDate=dr.date; s.week=mondayOf(dr.date); }
+  s.location=dr.location;
+  const log=clone(dr); delete log.date; delete log.location;
+  log.exercises.forEach(e=>{ e.sets=e.sets.filter((x,j)=>j===0||Object.values(x).some(v=>v!=null)); });
+  log.loggedAt=new Date().toISOString();
+  s.log=log; s.status=el.dataset.st; save();
+  ui.sessionId=null; ui.draft=null; toast('Einheit gespeichert ('+STATUS_LABEL[s.status]+').'); render();
+};
+ACT.discardLog = ()=>{ confirmDlg('Protokoll verwerfen?','Die erfassten Werte dieser Einheit werden gelöscht und die Einheit wieder auf „geplant“ gesetzt.','Verwerfen',()=>{ const s=sessionById(ui.sessionId); s.log=null; s.status='geplant'; save(); ui.sessionId=null; ui.draft=null; render(); }, true); };
+
+'use strict';
+/* ===== AOS – Tests, Körpergewicht, Verlauf ===== */
+function lineChart(points, opts){
+  opts=opts||{}; const W=640,H=200,P={l:44,r:14,t:14,b:28};
+  if(points.length<2) return '';
+  const xs=points.map(p=>parseISO(p.x).getTime()); const ys=points.map(p=>p.y);
+  let y0=Math.min(...ys), y1=Math.max(...ys); if(opts.goal!=null){ y0=Math.min(y0,opts.goal); y1=Math.max(y1,opts.goal); }
+  if(y0===y1){ y0-=1; y1+=1; } const pad=(y1-y0)*0.1; y0-=pad; y1+=pad;
+  const x0=Math.min(...xs), x1=Math.max(...xs)||x0+1;
+  const X=t=>P.l+(x1===x0?0.5:(t-x0)/(x1-x0))*(W-P.l-P.r), Y=v=>H-P.b-(v-y0)/(y1-y0)*(H-P.t-P.b);
+  let s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(opts.label||'Verlauf')+'">';
+  for(let i=0;i<=3;i++){ const v=y0+(y1-y0)*i/3; s+='<line class="gl" x1="'+P.l+'" x2="'+(W-P.r)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text x="'+(P.l-6)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+fmtNum(Math.round(v*10)/10)+'</text>'; }
+  if(opts.goal!=null) s+='<line class="goal" x1="'+P.l+'" x2="'+(W-P.r)+'" y1="'+Y(opts.goal)+'" y2="'+Y(opts.goal)+'"/><text x="'+(W-P.r)+'" y="'+(Y(opts.goal)-5)+'" text-anchor="end">Ziel '+fmtNum(opts.goal)+'</text>';
+  s+='<polyline class="ln" points="'+points.map((p,i)=>X(xs[i])+','+Y(p.y)).join(' ')+'"/>';
+  points.forEach((p,i)=>{ s+='<circle class="pt" cx="'+X(xs[i])+'" cy="'+Y(p.y)+'" r="4"><title>'+fmtDate(p.x)+': '+fmtNum(p.y)+(opts.unit?' '+opts.unit:'')+'</title></circle>'; });
+  s+='<text x="'+P.l+'" y="'+(H-8)+'">'+fmtDate(points[0].x)+'</text><text x="'+(W-P.r)+'" y="'+(H-8)+'" text-anchor="end">'+fmtDate(points[points.length-1].x)+'</text></svg>';
+  return s;
+}
+
+function viewTests(){
+  let h='<h1>Tests & Verlauf</h1><div class="row"><button class="primary" data-act="editTest">+ Testergebnis</button><button data-act="editBw">+ Körpergewicht</button></div>';
+  // Körpergewicht
+  const bws=S.bodyweight.slice().sort((a,b)=>(a.date||'')<(b.date||'')?-1:1);
+  const goalW=S.profile.targetWeightKg;
+  h+='<h2>Körpergewicht</h2><div class="section">';
+  const pts=bws.filter(x=>x.date&&x.kg!=null).map(x=>({x:x.date,y:x.kg}));
+  h+= pts.length>=2 ? lineChart(pts,{unit:'kg',goal:goalW,label:'Körpergewicht'}) : '<p class="small muted">Für ein Diagramm werden mindestens zwei Messungen mit Datum benötigt.</p>';
+  h+='<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Gewicht</th><th>Notiz</th><th></th></tr></thead><tbody>'+
+    bws.slice().reverse().map(x=>'<tr><td>'+(x.date?fmtDate(x.date):badge('Datum fehlt','warn'))+'</td><td>'+(x.approx?'≈ ':'')+fmtNum(x.kg)+' kg</td><td>'+esc(x.note)+' '+srcBadge(x)+'</td><td><button class="small" data-act="editBw" data-id="'+x.id+'">Bearbeiten</button></td></tr>').join('')+'</tbody></table></div></div>';
+  // Tests
+  const names=[...new Set(S.tests.map(t=>t.name))];
+  h+='<h2>Testergebnisse</h2>';
+  if(!names.length) h+='<div class="empty">Noch keine Tests. Erfasse z. B. Broad Jump, 40-Yard-Sprint oder einen Krafttest mit Datum und Testbedingungen.</div>';
+  TEST_CATS.forEach(cat=>{
+    const cn=names.filter(n=>S.tests.some(t=>t.name===n&&t.category===cat)); if(!cn.length) return;
+    h+='<h3>'+esc(cat)+'</h3>';
+    cn.forEach(n=>h+=testCard(n));
+  });
+  // Trainingsverlauf
+  h+='<h2>Verlauf aus Trainingsprotokollen</h2>'+trainingProgress();
+  return h;
+}
+function testCard(name){
+  const list=S.tests.filter(t=>t.name===name).slice().sort((a,b)=>{ if(a.date&&b.date) return a.date<b.date?-1:1; if(a.date) return 1; if(b.date) return -1; return 0; });
+  const goal=S.goals.find(g=>g.testName===name && g.status==='aktiv');
+  const units=[...new Set(list.filter(t=>t.value!=null).map(t=>t.unit))];
+  const pts=list.filter(t=>t.date&&t.value!=null&&t.unit===units[0]).map(t=>({x:t.date,y:t.value}));
+  let h='<div class="section"><div class="row between"><strong>'+esc(name)+'</strong><span class="small muted">'+(list.length===1?'1 Eintrag':list.length+' Einträge')+(goal?' · Ziel '+fmtNum(goal.target)+' '+esc(goal.unit):'')+'</span></div>';
+  if(pts.length>=2) h+=lineChart(pts,{unit:units[0],goal:goal&&goal.unit===units[0]?goal.target:null,label:name});
+  // Vergleich der letzten beiden Einträge
+  if(list.length>=2){
+    const a=list[list.length-2], b=list[list.length-1]; const issues=[];
+    if(!a.date||!b.date) issues.push('mindestens ein Datum fehlt – Reihenfolge unsicher');
+    if(!a.conditions||!b.conditions) issues.push('Testbedingungen fehlen');
+    else if(a.conditions!==b.conditions) issues.push('Testbedingungen unterscheiden sich');
+    if(a.unit!==b.unit) issues.push('unterschiedliche Einheiten');
+    if((a.reps||null)!==(b.reps||null)) issues.push('unterschiedliche Wiederholungszahl');
+    let diff=''; if(a.value!=null&&b.value!=null&&a.unit===b.unit){ const d=b.value-a.value; diff=(d>0?'+':'')+fmtNum(d)+' '+b.unit; }
+    h+='<p class="small">Vergleich der letzten beiden Einträge: '+esc(testValueText(a))+' → '+esc(testValueText(b))+(diff?' ('+esc(diff)+')':'')+'</p>';
+    if(issues.length) h+='<div class="note warn small">Vergleich nur eingeschränkt aussagekräftig: '+esc(issues.join('; '))+'.</div>';
+  }
+  h+='<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Ergebnis</th><th>Bedingungen</th><th>Hinweise</th><th></th></tr></thead><tbody>'+
+    list.slice().reverse().map(t=>{ const g=testGaps(t);
+      return '<tr><td>'+(t.date?fmtDate(t.date):'—')+'</td><td>'+esc(testValueText(t))+'</td><td>'+esc(t.conditions||'—')+'</td><td>'+srcBadge(t)+' '+g.map(x=>badge(x,'warn')).join(' ')+(t.note?'<div class="small muted">'+esc(t.note)+'</div>':'')+'</td><td><button class="small" data-act="editTest" data-id="'+t.id+'">Bearbeiten</button></td></tr>'; }).join('')+
+    '</tbody></table></div><button class="small" data-act="editTest" data-name="'+esc(name)+'">+ Neue Messung</button></div>';
+  return h;
+}
+ACT.editTest = el=>{
+  const t=el.dataset.id?S.tests.find(x=>x.id===el.dataset.id):null;
+  const prev=el.dataset.name?S.tests.filter(x=>x.name===el.dataset.name).slice(-1)[0]:null;
+  const d=t||{name:prev?prev.name:'',category:prev?prev.category:'Kraft',date:todayISO(),value:null,unit:prev?prev.unit:'',reps:null,detail:'',conditions:'',rpe:null,note:''};
+  const names=[...new Set(S.tests.map(x=>x.name).concat(S.goals.map(g=>g.testName)).filter(Boolean))];
+  let body=(t&&t.source==='ausgangsdaten'?'<p class="note small">Dies ist ein Ausgangswert aus der Produktbeschreibung. Ergänze nur Angaben, die du tatsächlich kennst.</p>':'')+
+    inp('t-name','Testname *',d.name,'list="t-names" required')+'<datalist id="t-names">'+names.map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>'+
+    '<div class="fields">'+sel('t-cat','Kategorie',TEST_CATS.map(c=>[c,c]),d.category)+inp('t-date','Datum',d.date||'','type="date"')+'</div>'+
+    '<div class="fields">'+inp('t-val','Messwert',fmtNum(d.value),'inputmode="decimal"')+inp('t-unit','Einheit',d.unit,'placeholder="kg, cm, s, Wdh …"')+inp('t-reps','Wdh (bei Kraft, optional)',d.reps,'inputmode="numeric"')+inp('t-rpe','RPE (optional)',fmtNum(d.rpe),'inputmode="decimal"')+'</div>'+
+    inp('t-detail','Detail (optional)',d.detail,'placeholder="z. B. 5 / 5 / 3 Wdh"')+
+    ta('t-cond','Testbedingungen',d.conditions,'placeholder="z. B. Halle, Turnschuhe, handgestoppt, nach Aufwärmen"')+ta('t-note','Notiz',d.note)+
+    '<p class="small muted">Fehlende Angaben bleiben leer und werden als unvollständig markiert.</p>';
+  openDlg(t?'Testergebnis bearbeiten':'Testergebnis erfassen', body,
+    (t?'<button class="danger" data-act="delTest" data-id="'+t.id+'">Löschen</button>':'')+'<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="saveTest" data-id="'+(t?t.id:'')+'">Speichern</button>');
+};
+ACT.saveTest = el=>{
+  const name=val('t-name'); if(!name){ toast('Bitte einen Testnamen eingeben.'); return; }
+  const v=val('t-val'), r=val('t-reps'), rp=val('t-rpe');
+  if((v&&num(v)==null)||(rp&&num(rp)==null)||(r&&!/^\d+$/.test(r))){ toast('Messwert, Wdh und RPE müssen Zahlen sein.'); return; }
+  if(!v && !val('t-detail')){ toast('Bitte einen Messwert oder ein Detail eintragen.'); return; }
+  let t=el.dataset.id?S.tests.find(x=>x.id===el.dataset.id):null;
+  if(!t){ t={id:uid('test'),source:'eingabe',createdAt:new Date().toISOString()}; S.tests.push(t); }
+  Object.assign(t,{name,category:val('t-cat'),date:val('t-date')||null,value:num(v),unit:val('t-unit'),reps:r?parseInt(r,10):null,rpe:num(rp),detail:val('t-detail'),conditions:val('t-cond'),note:val('t-note')});
+  save(); closeDlg(); render();
+};
+ACT.delTest = el=>{ const id=el.dataset.id; confirmDlg('Testergebnis löschen?','Diese Messung wird endgültig entfernt.','Löschen',()=>{ S.tests=S.tests.filter(x=>x.id!==id); save(); render(); }, true); };
+ACT.editBw = el=>{
+  const x=el.dataset.id?S.bodyweight.find(b=>b.id===el.dataset.id):null;
+  openDlg(x?'Körpergewicht bearbeiten':'Körpergewicht erfassen',
+    (x&&x.source==='ausgangsdaten'?'<p class="note small">Ausgangswert („ungefähr 92 kg“, Datum unbekannt). Neue Messungen bitte als eigenen Eintrag erfassen, damit der Ausgangswert erhalten bleibt.</p>':'')+
+    '<div class="fields">'+inp('bw-date','Datum',x?x.date||'':todayISO(),'type="date"')+inp('bw-kg','Gewicht (kg) *',x?fmtNum(x.kg):'','inputmode="decimal" required')+'</div>'+
+    '<label style="display:flex;align-items:center;color:var(--text)"><input type="checkbox" id="bw-approx" '+(x&&x.approx?'checked':'')+'> ungefährer Wert</label>'+inp('bw-note','Notiz (optional)',x?x.note:'','placeholder="z. B. morgens nüchtern"'),
+    (x?'<button class="danger" data-act="delBw" data-id="'+x.id+'">Löschen</button>':'')+'<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="saveBw" data-id="'+(x?x.id:'')+'">Speichern</button>');
+};
+ACT.saveBw = el=>{
+  const kg=num(val('bw-kg')); if(kg==null||kg<30||kg>300){ toast('Bitte ein gültiges Gewicht in kg eingeben.'); return; }
+  let x=el.dataset.id?S.bodyweight.find(b=>b.id===el.dataset.id):null;
+  if(!x){ x={id:uid('bw'),source:'eingabe',createdAt:new Date().toISOString()}; S.bodyweight.push(x); }
+  Object.assign(x,{date:val('bw-date')||null,kg,approx:document.getElementById('bw-approx').checked,note:val('bw-note')});
+  save(); closeDlg(); render();
+};
+ACT.delBw = el=>{ const id=el.dataset.id; confirmDlg('Messung löschen?','Diese Körpergewichtsmessung wird endgültig entfernt.','Löschen',()=>{ S.bodyweight=S.bodyweight.filter(x=>x.id!==id); save(); render(); }, true); };
+
+/* Verlauf je Übung aus den Protokollen: schwerster erfasster Satz pro Einheit (keine Hochrechnung) */
+function trainingProgress(){
+  const map={};
+  loggedSessions().forEach(s=>s.log.exercises.forEach(e=>{
+    const key=e.name+(e.variant?' ('+e.variant+')':'');
+    const withKg=e.sets.filter(x=>x.kg!=null);
+    const top=withKg.length?withKg.reduce((a,b)=>(b.kg>a.kg||(b.kg===a.kg&&(b.reps||0)>(a.reps||0)))?b:a):null;
+    (map[key]=map[key]||[]).push({date:sessionDate(s), top, sets:e.sets, session:s});
+  }));
+  const keys=Object.keys(map).sort();
+  if(!keys.length) return '<div class="empty">Sobald Einheiten protokolliert sind, siehst du hier je Übung den Verlauf.</div>';
+  if(!ui.exName || !map[ui.exName]) ui.exName=keys[0];
+  const list=map[ui.exName];
+  let h='<div class="section">'+sel('pr-ex','Übung',keys.map(k=>[k,k+' ('+map[k].length+')']),ui.exName,'data-chg="pickEx"');
+  const pts=list.filter(x=>x.top).map(x=>({x:x.date,y:x.top.kg}));
+  h+= pts.length>=2 ? lineChart(pts,{unit:'kg',label:'Schwerster Satz '+ui.exName}) : '<p class="small muted">Diagramm ab zwei Einheiten mit Gewichtsangabe.</p>';
+  h+='<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Schwerster Satz</th><th>Alle Sätze</th></tr></thead><tbody>'+list.slice().reverse().map(x=>'<tr><td>'+fmtDate(x.date)+'</td><td>'+(x.top?fmtNum(x.top.kg)+' kg × '+(x.top.reps!=null?x.top.reps:'?')+(x.top.rpe!=null?' @'+fmtNum(x.top.rpe):''):'—')+'</td><td class="small">'+esc(x.sets.map(y=>istOf(y)).filter(Boolean).join(' | ')||'—')+'</td></tr>').join('')+'</tbody></table></div>';
+  h+='<p class="small muted">„Schwerster Satz“ ist der erfasste Satz mit dem höchsten Gewicht – keine Schätzung eines Maximalgewichts.</p></div>';
+  return h;
+}
+CHG.pickEx = el=>{ ui.exName=el.value; render(); };
+
+'use strict';
+/* ===== AOS – Ernährung: Bausteine, Kontext, Ideen, Kombinationen =====
+   Grundsätze: keine Kalorien- oder Mengenvorgaben, keine Verbote, keine Bewertungen "gut/schlecht".
+   Ideen beruhen nur auf eingetragenen Daten und Markierungen und zeigen, worauf sie beruhen. */
+const N = ()=>S.nutrition;
+const catName = c=>(NUT_CATS.find(x=>x[0]===c)||[c,c])[1];
+const foodById = id=>N().items.find(f=>f.id===id);
+const PREF_LABEL = {favorit:'Favorit', neutral:'neutral', nicht:'lieber nicht'};
+
+/* ---------- Tageskontext aus den Trainingsdaten ---------- */
+function dayContext(date){
+  const sess=S.sessions.filter(s=>s.plannedDate===date && s.status!=='ausgelassen');
+  const auto = sess.length ? 'Trainingstag' : 'Ruhetag';
+  const type = N().dayOverrides[date] || auto;
+  const basis=[]; const hints=[];
+  const b=activeBlock();
+  if(b) basis.push('Trainingsphase: '+b.name+(capText(b)?' ('+capText(b)+')':''));
+  if(sess.length) basis.push((date===todayISO()?'Heute':fmtDateShort(date))+': '+sess.map(s=>s.name+' – '+STATUS_LABEL[s.status]).join(', '));
+  else basis.push((date===todayISO()?'Heute':fmtDateShort(date))+': keine Einheit geplant');
+  if(N().dayOverrides[date]) basis.push('Tagesart von dir festgelegt: '+type+' (automatisch wäre: '+auto+')');
+  const mon=mondayOf(date); const wk=S.sessions.filter(s=>s.plannedDate && mondayOf(s.plannedDate)===mon);
+  const done=wk.filter(s=>s.status==='absolviert'||s.status==='teilweise').length;
+  basis.push('Diese Woche: '+done+' von '+wk.length+' geplanten Einheiten absolviert');
+  if(done>=3) hints.push('Trainingsreiche Woche – regelmäßige Mahlzeiten unterstützen die Erholung.');
+  const last=loggedSessions().slice(-1)[0];
+  if(last && last.log.form!=null){ basis.push('Letzte Tagesform: '+last.log.form+' von 5 ('+fmtDate(sessionDate(last))+')'); if(last.log.form<=2) hints.push('Die Tagesform war zuletzt niedrig. Erholung (Schlaf, regelmäßiges Essen, Trinken) kannst du heute mitbedenken.'); }
+  else basis.push('Tagesform: noch nicht erfasst');
+  const bw=S.bodyweight.filter(x=>x.date).sort((a,c)=>a.date<c.date?1:-1)[0];
+  const tw=S.profile.targetWeightKg;
+  if(bw) basis.push('Körpergewicht: '+fmtNum(bw.kg)+' kg ('+fmtDate(bw.date)+')'+(tw!=null?' · Zielgewicht: '+fmtNum(tw)+' kg':' · kein Zielgewicht eingetragen'));
+  else basis.push('Körpergewicht: keine Messung mit Datum'+(tw!=null?' · Zielgewicht: '+fmtNum(tw)+' kg':''));
+  if(tw!=null && bw && Math.abs(bw.kg-tw)>=1) hints.push('Zwischen aktuellem Gewicht und Zielgewicht liegen '+fmtNum(Math.abs(bw.kg-tw))+' kg. AOS berechnet keinen Energiebedarf. Für ein konkretes Gewichtsziel kann eine Sporternährungsfachkraft weiterhelfen.');
+  return {type, auto, sess, basis, hints};
+}
+
+/* ---------- Ideen: transparent bewertete Kombinationen aus deinen Bausteinen ---------- */
+function mealIdea(dayType, slot, seed){
+  const recent=new Set(); N().meals.filter(m=>m.date>=addDays(todayISO(),-3)).forEach(m=>m.items.forEach(i=>recent.add(i)));
+  let rnd=seed||1; const rand=()=>{ rnd=(rnd*9301+49297)%233280; return rnd/233280; };
+  const pick=cat=>{
+    const pool=N().items.filter(f=>f.cat===cat && f.pref!=='nicht');
+    if(!pool.length) return null;
+    const scored=pool.map(f=>{ const why=[]; let sc=0;
+      if(f.pref==='favorit'){ sc+=2; why.push('Favorit'); }
+      if(f.tags.includes(dayType)){ sc+=2; why.push('markiert für '+dayType); }
+      if(f.tags.includes(slot)){ sc+=2; why.push('markiert für „'+slot+'“'); }
+      if(recent.has(f.id)){ sc-=1; why.push('in den letzten Tagen schon gegessen – Abwechslung'); }
+      return {f, sc:sc+rand()*1.5, why}; }).sort((a,c)=>c.sc-a.sc);
+    return scored[0];
+  };
+  const cats = slot==='Snack' ? ['snack','veg'] : slot==='Vor dem Training' ? ['carb','veg','protein'] : ['protein','carb','veg'].concat(slot==='Nach dem Training'?[]:['fat']);
+  return cats.map(pick).filter(Boolean);
+}
+
+function viewNutrition(){
+  const date=ui.nutDate||todayISO(); const ctx=dayContext(date);
+  let h='<h1>Ernährung</h1><p class="small muted">Bausteine statt Speiseplan: Du wählst aus, was zu deinem Tag passt. Keine Kalorienvorgaben, keine Verbote.</p>';
+  // Tag
+  h+='<div class="section"><div class="row between"><div class="row">'+
+    '<button class="small" data-act="nutDay" data-d="-1" aria-label="Vorheriger Tag">←</button><strong>'+(date===todayISO()?'Heute, ':'')+fmtDateShort(date)+'</strong>'+
+    '<button class="small" data-act="nutDay" data-d="1" aria-label="Nächster Tag">→</button>'+(date!==todayISO()?'<button class="small" data-act="nutDay" data-d="0">Heute</button>':'')+'</div>'+
+    '<div style="min-width:180px">'+sel('nut-type','Tagesart',[['','automatisch ('+ctx.auto+')']].concat(DAY_TYPES.map(t=>[t,t])),N().dayOverrides[date]||'','data-chg="nutType"')+'</div></div>';
+  h+='<h3>Orientierung für einen '+esc(ctx.type)+'</h3><p>'+esc(N().guides[ctx.type]||'')+'</p>'+
+    '<p class="small muted">'+(N().guidesSource==='ausgangsdaten'?'Allgemeiner Ausgangstext – ':'')+'<button class="link small" data-act="editGuides">an deine Erfahrung anpassen</button></p>';
+  ctx.hints.forEach(x=>h+='<div class="note small">'+esc(x)+'</div>');
+  h+='<details><summary class="small">Worauf das beruht</summary><ul class="small">'+ctx.basis.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul><p class="small muted">Es werden nur eingetragene Daten verwendet. Fehlende Angaben werden nicht geschätzt.</p></details></div>';
+  // Ideen
+  if(!ui.nutSlot) ui.nutSlot = ctx.type==='Trainingstag' ? 'Nach dem Training' : 'Mittagessen';
+  ui.nutSeed = ui.nutSeed || 1;
+  const idea=mealIdea(ctx.type, ui.nutSlot, ui.nutSeed);
+  h+='<h2>Idee für eine Mahlzeit</h2><div class="section">'+sel('nut-slot','Mahlzeit',NUT_SLOTS.map(x=>[x,x]),ui.nutSlot,'data-chg="nutSlot"');
+  if(!idea.length) h+='<div class="empty">Keine passenden Bausteine. Füge unten Bausteine hinzu.</div>';
+  else {
+    h+='<ul>'+idea.map(x=>'<li><strong>'+esc(x.f.name)+'</strong> <span class="small muted">('+esc(catName(x.f.cat))+(x.why.length?' · '+esc(x.why.join(', ')):'')+')</span></li>').join('')+'</ul>';
+    if(idea.every(x=>!x.why.length)) h+='<p class="small muted">Noch zufällig gewählt: Markiere Favoriten und ordne Bausteine Tagesarten oder Mahlzeiten zu, dann werden die Ideen persönlicher.</p>';
+    h+='<div class="row"><button class="primary" data-act="nutCompose" data-items="'+idea.map(x=>x.f.id).join(',')+'">Übernehmen & anpassen</button><button data-act="nutShuffle">Andere Idee</button></div>';
+  }
+  h+='</div>';
+  // Gegessen heute
+  const meals=N().meals.filter(m=>m.date===date).sort((a,c)=>NUT_SLOTS.indexOf(a.slot)-NUT_SLOTS.indexOf(c.slot));
+  h+='<h2>Mahlzeiten an diesem Tag</h2>';
+  if(!meals.length) h+='<div class="empty">Noch nichts eingetragen. Das Eintragen ist freiwillig – es hilft nur, Abwechslung in die Ideen zu bringen.</div>';
+  meals.forEach(m=>{ h+='<div class="sugg"><div class="row between"><strong>'+esc(m.slot)+(m.name?' – '+esc(m.name):'')+'</strong><span><button class="small" data-act="nutEditMeal" data-id="'+m.id+'">Bearbeiten</button></span></div><div class="small">'+esc(m.items.map(i=>(foodById(i)||{name:'(entfernter Baustein)'}).name).join(', '))+'</div>'+(m.note?'<div class="small muted">'+esc(m.note)+'</div>':'')+'</div>'; });
+  h+='<button data-act="nutCompose">+ Mahlzeit zusammenstellen</button>';
+  // Kombinationen
+  const combos=N().combos.slice().sort((a,c)=>(c.dayTypes.includes(ctx.type)?1:0)-(a.dayTypes.includes(ctx.type)?1:0));
+  h+='<h2>Deine Kombinationen</h2>';
+  if(!combos.length) h+='<div class="empty">Gespeicherte Lieblingskombinationen erscheinen hier, z. B. „Frühstück vor dem Training“.</div>';
+  combos.forEach(c=>{ h+='<div class="sugg"><div class="row between"><strong>'+esc(c.name)+'</strong><span class="small">'+c.dayTypes.map(t=>badge(t,t===ctx.type?'ok':'')).join(' ')+'</span></div><div class="small">'+esc(c.items.map(i=>(foodById(i)||{name:'(entfernt)'}).name).join(', '))+'</div>'+
+    '<div class="row" style="margin-top:6px"><button class="small" data-act="nutCompose" data-items="'+c.items.join(',')+'" data-name="'+esc(c.name)+'">Für diesen Tag eintragen</button><button class="small danger" data-act="nutDelCombo" data-id="'+c.id+'">Löschen</button></div></div>'; });
+  // Bausteine
+  h+='<h2>Bausteine</h2><p class="small muted">Markiere, was du magst, was du lieber nicht isst und wofür ein Baustein für dich passt. „Lieber nicht“ taucht in Ideen nicht auf.</p>';
+  NUT_CATS.forEach(([c,name])=>{
+    const its=N().items.filter(f=>f.cat===c).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    h+='<details class="section"'+(ui.nutOpen===c?' open':'')+'><summary data-act="nutOpen" data-c="'+c+'"><strong>'+esc(name)+'</strong> <span class="small muted">('+its.length+')</span></summary>'+
+      '<div style="margin-top:8px">'+its.map(f=>'<button class="chip pref-'+f.pref+'" data-act="nutEditFood" data-id="'+f.id+'">'+(f.pref==='favorit'?'★ ':'')+esc(f.name)+(f.tags.length?' <span class="small muted">· '+esc(f.tags.join(', '))+'</span>':'')+'</button>').join('')+'</div>'+
+      '<button class="small" data-act="nutEditFood" data-cat="'+c+'">+ Baustein</button></details>';
+  });
+  // Rahmen
+  h+='<h2>Vorlieben & Rahmenbedingungen</h2><div class="section">'+ta('nut-constraints','Was AOS wissen soll (z. B. Unverträglichkeiten, Kochzeit, Kantine, Budget)',N().constraints)+
+    '<p class="small muted">Dieser Text ist eine Notiz für dich. Damit Bausteine in Ideen nicht auftauchen, markiere sie als „lieber nicht“.</p><button class="small primary" data-act="nutSaveConstraints">Speichern</button></div>';
+  h+='<p class="small muted" style="margin-top:20px">Der Ernährungsbereich ist keine medizinische Ernährungsberatung und ersetzt keine Diagnose oder Behandlung. Bei Unverträglichkeiten, Erkrankungen oder medizinischen Fragen wende dich bitte an eine qualifizierte Fachperson (z. B. Ärztin/Arzt oder Diätologin/Diätologe).</p>';
+  return h;
+}
+
+ACT.nutDay = el=>{ const d=+el.dataset.d; ui.nutDate = d===0?todayISO():addDays(ui.nutDate||todayISO(),d); ui.nutSlot=null; render(); };
+CHG.nutType = el=>{ const date=ui.nutDate||todayISO(); if(el.value) N().dayOverrides[date]=el.value; else delete N().dayOverrides[date]; ui.nutSlot=null; save(); render(); };
+CHG.nutSlot = el=>{ ui.nutSlot=el.value; render(); };
+ACT.nutShuffle = ()=>{ ui.nutSeed=(ui.nutSeed||1)+7; render(); };
+ACT.nutOpen = el=>{ ui.nutOpen = ui.nutOpen===el.dataset.c ? null : el.dataset.c; setTimeout(render,0); };
+ACT.nutSaveConstraints = ()=>{ N().constraints=val('nut-constraints'); save(); toast('Gespeichert.'); };
+
+/* ---------- Mahlzeit zusammenstellen ---------- */
+function composer(sel_ids, meal, name){
+  ui.nutSel=new Set(sel_ids);
+  const date=meal?meal.date:(ui.nutDate||todayISO()); const ctx=dayContext(date);
+  let body='<div class="fields">'+inp('nm-date','Datum',date,'type="date"')+sel('nm-slot','Mahlzeit',NUT_SLOTS.map(x=>[x,x]),meal?meal.slot:(ui.nutSlot||'Mittagessen'))+'</div>'+inp('nm-name','Name (optional)',meal?meal.name:(name||''),'placeholder="z. B. Overnight Oats"');
+  NUT_CATS.forEach(([c,cn])=>{ const its=N().items.filter(f=>f.cat===c).sort((a,b)=>(b.pref==='favorit')-(a.pref==='favorit')||a.name.localeCompare(b.name,'de'));
+    body+='<h3>'+esc(cn)+'</h3><div>'+its.map(f=>'<button class="chip pref-'+f.pref+'" data-act="nutToggle" data-id="'+f.id+'" aria-pressed="'+ui.nutSel.has(f.id)+'">'+(f.pref==='favorit'?'★ ':'')+esc(f.name)+'</button>').join('')+'</div>'; });
+  body+=ta('nm-note','Notiz (optional)',meal?meal.note:'','placeholder="z. B. gut vertragen, zu spät gegessen"');
+  body+='<label style="display:flex;align-items:center;color:var(--text)"><input type="checkbox" id="nm-combo"> Auch als Kombination merken (für '+esc(ctx.type)+')</label>';
+  openDlg(meal?'Mahlzeit bearbeiten':'Mahlzeit zusammenstellen', body,
+    (meal?'<button class="danger" data-act="nutDelMeal" data-id="'+meal.id+'">Löschen</button>':'')+'<button data-act="closeDlg">Abbrechen</button>'+
+    (meal?'':'<button data-act="nutSaveCombo">Nur als Kombination merken</button>')+'<button class="primary" data-act="nutSaveMeal" data-id="'+(meal?meal.id:'')+'">'+(meal?'Speichern':'Eintragen')+'</button>');
+}
+ACT.nutCompose = el=>{ closeDlg(); composer(el.dataset.items?el.dataset.items.split(',').filter(Boolean):[], null, el.dataset.name); };
+ACT.nutEditMeal = el=>{ const m=N().meals.find(x=>x.id===el.dataset.id); composer(m.items, m); };
+ACT.nutToggle = el=>{ const id=el.dataset.id; if(ui.nutSel.has(id)) ui.nutSel.delete(id); else ui.nutSel.add(id); el.setAttribute('aria-pressed', ui.nutSel.has(id)); };
+function comboFromDialog(){
+  const date=val('nm-date')||todayISO(); const type=dayContext(date).type;
+  const items=[...ui.nutSel]; const name=val('nm-name')||val('nm-slot')+' ('+type+')';
+  N().combos.push({id:uid('combo'), name, items, dayTypes:[type], slot:val('nm-slot'), createdAt:new Date().toISOString()});
+}
+ACT.nutSaveMeal = el=>{
+  if(!ui.nutSel.size){ toast('Bitte mindestens einen Baustein auswählen.'); return; }
+  let m=el.dataset.id?N().meals.find(x=>x.id===el.dataset.id):null;
+  if(!m){ m={id:uid('meal'), createdAt:new Date().toISOString()}; N().meals.push(m); }
+  Object.assign(m,{date:val('nm-date')||todayISO(), slot:val('nm-slot'), name:val('nm-name'), items:[...ui.nutSel], note:val('nm-note')});
+  if(document.getElementById('nm-combo').checked) comboFromDialog();
+  save(); closeDlg(); render();
+};
+ACT.nutSaveCombo = ()=>{ if(!ui.nutSel.size){ toast('Bitte mindestens einen Baustein auswählen.'); return; } comboFromDialog(); save(); closeDlg(); toast('Kombination gespeichert.'); render(); };
+ACT.nutDelMeal = el=>{ N().meals=N().meals.filter(x=>x.id!==el.dataset.id); save(); closeDlg(); render(); };
+ACT.nutDelCombo = el=>{ const id=el.dataset.id; confirmDlg('Kombination löschen?','Die gespeicherte Kombination wird entfernt. Eingetragene Mahlzeiten bleiben erhalten.','Löschen',()=>{ N().combos=N().combos.filter(x=>x.id!==id); save(); render(); }, true); };
+
+/* ---------- Baustein bearbeiten ---------- */
+ACT.nutEditFood = el=>{
+  const f=el.dataset.id?foodById(el.dataset.id):{name:'',cat:el.dataset.cat||'protein',pref:'neutral',tags:[]};
+  const tagOpts=DAY_TYPES.concat(NUT_SLOTS);
+  openDlg(el.dataset.id?'Baustein bearbeiten':'Baustein hinzufügen',
+    inp('nf-name','Name *',f.name)+'<div class="fields">'+sel('nf-cat','Kategorie',NUT_CATS,f.cat)+sel('nf-pref','Deine Einstellung',[['favorit','★ Favorit'],['neutral','neutral'],['nicht','lieber nicht (nicht in Ideen)']],f.pref)+'</div>'+
+    '<label>Passt für mich zu (optional)</label><div>'+tagOpts.map(t=>'<label style="display:inline-flex;align-items:center;margin:4px 12px 4px 0;color:var(--text)"><input type="checkbox" class="nf-tag" value="'+esc(t)+'" '+(f.tags.includes(t)?'checked':'')+'>'+esc(t)+'</label>').join('')+'</div>',
+    (el.dataset.id?'<button class="danger" data-act="nutDelFood" data-id="'+f.id+'">Entfernen</button>':'')+'<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="nutSaveFood" data-id="'+(el.dataset.id||'')+'">Speichern</button>');
+};
+ACT.nutSaveFood = el=>{
+  const name=val('nf-name'); if(!name){ toast('Bitte einen Namen eingeben.'); return; }
+  let f=el.dataset.id?foodById(el.dataset.id):null;
+  if(!f){ f={id:uid('food'),source:'eingabe'}; N().items.push(f); }
+  Object.assign(f,{name,cat:val('nf-cat'),pref:val('nf-pref'),tags:[...document.querySelectorAll('.nf-tag:checked')].map(x=>x.value)});
+  ui.nutOpen=f.cat; save(); closeDlg(); render();
+};
+ACT.nutDelFood = el=>{ N().items=N().items.filter(x=>x.id!==el.dataset.id); save(); closeDlg(); render(); };
+
+/* ---------- Orientierungstexte ---------- */
+ACT.editGuides = ()=>{
+  openDlg('Orientierung je Tagesart', '<p class="small muted">Schreib hier, was sich für dich bewährt hat. AOS zeigt den Text je nach Tagesart an.</p>'+DAY_TYPES.map((t,i)=>ta('ng-'+i,t,N().guides[t])).join(''),
+    '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="saveGuides">Speichern</button>'); };
+ACT.saveGuides = ()=>{ DAY_TYPES.forEach((t,i)=>N().guides[t]=val('ng-'+i)); N().guidesSource='eingabe'; save(); closeDlg(); render(); };
+
+'use strict';
+/* ===== AOS – Profil & Einstellungen ===== */
+function viewProfile(){
+  const p=S.profile; const bw=latestBodyweight();
+  if(!ui.posDraft) ui.posDraft=clone(p.positions);
+  let h='<h1>Profil & Einstellungen</h1>';
+  // Stammdaten
+  h+='<h2>Athletenprofil</h2><div class="section">'+
+    '<div class="fields">'+inp('p-name','Name',p.name)+sel('p-sex','Geschlecht',[['männlich','männlich'],['weiblich','weiblich'],['divers','divers'],['','keine Angabe']],p.sex)+'</div>'+
+    '<div class="fields">'+inp('p-age','Alter',p.birthYear?'':p.age,'inputmode="numeric"'+(p.birthYear?' disabled placeholder="aus Geburtsjahr: '+profileAge()+'"':''))+inp('p-by','Geburtsjahr (empfohlen)',p.birthYear,'inputmode="numeric" placeholder="z. B. 1993"')+'</div>'+
+    '<div class="fields">'+inp('p-h','Körpergröße (cm)',p.heightCm,'inputmode="numeric"')+inp('p-tw','Zielgewicht (kg, optional)',fmtNum(p.targetWeightKg),'inputmode="decimal"')+'</div>'+
+    '<p class="small">Aktuelles Körpergewicht: <strong>'+(bw?(bw.approx?'≈ ':'')+fmtNum(bw.kg)+' kg':'—')+'</strong> '+(bw&&!bw.date?badge('ohne Datum','warn'):bw?'('+fmtDate(bw.date)+')':'')+' <button class="link" data-act="editBw">neue Messung</button></p>'+
+    '<p class="small muted">Das Körpergewicht wird als Verlauf mit Datum gespeichert (Tests & Verlauf), damit alte Werte erhalten bleiben.</p>'+
+    '<button class="primary" data-act="saveProfile">Profil speichern</button></div>';
+  // Positionen
+  const sum=ui.posDraft.reduce((a,x)=>a+(Number(x.weight)||0),0);
+  h+='<h2>Football-Positionen und Gewichtung</h2><div class="section">';
+  h+='<p class="small muted">Die Gewichtung beschreibt, wie stark die Anforderungen jeder Position in deiner Planung berücksichtigt werden sollen. Sie muss zusammen 100 % ergeben.</p>';
+  ui.posDraft.forEach((x,i)=>{
+    h+='<div class="fields" style="align-items:end">'+inp('pos-c-'+i,'Kürzel',x.code)+inp('pos-n-'+i,'Position',x.name)+inp('pos-w-'+i,'Anteil (%)',x.weight,'inputmode="numeric"')+
+      '<div class="field"><button class="small danger" data-act="delPos" data-i="'+i+'" '+(ui.posDraft.length<=1?'disabled':'')+'>Entfernen</button></div></div>'; });
+  h+='<p id="pos-sum" class="small" aria-live="polite">'+posSumText(sum)+'</p>';
+  h+='<div class="row"><button class="small" data-act="addPos">+ Position</button><button class="primary" data-act="savePos">Gewichtung speichern</button><button class="small" data-act="resetPos">Änderungen verwerfen</button></div>';
+  h+='<details><summary class="small">Begriffe</summary><div class="small">'+Object.values(GLOSSAR).map(x=>'<p>'+esc(x)+'</p>').join('')+'</div></details>';
+  if(p.positionHistory.length) h+='<details><summary class="small">Frühere Gewichtungen</summary><div class="small">'+p.positionHistory.map(x=>'<p>bis '+fmtDate(x.replacedAt)+': '+x.positions.map(y=>esc(y.code)+' '+y.weight+' %').join(', ')+(x.note?' – '+esc(x.note):'')+'</p>').join('')+'</div></details>';
+  h+='</div>';
+  // Orte & Ausstattung
+  h+='<h2>Trainingsorte und Ausstattung</h2>';
+  p.locations.forEach(l=>{
+    h+='<div class="section">'+inp('loc-n-'+l.id,'Name',l.name)+ta('loc-e-'+l.id,'Ausstattung (eine pro Zeile oder kommagetrennt)',l.equipment.join('\n'))+(l.note?'<p class="small muted">'+esc(l.note)+'</p>':'')+
+      '<div class="row"><button class="small primary" data-act="saveLoc" data-id="'+l.id+'">Speichern</button><button class="small danger" data-act="delLoc" data-id="'+l.id+'">Ort entfernen</button></div></div>'; });
+  h+='<button data-act="addLoc">+ Trainingsort</button>';
+  // Ziele
+  h+='<h2>Persönliche Ziele</h2><p class="small muted">Zielmarken sind langfristige Ziele und werden nie automatisch als Trainingsvorgabe verwendet. Archivieren löscht keine Messungen.</p>';
+  ['aktiv','archiviert'].forEach(st=>{ const gl=S.goals.filter(g=>g.status===st); if(!gl.length) return;
+    h+='<div class="section"><strong>'+(st==='aktiv'?'Aktive Ziele':'Archivierte Ziele')+'</strong><div class="table-wrap"><table><tbody>'+gl.map(g=>'<tr><td>'+esc(g.name)+'</td><td>'+fmtNum(g.target)+' '+esc(g.unit)+'</td><td class="small muted">Bezugstest: '+esc(g.testName||'—')+'</td><td><button class="small" data-act="editGoal" data-id="'+g.id+'">Bearbeiten</button> <button class="small" data-act="toggleGoal" data-id="'+g.id+'">'+(st==='aktiv'?'Archivieren':'Aktivieren')+'</button></td></tr>').join('')+'</tbody></table></div></div>'; });
+  h+='<button data-act="editGoal">+ Ziel</button>';
+  // Daten
+  const le=S.settings.lastExport;
+  h+='<h2>Daten & Sicherung</h2><div class="section">'+
+    '<p class="small">Alle Daten liegen ausschließlich im lokalen Speicher dieses Browsers (localStorage) auf diesem Gerät. AOS sendet nichts an externe Dienste. Wenn du Browserdaten löschst, einen anderen Browser oder ein anderes Gerät nutzt, sind die Daten dort nicht vorhanden – deshalb regelmäßig sichern.</p>'+
+    (isIOS()?'<p class="small muted">Auf dem iPhone öffnet sich beim Sichern das Teilen-Menü: „In Dateien sichern“ (z. B. iCloud Drive) oder per AirDrop an den Laptop.</p>':'')+'<p class="small">Letzte JSON-Sicherung: <strong>'+(le?fmtDate(le.slice(0,10)):'noch keine')+'</strong> · Datenstand: '+fmtDate(S.meta.updatedAt.slice(0,10))+(S.sync&&S.sync.lastMerge?' · Zuletzt zusammengeführt: '+fmtDate(S.sync.lastMerge.at.slice(0,10)):'')+'</p>'+
+    '<div class="row"><button class="primary" data-act="exportJSON">JSON-Sicherung herunterladen</button></div>'+
+    '<h3>Zwischen Geräten abgleichen</h3><p class="small muted">Sicherung des anderen Geräts (z. B. iPhone ↔ Laptop) hier zusammenführen: Neue Einträge kommen dazu, bei Änderungen am selben Eintrag gewinnt die jüngere, Löschungen werden übernommen. Danach hier sichern und auf dem anderen Gerät ebenfalls zusammenführen – dann sind beide gleich.</p>'+
+    '<div class="row"><label class="btn" for="merge-file" style="display:inline-flex;align-items:center;color:var(--text);margin:0;font-weight:600">Sicherung zusammenführen …</label><input id="merge-file" type="file" accept=".json,application/json" class="sr-only" data-chg="mergeFile"></div>'+
+    '<h3>Wiederherstellen</h3><p class="small muted">Ersetzt alle Daten auf diesem Gerät durch die Sicherung (z. B. nach Gerätewechsel).</p>'+
+    '<div class="row"><label class="btn" for="imp-file" style="display:inline-flex;align-items:center;color:var(--text);margin:0">Sicherung importieren (alles ersetzen) …</label><input id="imp-file" type="file" accept=".json,application/json" class="sr-only" data-chg="importFile"></div>'+
+    '<h3>CSV (für Tabellenkalkulation)</h3><div class="row"><button class="small" data-act="csv" data-k="saetze">Trainingssätze</button><button class="small" data-act="csv" data-k="tests">Tests</button><button class="small" data-act="csv" data-k="bw">Körpergewicht</button></div>'+
+    '<h3>Zurücksetzen</h3><p class="small muted">Löscht alle Einträge in diesem Browser und stellt nur die Ausgangsdaten wieder her.</p><button class="small danger" data-act="resetAll">Alle Daten zurücksetzen …</button></div>';
+
+  h+='<p class="small muted" style="margin-top:24px">AOS ist kein Ersatz für medizinische oder sportwissenschaftliche Betreuung.</p>';
+  return h;
+}
+function posSumText(sum){ return Math.round(sum)===100 ? 'Summe: <strong>100 %</strong> ✓' : '<span style="color:var(--bad)">Summe: <strong>'+fmtNum(sum)+' %</strong> – die Anteile müssen zusammen genau 100 % ergeben ('+(sum<100?'es fehlen '+fmtNum(100-sum):'es sind '+fmtNum(sum-100)+' zu viel')+' Prozentpunkte).</span>'; }
+function readPosDraft(){ ui.posDraft.forEach((x,i)=>{ x.code=val('pos-c-'+i); x.name=val('pos-n-'+i); const w=num(val('pos-w-'+i)); x.weight=w==null?0:w; }); }
+function updatePosSum(){ const el=document.getElementById('pos-sum'); if(!el) return; readPosDraft(); el.innerHTML=posSumText(ui.posDraft.reduce((a,x)=>a+x.weight,0)); }
+ACT.addPos = ()=>{ readPosDraft(); ui.posDraft.push({id:uid('pos'),code:'',name:'',weight:0}); render(); };
+ACT.delPos = el=>{ readPosDraft(); ui.posDraft.splice(+el.dataset.i,1); render(); };
+ACT.resetPos = ()=>{ ui.posDraft=null; render(); };
+ACT.savePos = ()=>{
+  readPosDraft(); const d=ui.posDraft;
+  if(d.some(x=>!x.code)){ toast('Jede Position braucht ein Kürzel.'); return; }
+  if(new Set(d.map(x=>x.code)).size!==d.length){ toast('Kürzel müssen eindeutig sein.'); return; }
+  if(d.some(x=>x.weight<0)){ toast('Anteile dürfen nicht negativ sein.'); return; }
+  const sum=d.reduce((a,x)=>a+x.weight,0);
+  if(Math.round(sum*100)!==10000){ toast('Nicht gespeichert: Die Anteile ergeben '+fmtNum(sum)+' % statt 100 %.'); return; }
+  S.profile.positionHistory.unshift({replacedAt:todayISO(), positions:clone(S.profile.positions).map(({code,name,weight})=>({code,name,weight})), note:''});
+  S.profile.positions=clone(d); ui.posDraft=null; save(); toast('Positionsgewichtung gespeichert.'); render();
+};
+ACT.saveProfile = ()=>{
+  const p=S.profile; const by=val('p-by'), age=val('p-age'), hgt=val('p-h'), tw=val('p-tw'); const y=new Date().getFullYear();
+  if(by && (!/^\d{4}$/.test(by)||+by<y-90||+by>y-10)){ toast('Bitte ein gültiges Geburtsjahr eingeben.'); return; }
+  if(age && !/^\d{1,2}$/.test(age)){ toast('Alter: bitte eine ganze Zahl.'); return; }
+  if(hgt && (num(hgt)==null||num(hgt)<120||num(hgt)>230)){ toast('Körpergröße: bitte in cm eingeben.'); return; }
+  if(tw && num(tw)==null){ toast('Zielgewicht: bitte eine Zahl.'); return; }
+  p.name=val('p-name'); p.sex=val('p-sex'); p.birthYear=by?+by:null; if(!p.birthYear) p.age=age?+age:null;
+  p.heightCm=hgt?num(hgt):null; p.targetWeightKg=tw?num(tw):null; save(); toast('Profil gespeichert.'); render();
+};
+ACT.saveLoc = el=>{ const l=locById(el.dataset.id); const n=val('loc-n-'+l.id); if(!n){ toast('Bitte einen Namen eingeben.'); return; }
+  l.name=n; l.equipment=val('loc-e-'+l.id).split(/[\n,]/).map(x=>x.trim()).filter(Boolean); save(); toast('Trainingsort gespeichert.'); render(); };
+ACT.delLoc = el=>{ const id=el.dataset.id; const used=S.blocks.some(b=>b.days.some(d=>d.location===id));
+  confirmDlg('Trainingsort entfernen?', used?'Dieser Ort ist Trainingstagen zugeordnet; die Zuordnung wird dort entfernt. Bei bereits erfassten Einheiten wird der Ort danach nicht mehr angezeigt.':'Der Ort wird entfernt.', 'Entfernen', ()=>{
+    S.profile.locations=S.profile.locations.filter(l=>l.id!==id); S.blocks.forEach(b=>b.days.forEach(d=>{ if(d.location===id) d.location=''; })); save(); render(); }, true); };
+ACT.addLoc = ()=>{ S.profile.locations.push({id:uid('loc'),name:'Neuer Ort',equipment:[],note:'',source:'eingabe'}); save(); render(); };
+ACT.editGoal = el=>{ const g=el.dataset.id?S.goals.find(x=>x.id===el.dataset.id):null;
+  const names=[...new Set(S.tests.map(t=>t.name))];
+  openDlg(g?'Ziel bearbeiten':'Neues Ziel', inp('g-name','Ziel *',g?g.name:'')+'<div class="fields">'+inp('g-t','Zielmarke *',g?fmtNum(g.target):'','inputmode="decimal"')+inp('g-u','Einheit',g?g.unit:'','placeholder="kg, Wdh, s …"')+'</div>'+
+    inp('g-test','Bezugstest (für Verlauf, optional)',g?g.testName:'','list="g-tests"')+'<datalist id="g-tests">'+names.map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>'+ta('g-note','Notiz',g?g.note:''),
+    '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="saveGoal" data-id="'+(g?g.id:'')+'">Speichern</button>'); };
+ACT.saveGoal = el=>{ const n=val('g-name'), t=num(val('g-t')); if(!n||t==null){ toast('Bitte Ziel und Zielmarke (Zahl) eingeben.'); return; }
+  let g=el.dataset.id?S.goals.find(x=>x.id===el.dataset.id):null;
+  if(!g){ g={id:uid('goal'),status:'aktiv',createdAt:new Date().toISOString(),source:'eingabe'}; S.goals.push(g); }
+  Object.assign(g,{name:n,target:t,unit:val('g-u'),testName:val('g-test'),note:val('g-note')}); save(); closeDlg(); render(); };
+ACT.toggleGoal = el=>{ const g=S.goals.find(x=>x.id===el.dataset.id); g.status=g.status==='aktiv'?'archiviert':'aktiv'; save(); render(); };
+ACT.csv = el=>{ exportCSV(el.dataset.k); toast('CSV wird heruntergeladen.'); };
+
+/* ---------- Import ---------- */
+function readBackup(el, onOk){
+  const f=el.files&&el.files[0]; el.value=''; if(!f) return;
+  const fail=msg=>openDlg('Datei nicht verwendbar', msg+'<p class="small muted">Deine aktuellen Daten wurden nicht verändert.</p>','<button data-act="closeDlg">OK</button>');
+  if(f.size>20*1024*1024){ fail('<p>Die Datei ist größer als 20 MB und wird nicht als AOS-Sicherung erkannt.</p>'); return; }
+  const r=new FileReader();
+  r.onload=()=>{
+    let d; try{ d=JSON.parse(r.result); }catch(e){ fail('<p>Die Datei „'+esc(f.name)+'“ ist keine gültige JSON-Datei.</p>'); return; }
+    const v=validateData(d);
+    if(!v.ok){ fail('<p>„'+esc(f.name)+'“ ist keine gültige AOS-Sicherung:</p><ul>'+v.errors.slice(0,8).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'); return; }
+    try{ onOk(d, f); }catch(e){ console.error(e); fail('<p>Die Sicherung konnte nicht verarbeitet werden ('+esc(e.message)+').</p>'); }
+  };
+  r.onerror=()=>toast('Die Datei konnte nicht gelesen werden.');
+  r.readAsText(f);
+}
+CHG.importFile = el=>readBackup(el, (d,f)=>{
+  ui.importData=d;
+  const logged=d.sessions.filter(s=>s.log).length;
+  openDlg('Alles ersetzen?','<p>Datei: <strong>'+esc(f.name)+'</strong><br>Stand: '+(d.meta&&d.meta.updatedAt?fmtDate(d.meta.updatedAt.slice(0,10)):'unbekannt')+'</p>'+
+    '<p class="small">'+d.blocks.length+' Block/Blöcke · '+d.sessions.length+' Einheiten ('+logged+' protokolliert) · '+d.tests.length+' Tests · '+d.bodyweight.length+' Körpergewichtsmessungen</p>'+
+    '<div class="note warn"><strong>Achtung:</strong> Der Import ersetzt alle aktuell auf diesem Gerät gespeicherten AOS-Daten ('+S.sessions.length+' Einheiten, '+S.tests.length+' Tests). Wenn du Daten von zwei Geräten behalten willst, nutze stattdessen „Sicherung zusammenführen“.</div>',
+    '<button data-act="closeDlg">Abbrechen</button><button data-act="exportJSON">Aktuelle Daten zuerst sichern</button><button class="danger" data-act="importOk">Daten ersetzen</button>');
+});
+CHG.mergeFile = el=>readBackup(el, (d,f)=>{
+  const R=migrate(clone(d));
+  ui.mergeResult=mergeData(S, R);
+  const rep=ui.mergeResult.report;
+  openDlg('Sicherung zusammenführen','<p>Datei: <strong>'+esc(f.name)+'</strong><br>Stand der Datei: '+(d.meta&&d.meta.updatedAt?fmtDate(d.meta.updatedAt.slice(0,10)):'unbekannt')+'</p>'+reportHTML(rep)+
+    (rep.total?'<p class="small muted">Pro Eintrag gewinnt die jüngste Änderung. Ein Trainingsblock zählt dabei als ein Eintrag (inklusive seiner Trainingstage und Übungen).</p>':''),
+    '<button data-act="closeDlg">'+(rep.total?'Abbrechen':'Schließen')+'</button>'+(rep.total?'<button data-act="exportJSON">Vorher sichern</button><button class="primary" data-act="mergeOk">Zusammenführen</button>':''));
+});
+ACT.mergeOk = ()=>{ if(!ui.mergeResult) return; S=ui.mergeResult.data; ui.mergeResult=null; syncInit(); ui.posDraft=null; ui.blockId=null; ui.sessionId=null; ui.draft=null; save(); closeDlg(); toast('Zusammengeführt. Sichere jetzt und führe die Datei auch auf dem anderen Gerät zusammen.'); render(); };
+ACT.importOk = ()=>{ if(!ui.importData) return; S=migrate(ui.importData); syncInit(); ui.importData=null; ui.posDraft=null; ui.blockId=null; save(); closeDlg(); toast('Sicherung importiert.'); render(); };
+ACT.resetAll = ()=>{
+  openDlg('Alle Daten zurücksetzen?','<p>Alle Einheiten, Protokolle, Tests, Blöcke und Einstellungen in diesem Browser werden gelöscht. Nur die Ausgangsdaten werden wiederhergestellt.</p><p>Zur Bestätigung <strong>LÖSCHEN</strong> eingeben:</p>'+inp('rs-conf','Bestätigung',''),
+    '<button data-act="closeDlg">Abbrechen</button><button data-act="exportJSON">Vorher sichern</button><button class="danger" data-act="resetOk">Zurücksetzen</button>'); };
+ACT.resetOk = ()=>{ if(val('rs-conf')!=='LÖSCHEN'){ toast('Bitte LÖSCHEN eingeben.'); return; } S=freshData(); syncInit(); ui.posDraft=null; ui.blockId=null; save(); closeDlg(); toast('Zurückgesetzt.'); render(); };
+
+(function init(){
+  load();
+  const h=location.hash.slice(1); if(VIEWS.some(v=>v[0]===h)||h==='druck') ui.view=h;
+  render();
+  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+  if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') && document.querySelector('link[rel=manifest]')){
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js').catch(e=>console.warn('Offline-Modus nicht verfügbar', e));
+    navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(hadController) toast('AOS wurde aktualisiert. Die neue Version ist beim nächsten Öffnen aktiv.'); });
+  }
+})();
+</script>
+</body>
+</html>
