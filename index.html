@@ -335,6 +335,24 @@ nav.tabs button[aria-current="page"]{color:#000;background:var(--sig)}
   nav.tabs button{width:auto;min-height:48px;padding:0;border-radius:24px;font-size:0}
   nav.tabs button svg{width:24px;height:24px}
 }
+/* Gestapelte Tabellen und Umbruch am Handy */
+main{overflow-wrap:break-word}
+main table:not(.stack){width:100%;max-width:100%}
+main table:not(.stack) td{overflow-wrap:anywhere}
+main table:not(.stack) td button{white-space:nowrap}
+@media (max-width:760px){
+  .table-wrap{overflow:visible}
+  table.stack,table.stack tbody,table.stack tr,table.stack td{display:block;width:100%}
+  table.stack thead{display:none}
+  table.stack tr{border-bottom:1px solid var(--line);padding:10px 0}
+  table.stack td{border:0;padding:3px 0;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+  table.stack td::before{content:attr(data-label);flex:0 0 96px;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  table.stack td[data-label=""]::before{display:none}
+  table.stack td.empty-cell{display:none}
+  table.stack td>*{max-width:100%}
+  .badge{white-space:normal}
+  .row.between{flex-wrap:wrap;gap:4px 12px}
+}
 @media print{
   header.top,nav.tabs,.no-print,button{display:none!important}
   .print-only{display:block}
@@ -441,6 +459,7 @@ function migrate(d){
   const n=d.nutrition; n.combos=n.combos||[]; n.meals=n.meals||[]; n.dayOverrides=n.dayOverrides||{}; n.constraints=n.constraints||''; n.guides=n.guides||defaultNutrition().guides;
   Object.keys(n.dayOverrides).forEach(k=>{ if(typeof n.dayOverrides[k]!=='object' || n.dayOverrides[k]===null) n.dayOverrides[k]={}; });   // alte Tagesarten (Text) → neues Format
   d.settings = d.settings || {};
+  (d.tests||[]).forEach(t=>{ if(t.name==='High-Bar Squatü') t.name='High-Bar Squat'; });   // Tippfehler aus der Ersterfassung
   d.profile.positionHistory = d.profile.positionHistory || [];
   (d.blocks||[]).forEach(b=>{ b.changelog=b.changelog||[]; (b.days||[]).forEach(x=>{ x.version=x.version||1; x.exercises=x.exercises||[]; }); });
   if(!d.sync) syncMigrateLegacy(d);
@@ -480,7 +499,6 @@ function profileAge(){ const p=S.profile; if(p.birthYear) return new Date().getF
 function testGaps(t){
   const g=[];
   if(!t.date) g.push('Datum fehlt');
-  if(!t.conditions) g.push('Testbedingungen fehlen');
   if(t.category==='Kraft' && t.rpe==null) g.push('RPE fehlt');
   if(t.value==null && !t.detail) g.push('Messwert fehlt');
   return g;
@@ -503,8 +521,6 @@ function missingData(){
   }
   const undated=S.tests.filter(t=>!t.date).length;
   if(undated) out.push({where:'tests', text: undated+' Testergebnis(se) ohne Datum.'});
-  const nocond=S.tests.filter(t=>!t.conditions).length;
-  if(nocond) out.push({where:'tests', text: nocond+' Testergebnis(se) ohne Testbedingungen.'});
   return out;
 }
 
@@ -1015,12 +1031,21 @@ function renderShell(){
       info='<span>'+esc(ph?ph.id:pb.id)+'/<b>'+(pb.start>td?'ab '+fmtDateShort(pb.start).slice(3,8):'W'+plWeek(pb,td))+'</b></span>'+(pb.start>td?'':'<span>D'+d+'/<b>'+tot+'</b></span>'); } }
   document.getElementById('topinfo').innerHTML = '<div class="sysbar">'+info+'<span id="hsync">'+ghDot()+'</span></div>';
 }
+/* Tabellen mit 3+ Spalten werden am Handy als Liste untereinander dargestellt (kein Seitwärts-Scrollen) */
+function stackTables(root){
+  root.querySelectorAll('table').forEach(tb=>{ const th=[...tb.querySelectorAll('thead th')].map(x=>x.textContent.trim()); if(th.length<3 || tb.querySelector('td[data-act]')) return;   // Wochenraster mit antippbaren Tagen bleibt eine Tabelle
+    tb.classList.add('stack');
+    tb.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{ td.setAttribute('data-label', th[i]||'');
+      const txt=td.textContent.trim(); if((txt==='—'||txt==='') && !td.querySelector('button,input,select,svg')) td.classList.add('empty-cell'); })); });
+}
 function render(){
   if(window.__aosUpdate && typeof aosApplyUpdate==='function'){ aosApplyUpdate(); }
   renderShell();
   const m=document.getElementById('main');
   const fn = {uebersicht:viewOverview, plan:viewPlan, training:viewTraining, tests:viewTests, profil:viewProfile, ernaehrung:viewNutrition, druck:viewPrint}[ui.view] || viewOverview;
   m.innerHTML = (storageOK?'':'<div class="note bad"><strong>Lokaler Speicher nicht verfügbar.</strong> Der Browser erlaubt für diese Datei keine dauerhafte Speicherung (z. B. privater Modus oder blockierte Website-Daten). Eingaben gehen beim Schließen verloren – exportiere eine JSON-Sicherung oder öffne die Datei in einem normalen Browserfenster.</div>') + fn();
+  stackTables(m);
+  stackTables(m);
 }
 ACT.go = el=>{ ui.view=el.dataset.view; if(ui.view!=='training'){ ui.sessionId=null; ui.draft=null; } location.hash=ui.view; render(); window.scrollTo(0,0); };
 window.addEventListener('hashchange', ()=>{ const h=location.hash.slice(1); if(h && h!==ui.view && (VIEWS.some(v=>v[0]===h)||h==='druck')){ ui.view=h; render(); } });
@@ -1535,8 +1560,7 @@ function testCard(name){
   if(list.length>=2){
     const a=list[list.length-2], b=list[list.length-1]; const issues=[];
     if(!a.date||!b.date) issues.push('mindestens ein Datum fehlt – Reihenfolge unsicher');
-    if(!a.conditions||!b.conditions) issues.push('Testbedingungen fehlen');
-    else if(a.conditions!==b.conditions) issues.push('Testbedingungen unterscheiden sich');
+    if(a.conditions && b.conditions && a.conditions!==b.conditions) issues.push('Testbedingungen unterscheiden sich');
     if(a.unit!==b.unit) issues.push('unterschiedliche Einheiten');
     if((a.reps||null)!==(b.reps||null)) issues.push('unterschiedliche Wiederholungszahl');
     let diff=''; if(a.value!=null&&b.value!=null&&a.unit===b.unit){ const d=b.value-a.value; diff=(d>0?'+':'')+fmtNum(d)+' '+b.unit; }
@@ -2478,7 +2502,7 @@ function viewTraining(){
     saved.forEach(s=>{ const ov=s.plannedDate&&s.plannedDate<today;
       h+='<div class="section"><div class="row between"><div><strong>'+esc(s.name)+'</strong> <span class="small muted">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+'</span> '+(ov?badge('nicht erfasst','warn'):'')+'</div></div>'+
         '<div class="row" style="margin-top:8px"><button class="primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button><button data-act="openSession" data-id="'+s.id+'">Verschieben / Auslassen</button></div></div>'; }); }
-  h+='<p style="margin-top:16px"><button data-act="logFree">+ Freie Einheit erfassen</button> <span class="small muted">für Training außerhalb des Plans</span></p>';
+  h+='<div style="margin-top:16px"><button data-act="logFree">+ Freie Einheit erfassen</button><div class="small muted" style="margin-top:6px">Für Training außerhalb des Plans.</div></div>';
   const done=S.sessions.filter(s=>s.log && isDone(s)).sort((a,c)=>sessionDate(a)<sessionDate(c)?1:-1).slice(0,5);
   if(done.length) h+='<h2>Zuletzt</h2><div class="section">'+done.map(s=>'<p style="margin:6px 0"><button class="link" data-act="startLog" data-id="'+s.id+'">'+esc(s.name)+'</button> <span class="small muted">'+fmtDateShort(sessionDate(s))+(s.status==='teilweise'?' · teilweise':'')+'</span></p>').join('')+'</div>';
   return h;
@@ -2519,7 +2543,7 @@ function goalsSection(){
   const gl=S.goals.filter(g=>g.status==='aktiv');
   let h='<h2>Ziele</h2><div class="section">';
   if(!gl.length) h+='<p class="small muted">Noch keine Ziele.</p>';
-  else h+='<div class="table-wrap"><table><tbody>'+gl.map(g=>{ const t=latestTest(g.testName);
+  else h+='<div class="table-wrap"><table><thead><tr><th></th><th>Ziel</th><th>Aktuell</th></tr></thead><tbody>'+gl.map(g=>{ const t=latestTest(g.testName);
     return '<tr><td><button class="link" data-act="editGoal" data-id="'+g.id+'">'+esc(g.name)+'</button></td><td>'+fmtNum(g.target)+' '+esc(g.unit)+'</td><td class="small">'+(t?esc(testValueText(t)):'<span class="muted">—</span>')+'</td></tr>'; }).join('')+'</tbody></table></div>';
   return h+'<button class="small" data-act="editGoal">+ Ziel</button></div>';
 }
@@ -2752,7 +2776,7 @@ function aosApplyUpdate(){
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') && document.querySelector('link[rel=manifest]')){
     const hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.register('sw.js').then(reg=>{
+    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{ reg.update().catch(()=>{});
       // Beim Zurückkehren in die App nach einer neuen Version suchen
       document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') reg.update().catch(()=>{}); });
     }).catch(e=>console.warn('Offline-Modus nicht verfügbar', e));
