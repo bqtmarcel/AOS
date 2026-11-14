@@ -57,6 +57,7 @@ p{margin:6px 0}
 .badge.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
 .badge.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
 .badge.info{background:var(--info-soft);color:var(--info);border-color:transparent}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0}.kpis>div{background:var(--surface2);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column}.kpis strong{font-size:1.1rem}
 .syncchip{font:inherit;font-size:.78rem;line-height:1.3;min-height:0;height:auto;padding:3px 10px;border-radius:99px;border:1px solid transparent;cursor:pointer;white-space:nowrap;background:var(--surface2);color:var(--text)}
 .syncchip.ok{background:var(--accent-soft)}.syncchip.warn{background:var(--warn-soft);color:var(--warn)}.syncchip.bad{background:var(--bad-soft);color:var(--bad)}.syncchip.info{background:var(--info-soft);color:var(--info)}
 .cap{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:.85rem;background:var(--warn-soft);color:var(--warn);padding:3px 10px;border-radius:99px}
@@ -238,6 +239,7 @@ function migrate(d){
   d.suggestionDecisions = d.suggestionDecisions || {};
   if(!d.nutrition || !Array.isArray(d.nutrition.items)) d.nutrition = defaultNutrition();
   const n=d.nutrition; n.combos=n.combos||[]; n.meals=n.meals||[]; n.dayOverrides=n.dayOverrides||{}; n.constraints=n.constraints||''; n.guides=n.guides||defaultNutrition().guides;
+  Object.keys(n.dayOverrides).forEach(k=>{ if(typeof n.dayOverrides[k]!=='object' || n.dayOverrides[k]===null) n.dayOverrides[k]={}; });   // alte Tagesarten (Text) → neues Format
   d.settings = d.settings || {};
   d.profile.positionHistory = d.profile.positionHistory || [];
   (d.blocks||[]).forEach(b=>{ b.changelog=b.changelog||[]; (b.days||[]).forEach(x=>{ x.version=x.version||1; x.exercises=x.exercises||[]; }); });
@@ -841,7 +843,10 @@ ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f
 function renderShell(){
   const b=activeBlock();
   document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+'>'+t+'</button>').join('');
-  document.getElementById('topinfo').innerHTML = (b ? '<span class="small muted">'+esc(b.name)+'</span> '+capBadge(b)+' ' : '')+'<span id="syncchip">'+ghChip()+'</span>';
+  let info = b ? '<span class="small muted">'+esc(b.name)+'</span> '+capBadge(b)+' ' : '';
+  if(typeof REF!=='undefined' && REF.plan){ const pb=plBlockAt(todayISO()), ph=plPhase(todayISO());
+    if(pb) info='<span class="small muted">'+esc((ph?ph.id+' · ':'')+'Woche '+plWeek(pb,todayISO()))+'</span> <span class="cap" title="RPE-Obergrenze laut Plan">RPE ≤ '+fmtNum(pb.rpe_cap[0])+(pb.rpe_cap.length>1&&pb.rpe_cap[1]!==pb.rpe_cap[0]?'–'+fmtNum(pb.rpe_cap[1]):'')+'</span> '; }
+  document.getElementById('topinfo').innerHTML = info+'<span id="syncchip">'+ghChip()+'</span>';
 }
 function render(){
   renderShell();
@@ -949,7 +954,7 @@ document.addEventListener('input', e=>{
 /* ===== AOS – Plan: Blöcke, Woche, Trainingstage, Übungen, Vorschläge ===== */
 function planBlock(){ return (ui.blockId && blockById(ui.blockId)) || activeBlock() || S.blocks[S.blocks.length-1] || null; }
 
-function viewPlan(){
+function viewPlanLegacy(){
   const b=planBlock();
   let h='<h1>Plan</h1>';
   // Blockauswahl
@@ -1534,175 +1539,6 @@ function trainingProgress(){
 CHG.pickEx = el=>{ ui.exName=el.value; render(); };
 
 'use strict';
-/* ===== AOS – Ernährung: Bausteine, Kontext, Ideen, Kombinationen =====
-   Grundsätze: keine Kalorien- oder Mengenvorgaben, keine Verbote, keine Bewertungen "gut/schlecht".
-   Ideen beruhen nur auf eingetragenen Daten und Markierungen und zeigen, worauf sie beruhen. */
-const N = ()=>S.nutrition;
-const catName = c=>(NUT_CATS.find(x=>x[0]===c)||[c,c])[1];
-const foodById = id=>N().items.find(f=>f.id===id);
-const PREF_LABEL = {favorit:'Favorit', neutral:'neutral', nicht:'lieber nicht'};
-
-/* ---------- Tageskontext aus den Trainingsdaten ---------- */
-function dayContext(date){
-  const sess=S.sessions.filter(s=>s.plannedDate===date && s.status!=='ausgelassen');
-  const auto = sess.length ? 'Trainingstag' : 'Ruhetag';
-  const type = N().dayOverrides[date] || auto;
-  const basis=[]; const hints=[];
-  const b=activeBlock();
-  if(b) basis.push('Trainingsphase: '+b.name+(capText(b)?' ('+capText(b)+')':''));
-  if(sess.length) basis.push((date===todayISO()?'Heute':fmtDateShort(date))+': '+sess.map(s=>s.name+' – '+STATUS_LABEL[s.status]).join(', '));
-  else basis.push((date===todayISO()?'Heute':fmtDateShort(date))+': keine Einheit geplant');
-  if(N().dayOverrides[date]) basis.push('Tagesart von dir festgelegt: '+type+' (automatisch wäre: '+auto+')');
-  const mon=mondayOf(date); const wk=S.sessions.filter(s=>s.plannedDate && mondayOf(s.plannedDate)===mon);
-  const done=wk.filter(s=>s.status==='absolviert'||s.status==='teilweise').length;
-  basis.push('Diese Woche: '+done+' von '+wk.length+' geplanten Einheiten absolviert');
-  if(done>=3) hints.push('Trainingsreiche Woche – regelmäßige Mahlzeiten unterstützen die Erholung.');
-  const last=loggedSessions().slice(-1)[0];
-  if(last && last.log.form!=null){ basis.push('Letzte Tagesform: '+last.log.form+' von 5 ('+fmtDate(sessionDate(last))+')'); if(last.log.form<=2) hints.push('Die Tagesform war zuletzt niedrig. Erholung (Schlaf, regelmäßiges Essen, Trinken) kannst du heute mitbedenken.'); }
-  else basis.push('Tagesform: noch nicht erfasst');
-  const bw=S.bodyweight.filter(x=>x.date).sort((a,c)=>a.date<c.date?1:-1)[0];
-  const tw=S.profile.targetWeightKg;
-  if(bw) basis.push('Körpergewicht: '+fmtNum(bw.kg)+' kg ('+fmtDate(bw.date)+')'+(tw!=null?' · Zielgewicht: '+fmtNum(tw)+' kg':' · kein Zielgewicht eingetragen'));
-  else basis.push('Körpergewicht: keine Messung mit Datum'+(tw!=null?' · Zielgewicht: '+fmtNum(tw)+' kg':''));
-  if(tw!=null && bw && Math.abs(bw.kg-tw)>=1) hints.push('Zwischen aktuellem Gewicht und Zielgewicht liegen '+fmtNum(Math.abs(bw.kg-tw))+' kg. AOS berechnet keinen Energiebedarf. Für ein konkretes Gewichtsziel kann eine Sporternährungsfachkraft weiterhelfen.');
-  return {type, auto, sess, basis, hints};
-}
-
-/* ---------- Ideen: transparent bewertete Kombinationen aus deinen Bausteinen ---------- */
-function mealIdea(dayType, slot, seed){
-  const recent=new Set(); N().meals.filter(m=>m.date>=addDays(todayISO(),-3)).forEach(m=>m.items.forEach(i=>recent.add(i)));
-  let rnd=seed||1; const rand=()=>{ rnd=(rnd*9301+49297)%233280; return rnd/233280; };
-  const pick=cat=>{
-    const pool=N().items.filter(f=>f.cat===cat && f.pref!=='nicht');
-    if(!pool.length) return null;
-    const scored=pool.map(f=>{ const why=[]; let sc=0;
-      if(f.pref==='favorit'){ sc+=2; why.push('Favorit'); }
-      if(f.tags.includes(dayType)){ sc+=2; why.push('markiert für '+dayType); }
-      if(f.tags.includes(slot)){ sc+=2; why.push('markiert für „'+slot+'“'); }
-      if(recent.has(f.id)){ sc-=1; why.push('in den letzten Tagen schon gegessen – Abwechslung'); }
-      return {f, sc:sc+rand()*1.5, why}; }).sort((a,c)=>c.sc-a.sc);
-    return scored[0];
-  };
-  const cats = slot==='Snack' ? ['snack','veg'] : slot==='Vor dem Training' ? ['carb','veg','protein'] : ['protein','carb','veg'].concat(slot==='Nach dem Training'?[]:['fat']);
-  return cats.map(pick).filter(Boolean);
-}
-
-function viewNutrition(){
-  const date=ui.nutDate||todayISO(); const ctx=dayContext(date);
-  let h='<h1>Ernährung</h1><p class="small muted">Bausteine statt Speiseplan: Du wählst aus, was zu deinem Tag passt. Keine Kalorienvorgaben, keine Verbote.</p>';
-  // Tag
-  h+='<div class="section"><div class="row between"><div class="row">'+
-    '<button class="small" data-act="nutDay" data-d="-1" aria-label="Vorheriger Tag">←</button><strong>'+(date===todayISO()?'Heute, ':'')+fmtDateShort(date)+'</strong>'+
-    '<button class="small" data-act="nutDay" data-d="1" aria-label="Nächster Tag">→</button>'+(date!==todayISO()?'<button class="small" data-act="nutDay" data-d="0">Heute</button>':'')+'</div>'+
-    '<div style="min-width:180px">'+sel('nut-type','Tagesart',[['','automatisch ('+ctx.auto+')']].concat(DAY_TYPES.map(t=>[t,t])),N().dayOverrides[date]||'','data-chg="nutType"')+'</div></div>';
-  h+='<h3>Orientierung für einen '+esc(ctx.type)+'</h3><p>'+esc(N().guides[ctx.type]||'')+'</p>'+
-    '<p class="small muted">'+(N().guidesSource==='ausgangsdaten'?'Allgemeiner Ausgangstext – ':'')+'<button class="link small" data-act="editGuides">an deine Erfahrung anpassen</button></p>';
-  ctx.hints.forEach(x=>h+='<div class="note small">'+esc(x)+'</div>');
-  h+='<details><summary class="small">Worauf das beruht</summary><ul class="small">'+ctx.basis.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul><p class="small muted">Es werden nur eingetragene Daten verwendet. Fehlende Angaben werden nicht geschätzt.</p></details></div>';
-  // Ideen
-  if(!ui.nutSlot) ui.nutSlot = ctx.type==='Trainingstag' ? 'Nach dem Training' : 'Mittagessen';
-  ui.nutSeed = ui.nutSeed || 1;
-  const idea=mealIdea(ctx.type, ui.nutSlot, ui.nutSeed);
-  h+='<h2>Idee für eine Mahlzeit</h2><div class="section">'+sel('nut-slot','Mahlzeit',NUT_SLOTS.map(x=>[x,x]),ui.nutSlot,'data-chg="nutSlot"');
-  if(!idea.length) h+='<div class="empty">Keine passenden Bausteine. Füge unten Bausteine hinzu.</div>';
-  else {
-    h+='<ul>'+idea.map(x=>'<li><strong>'+esc(x.f.name)+'</strong> <span class="small muted">('+esc(catName(x.f.cat))+(x.why.length?' · '+esc(x.why.join(', ')):'')+')</span></li>').join('')+'</ul>';
-    if(idea.every(x=>!x.why.length)) h+='<p class="small muted">Noch zufällig gewählt: Markiere Favoriten und ordne Bausteine Tagesarten oder Mahlzeiten zu, dann werden die Ideen persönlicher.</p>';
-    h+='<div class="row"><button class="primary" data-act="nutCompose" data-items="'+idea.map(x=>x.f.id).join(',')+'">Übernehmen & anpassen</button><button data-act="nutShuffle">Andere Idee</button></div>';
-  }
-  h+='</div>';
-  // Gegessen heute
-  const meals=N().meals.filter(m=>m.date===date).sort((a,c)=>NUT_SLOTS.indexOf(a.slot)-NUT_SLOTS.indexOf(c.slot));
-  h+='<h2>Mahlzeiten an diesem Tag</h2>';
-  if(!meals.length) h+='<div class="empty">Noch nichts eingetragen. Das Eintragen ist freiwillig – es hilft nur, Abwechslung in die Ideen zu bringen.</div>';
-  meals.forEach(m=>{ h+='<div class="sugg"><div class="row between"><strong>'+esc(m.slot)+(m.name?' – '+esc(m.name):'')+'</strong><span><button class="small" data-act="nutEditMeal" data-id="'+m.id+'">Bearbeiten</button></span></div><div class="small">'+esc(m.items.map(i=>(foodById(i)||{name:'(entfernter Baustein)'}).name).join(', '))+'</div>'+(m.note?'<div class="small muted">'+esc(m.note)+'</div>':'')+'</div>'; });
-  h+='<button data-act="nutCompose">+ Mahlzeit zusammenstellen</button>';
-  // Kombinationen
-  const combos=N().combos.slice().sort((a,c)=>(c.dayTypes.includes(ctx.type)?1:0)-(a.dayTypes.includes(ctx.type)?1:0));
-  h+='<h2>Deine Kombinationen</h2>';
-  if(!combos.length) h+='<div class="empty">Gespeicherte Lieblingskombinationen erscheinen hier, z. B. „Frühstück vor dem Training“.</div>';
-  combos.forEach(c=>{ h+='<div class="sugg"><div class="row between"><strong>'+esc(c.name)+'</strong><span class="small">'+c.dayTypes.map(t=>badge(t,t===ctx.type?'ok':'')).join(' ')+'</span></div><div class="small">'+esc(c.items.map(i=>(foodById(i)||{name:'(entfernt)'}).name).join(', '))+'</div>'+
-    '<div class="row" style="margin-top:6px"><button class="small" data-act="nutCompose" data-items="'+c.items.join(',')+'" data-name="'+esc(c.name)+'">Für diesen Tag eintragen</button><button class="small danger" data-act="nutDelCombo" data-id="'+c.id+'">Löschen</button></div></div>'; });
-  // Bausteine
-  h+='<h2>Bausteine</h2><p class="small muted">Markiere, was du magst, was du lieber nicht isst und wofür ein Baustein für dich passt. „Lieber nicht“ taucht in Ideen nicht auf.</p>';
-  NUT_CATS.forEach(([c,name])=>{
-    const its=N().items.filter(f=>f.cat===c).sort((a,b)=>a.name.localeCompare(b.name,'de'));
-    h+='<details class="section"'+(ui.nutOpen===c?' open':'')+'><summary data-act="nutOpen" data-c="'+c+'"><strong>'+esc(name)+'</strong> <span class="small muted">('+its.length+')</span></summary>'+
-      '<div style="margin-top:8px">'+its.map(f=>'<button class="chip pref-'+f.pref+'" data-act="nutEditFood" data-id="'+f.id+'">'+(f.pref==='favorit'?'★ ':'')+esc(f.name)+(f.tags.length?' <span class="small muted">· '+esc(f.tags.join(', '))+'</span>':'')+'</button>').join('')+'</div>'+
-      '<button class="small" data-act="nutEditFood" data-cat="'+c+'">+ Baustein</button></details>';
-  });
-  // Rahmen
-  h+='<h2>Vorlieben & Rahmenbedingungen</h2><div class="section">'+ta('nut-constraints','Was AOS wissen soll (z. B. Unverträglichkeiten, Kochzeit, Kantine, Budget)',N().constraints)+
-    '<p class="small muted">Dieser Text ist eine Notiz für dich. Damit Bausteine in Ideen nicht auftauchen, markiere sie als „lieber nicht“.</p><button class="small primary" data-act="nutSaveConstraints">Speichern</button></div>';
-  h+='<p class="small muted" style="margin-top:20px">Der Ernährungsbereich ist keine medizinische Ernährungsberatung und ersetzt keine Diagnose oder Behandlung. Bei Unverträglichkeiten, Erkrankungen oder medizinischen Fragen wende dich bitte an eine qualifizierte Fachperson (z. B. Ärztin/Arzt oder Diätologin/Diätologe).</p>';
-  return h;
-}
-
-ACT.nutDay = el=>{ const d=+el.dataset.d; ui.nutDate = d===0?todayISO():addDays(ui.nutDate||todayISO(),d); ui.nutSlot=null; render(); };
-CHG.nutType = el=>{ const date=ui.nutDate||todayISO(); if(el.value) N().dayOverrides[date]=el.value; else delete N().dayOverrides[date]; ui.nutSlot=null; save(); render(); };
-CHG.nutSlot = el=>{ ui.nutSlot=el.value; render(); };
-ACT.nutShuffle = ()=>{ ui.nutSeed=(ui.nutSeed||1)+7; render(); };
-ACT.nutOpen = el=>{ ui.nutOpen = ui.nutOpen===el.dataset.c ? null : el.dataset.c; setTimeout(render,0); };
-ACT.nutSaveConstraints = ()=>{ N().constraints=val('nut-constraints'); save(); toast('Gespeichert.'); };
-
-/* ---------- Mahlzeit zusammenstellen ---------- */
-function composer(sel_ids, meal, name){
-  ui.nutSel=new Set(sel_ids);
-  const date=meal?meal.date:(ui.nutDate||todayISO()); const ctx=dayContext(date);
-  let body='<div class="fields">'+inp('nm-date','Datum',date,'type="date"')+sel('nm-slot','Mahlzeit',NUT_SLOTS.map(x=>[x,x]),meal?meal.slot:(ui.nutSlot||'Mittagessen'))+'</div>'+inp('nm-name','Name (optional)',meal?meal.name:(name||''),'placeholder="z. B. Overnight Oats"');
-  NUT_CATS.forEach(([c,cn])=>{ const its=N().items.filter(f=>f.cat===c).sort((a,b)=>(b.pref==='favorit')-(a.pref==='favorit')||a.name.localeCompare(b.name,'de'));
-    body+='<h3>'+esc(cn)+'</h3><div>'+its.map(f=>'<button class="chip pref-'+f.pref+'" data-act="nutToggle" data-id="'+f.id+'" aria-pressed="'+ui.nutSel.has(f.id)+'">'+(f.pref==='favorit'?'★ ':'')+esc(f.name)+'</button>').join('')+'</div>'; });
-  body+=ta('nm-note','Notiz (optional)',meal?meal.note:'','placeholder="z. B. gut vertragen, zu spät gegessen"');
-  body+='<label style="display:flex;align-items:center;color:var(--text)"><input type="checkbox" id="nm-combo"> Auch als Kombination merken (für '+esc(ctx.type)+')</label>';
-  openDlg(meal?'Mahlzeit bearbeiten':'Mahlzeit zusammenstellen', body,
-    (meal?'<button class="danger" data-act="nutDelMeal" data-id="'+meal.id+'">Löschen</button>':'')+'<button data-act="closeDlg">Abbrechen</button>'+
-    (meal?'':'<button data-act="nutSaveCombo">Nur als Kombination merken</button>')+'<button class="primary" data-act="nutSaveMeal" data-id="'+(meal?meal.id:'')+'">'+(meal?'Speichern':'Eintragen')+'</button>');
-}
-ACT.nutCompose = el=>{ closeDlg(); composer(el.dataset.items?el.dataset.items.split(',').filter(Boolean):[], null, el.dataset.name); };
-ACT.nutEditMeal = el=>{ const m=N().meals.find(x=>x.id===el.dataset.id); composer(m.items, m); };
-ACT.nutToggle = el=>{ const id=el.dataset.id; if(ui.nutSel.has(id)) ui.nutSel.delete(id); else ui.nutSel.add(id); el.setAttribute('aria-pressed', ui.nutSel.has(id)); };
-function comboFromDialog(){
-  const date=val('nm-date')||todayISO(); const type=dayContext(date).type;
-  const items=[...ui.nutSel]; const name=val('nm-name')||val('nm-slot')+' ('+type+')';
-  N().combos.push({id:uid('combo'), name, items, dayTypes:[type], slot:val('nm-slot'), createdAt:new Date().toISOString()});
-}
-ACT.nutSaveMeal = el=>{
-  if(!ui.nutSel.size){ toast('Bitte mindestens einen Baustein auswählen.'); return; }
-  let m=el.dataset.id?N().meals.find(x=>x.id===el.dataset.id):null;
-  if(!m){ m={id:uid('meal'), createdAt:new Date().toISOString()}; N().meals.push(m); }
-  Object.assign(m,{date:val('nm-date')||todayISO(), slot:val('nm-slot'), name:val('nm-name'), items:[...ui.nutSel], note:val('nm-note')});
-  if(document.getElementById('nm-combo').checked) comboFromDialog();
-  save(); closeDlg(); render();
-};
-ACT.nutSaveCombo = ()=>{ if(!ui.nutSel.size){ toast('Bitte mindestens einen Baustein auswählen.'); return; } comboFromDialog(); save(); closeDlg(); toast('Kombination gespeichert.'); render(); };
-ACT.nutDelMeal = el=>{ N().meals=N().meals.filter(x=>x.id!==el.dataset.id); save(); closeDlg(); render(); };
-ACT.nutDelCombo = el=>{ const id=el.dataset.id; confirmDlg('Kombination löschen?','Die gespeicherte Kombination wird entfernt. Eingetragene Mahlzeiten bleiben erhalten.','Löschen',()=>{ N().combos=N().combos.filter(x=>x.id!==id); save(); render(); }, true); };
-
-/* ---------- Baustein bearbeiten ---------- */
-ACT.nutEditFood = el=>{
-  const f=el.dataset.id?foodById(el.dataset.id):{name:'',cat:el.dataset.cat||'protein',pref:'neutral',tags:[]};
-  const tagOpts=DAY_TYPES.concat(NUT_SLOTS);
-  openDlg(el.dataset.id?'Baustein bearbeiten':'Baustein hinzufügen',
-    inp('nf-name','Name *',f.name)+'<div class="fields">'+sel('nf-cat','Kategorie',NUT_CATS,f.cat)+sel('nf-pref','Deine Einstellung',[['favorit','★ Favorit'],['neutral','neutral'],['nicht','lieber nicht (nicht in Ideen)']],f.pref)+'</div>'+
-    '<label>Passt für mich zu (optional)</label><div>'+tagOpts.map(t=>'<label style="display:inline-flex;align-items:center;margin:4px 12px 4px 0;color:var(--text)"><input type="checkbox" class="nf-tag" value="'+esc(t)+'" '+(f.tags.includes(t)?'checked':'')+'>'+esc(t)+'</label>').join('')+'</div>',
-    (el.dataset.id?'<button class="danger" data-act="nutDelFood" data-id="'+f.id+'">Entfernen</button>':'')+'<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="nutSaveFood" data-id="'+(el.dataset.id||'')+'">Speichern</button>');
-};
-ACT.nutSaveFood = el=>{
-  const name=val('nf-name'); if(!name){ toast('Bitte einen Namen eingeben.'); return; }
-  let f=el.dataset.id?foodById(el.dataset.id):null;
-  if(!f){ f={id:uid('food'),source:'eingabe'}; N().items.push(f); }
-  Object.assign(f,{name,cat:val('nf-cat'),pref:val('nf-pref'),tags:[...document.querySelectorAll('.nf-tag:checked')].map(x=>x.value)});
-  ui.nutOpen=f.cat; save(); closeDlg(); render();
-};
-ACT.nutDelFood = el=>{ N().items=N().items.filter(x=>x.id!==el.dataset.id); save(); closeDlg(); render(); };
-
-/* ---------- Orientierungstexte ---------- */
-ACT.editGuides = ()=>{
-  openDlg('Orientierung je Tagesart', '<p class="small muted">Schreib hier, was sich für dich bewährt hat. AOS zeigt den Text je nach Tagesart an.</p>'+DAY_TYPES.map((t,i)=>ta('ng-'+i,t,N().guides[t])).join(''),
-    '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="saveGuides">Speichern</button>'); };
-ACT.saveGuides = ()=>{ DAY_TYPES.forEach((t,i)=>N().guides[t]=val('ng-'+i)); N().guidesSource='eingabe'; save(); closeDlg(); render(); };
-
-'use strict';
 /* ===== AOS – Profil & Einstellungen ===== */
 function viewProfile(){
   const p=S.profile; const bw=latestBodyweight();
@@ -1846,9 +1682,10 @@ ACT.resetOk = ()=>{ if(val('rs-conf')!=='LÖSCHEN'){ toast('Bitte LÖSCHEN einge
    Reduktionen wegen Readiness/Zeit/Beschwerden passieren automatisch und werden begründet. */
 
 const REF_KEY = 'aos-ref-v1';
-const REF = { plan:null, ex:null, exMap:{}, at:null, error:'', loading:false };
-function refSet(plan, ex, at){ REF.plan=plan; REF.ex=ex; REF.at=at; REF.exMap={}; ((ex&&ex.exercises)||[]).forEach(e=>{ REF.exMap[e.id]=e; }); }
-function refInit(){ try{ const c=JSON.parse(localStorage.getItem(REF_KEY)||'null'); if(c&&c.plan&&c.ex) refSet(c.plan, c.ex, c.at); }catch(e){} }
+const REF = { plan:null, ex:null, exMap:{}, nut:null, food:null, recipes:null, at:null, error:'', nutError:'', loading:false };
+function refSet(plan, ex, at, more){ REF.plan=plan; REF.ex=ex; REF.at=at; REF.exMap={}; ((ex&&ex.exercises)||[]).forEach(e=>{ REF.exMap[e.id]=e; });
+  if(more){ REF.nut=more.nut||null; REF.food=more.food||null; REF.recipes=more.recipes||null; } }
+function refInit(){ try{ const c=JSON.parse(localStorage.getItem(REF_KEY)||'null'); if(c&&c.plan&&c.ex) refSet(c.plan, c.ex, c.at, c); }catch(e){} }
 async function ghRaw(path){
   let res;
   try{ res = await fetch(ghRepoUrl('/contents/'+path.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(gh.cfg.branch)),
@@ -1865,11 +1702,17 @@ async function refLoad(force){
     const [p, x] = await Promise.all([ ghRaw('planner/plan.json'), ghRaw('db/AOS_Uebungsdatenbank.json') ]);
     let plan, ex; try{ plan=JSON.parse(p); ex=JSON.parse(x); }catch(e){ throw new Error('Planerdaten im Datenrepo sind kein gültiges JSON.'); }
     if(!plan.blocks || !ex.exercises) throw new Error('Planerdaten unvollständig.');
-    refSet(plan, ex, new Date().toISOString()); REF.error='';
-    try{ localStorage.setItem(REF_KEY, JSON.stringify({ plan, ex, at:REF.at })); }catch(e){}
+    // Ernährungsdaten getrennt laden: Fehlen sie, funktioniert der Trainingsplaner trotzdem
+    const more={ nut:REF.nut, food:REF.food, recipes:REF.recipes };
+    const r=await Promise.allSettled([ ghRaw('planner/nutrition.json'), ghRaw('db/AOS_Lebensmitteldatenbank.json'), ghRaw('db/AOS_Rezeptdatenbank.json') ]);
+    try{ if(r[0].status==='fulfilled') more.nut=JSON.parse(r[0].value); if(r[1].status==='fulfilled') more.food=JSON.parse(r[1].value); if(r[2].status==='fulfilled') more.recipes=JSON.parse(r[2].value);
+      REF.nutError = r.slice(0,2).some(x=>x.status!=='fulfilled') ? 'Ernährungsdaten fehlen im Datenrepo (planner/nutrition.json, db/AOS_Lebensmitteldatenbank.json).' : ''; }
+    catch(e){ REF.nutError='Ernährungsdaten im Datenrepo sind kein gültiges JSON.'; }
+    refSet(plan, ex, new Date().toISOString(), more); REF.error='';
+    try{ localStorage.setItem(REF_KEY, JSON.stringify({ plan, ex, at:REF.at, nut:REF.nut, food:REF.food, recipes:REF.recipes })); }catch(e){}
     return true;
   }catch(e){ REF.error = e.offline ? '' : (e.status ? ghErrText(e) : e.message); return false; }
-  finally{ REF.loading=false; const dlg=document.getElementById('dlg'); if((ui.view==='training'||ui.view==='uebersicht') && !ui.sessionId && !(dlg&&dlg.open)) render(); }
+  finally{ REF.loading=false; const dlg=document.getElementById('dlg'); if(['training','uebersicht','plan','ernaehrung'].includes(ui.view) && !ui.sessionId && !(dlg&&dlg.open)) render(); }
 }
 
 /* ---------- Kalender ---------- */
@@ -2199,6 +2042,324 @@ function plOverviewNote(){
   return '<div class="note"><strong>Heute: '+esc(t.id+' – '+t.name)+'</strong> · '+esc(due.phase?due.phase.id:'')+' Woche '+due.week+'. '+
     (planned?'<button class="link" data-act="startLog" data-id="'+planned.id+'">Erfassen</button>':'<button class="link" data-act="go" data-view="training">Einheit planen</button>')+'</div>';
 }
+
+'use strict';
+/* ===== AOS – Ernährung (Spezifikation Nutrition v11) =====
+   Persönliche Ernährungsdaten (planner/nutrition.json), Lebensmittel- und Rezeptdatenbank kommen aus dem privaten Datenrepo.
+   Gespeichert werden nur deine Eingaben: Mahlzeiten (nutrition.meals, Format v2), Tageseinstellungen (nutrition.dayOverrides),
+   Bewertungen und eigene Lebensmittel (nutrition.items). Keine Bewertung von Essen, Abweichungen werden neutral angezeigt. */
+
+const NUT = ()=>REF.nut;
+const MAC = { P:'protein_g', K:'carbs_g', F:'fat_g' };
+const r5 = x=>Math.round(x/5)*5;
+const r10 = x=>Math.round(x/10)*10;
+const fmtK = n=>String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+
+function nutDayCfg(date){ const v=(S.nutrition.dayOverrides||{})[date]; return (v && typeof v==='object') ? v : {}; }
+function nutSetDay(date, patch){ const o=Object.assign({}, nutDayCfg(date), patch); Object.keys(o).forEach(k=>{ if(o[k]==null) delete o[k]; }); S.nutrition.dayOverrides[date]=o; }
+
+/* ---------- Lebensmittel ---------- */
+function nutPrefs(){ const m={}; (S.nutrition.items||[]).forEach(i=>{ if(i.ref) m[i.ref]=i; }); return m; }
+function nutFoods(all){
+  const pr=nutPrefs();
+  const db=((REF.food&&REF.food.foods)||[]).map(f=>Object.assign({}, f, pr[f.id]?{ user_rating:pr[f.id].rating, active:pr[f.id].active!==false }:{}));
+  const own=(S.nutrition.items||[]).filter(i=>i.custom).map(i=>Object.assign({ tags:[], grams_per_block:{}, active:true }, i));
+  return db.concat(own).filter(f=>all || (f.active!==false && f.user_rating!==1));
+}
+function nutFood(id){ return nutFoods(true).find(f=>f.id===id) || null; }
+const isPortion = f=>f && f.per==='Portion';
+function itemMac(it){ const f=nutFood(it.food); if(!f || it.g==null) return { P:0, K:0, F:0, kcal:0 };
+  const k = isPortion(f) ? it.g : it.g/100;
+  return { P:(f.protein_g||0)*k, K:(f.carbs_g||0)*k, F:(f.fat_g||0)*k, kcal:(f.kcal||0)*k }; }
+function sumMac(items){ return items.reduce((a,it)=>{ const m=itemMac(it); a.P+=m.P; a.K+=m.K; a.F+=m.F; a.kcal+=m.kcal; return a; }, { P:0, K:0, F:0, kcal:0 }); }
+function amountTxt(it){ const f=nutFood(it.food); if(it.g==null) return '—'; return isPortion(f) ? fmtNum(it.g)+' Port.' : fmtNum(it.g)+(f&&/ml/.test(f.per)?' ml':' g'); }
+
+/* Mengenrechner (6.6): feste Einträge abziehen, dann KH-, P-, F-Lebensmittel auf das Restziel skalieren, mehrere Durchgänge, runden */
+const NUT_SIDE_CATS=['obst','gemuese','suess','getraenk','sauce','kantine'];   // Beilagen-Kategorien: Standardportion statt Hochrechnen
+function nutCalc(items, T){
+  const scalable = it=>{ const f=nutFood(it.food); return f && ['P','K','F'].includes(f.main_block) && !NUT_SIDE_CATS.includes(f.category); };
+  const grp = it=>{ const f=nutFood(it.food); if(!f) return null;
+    if(scalable(it)) return f.main_block;
+    // Obst, Süßes usw. nur hochrechnen, wenn sie die einzige Quelle dieses Makros in der Mahlzeit sind
+    return items.some(o=>o!==it && scalable(o) && nutFood(o.food).main_block===f.main_block) ? 'side' : f.main_block; };
+  const free = items.filter(it=>!it.fixed && ['P','K','F'].includes(grp(it)));
+  items.forEach(it=>{ const f=nutFood(it.food); if(!f) return;
+    if(!it.fixed && !['P','K','F'].includes(grp(it))) it.g = isPortion(f) ? (it.g||1) : (it.g!=null && it.g>0 && it.g<=(f.default_portion_g||100)*3 ? it.g : (f.default_portion_g||100)); });
+  free.forEach(it=>{ it.g=0; });
+  for(let pass=0; pass<3; pass++){
+    ['K','P','F'].forEach(m=>{
+      const mine=free.filter(it=>grp(it)===m); if(!mine.length) return;
+      const have=items.filter(it=>!mine.includes(it)).reduce((a,it)=>a+itemMac(it)[m],0);
+      const need=Math.max(0, T[m]-have);
+      mine.forEach(it=>{ const f=nutFood(it.food); const per=(f[MAC[m]]||0)/(isPortion(f)?1:100); it.g = per>0 ? need/mine.length/per : 0; });
+    });
+  }
+  free.forEach(it=>{ const f=nutFood(it.food); it.g = isPortion(f) ? Math.max(0.5, Math.round(it.g*2)/2) : Math.max(5, r5(it.g)); });
+  return items;
+}
+
+/* ---------- Tagestyp, Gewicht, Ziele (4, 5, 6.4) ---------- */
+function nutWeight(date){
+  const dated=S.bodyweight.filter(b=>b.date && b.date<=date && b.kg!=null).sort((a,b)=>a.date<b.date?1:-1);
+  const win=dated.filter(b=>daysBetween(b.date,date)<7);
+  if(win.length) return { kg:win.reduce((a,b)=>a+b.kg,0)/win.length, basis:win.length>1?'7-Tage-Schnitt aus '+win.length+' Messungen':'Messung vom '+fmtDate(win[0].date), provisional:win.length<3 };
+  if(dated.length) return { kg:dated[0].kg, basis:'letzte Messung '+fmtDate(dated[0].date)+' (älter als 7 Tage)', provisional:true };
+  const any=S.bodyweight.find(b=>b.kg!=null);
+  if(any) return { kg:any.kg, basis:'Ausgangswert ohne Datum', provisional:true };
+  return { kg:NUT().weight_default_kg, basis:NUT().weight_default_note||'Standardwert', provisional:true };
+}
+function nutAutoType(date){
+  const map=NUT().template_day_type||{};
+  const s=S.sessions.find(x=>x.planner && x.status!=='ausgelassen' && (sessionDate(x)===date));
+  if(s) return { type:map[s.planner.templateId]||'gym_upper', why:(isDone(s)?'Einheit ':'geplante Einheit ')+s.planner.templateId+' – '+s.name.replace(/^D\d – /,'') };
+  if(REF.plan && date>=todayISO()){ const due=plDue(date); if(due.block && due.tpl && !due.offday) return { type:map[due.tpl]||'gym_upper', why:'laut Wochenplan '+due.tpl+' fällig' }; }
+  return { type:'rest', why:'keine Einheit an diesem Tag' };
+}
+function nutTargets(date){
+  const N=NUT(), cfg=nutDayCfg(date), auto=nutAutoType(date);
+  const type=cfg.type||auto.type; const dt=N.day_types[type]||N.day_types.rest;
+  const w=nutWeight(date);
+  const P=r5(N.protein_g_per_kg*w.kg); let K=r5(dt.carb_g_per_kg*w.kg); const F=Math.round(dt.fat_g_per_kg*w.kg);
+  const en=N.entry; const entry=!!(en && date<=en.until && en.day_types.includes(type));
+  if(entry) K=Math.max(0, K-en.carb_minus_g);
+  const training=type!=='rest';
+  const time = training ? (cfg.time||'morning') : 'rest';
+  return { type, label:dt.label, auto, manual:!!cfg.type, w, P, K, F, kcal:r10(4*P+4*K+9*F), entry, time, training };
+}
+function nutMealPlan(T){ const mp=NUT().meal_plans[T.time] || NUT().meal_plans.rest;
+  return mp.map(s=>({ slot:s, P:Math.round(T.P*s.P), K:Math.round(T.K*s.K), F:Math.round(T.F*s.F) })); }
+function nutMeal(date, slotId){ return (S.nutrition.meals||[]).find(m=>m.v===2 && m.date===date && m.slot===slotId) || null; }
+function nutEnsureMeal(date, slotId){ let m=nutMeal(date, slotId); if(!m){ m={ id:'meal-'+date+'-'+slotId, v:2, date, slot:slotId, items:[], done:false, createdAt:new Date().toISOString() }; S.nutrition.meals.push(m); } return m; }
+
+/* Meal-Prep-Box für ein Datum aus der Rezeptdatenbank (12.6) */
+function nutPrepBox(date){
+  const w=(REF.recipes&&REF.recipes.beispiel_woche_23_27_11)||[]; const d=parseISO(date);
+  const key=pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.';
+  return w.find(x=>x.day.endsWith(key) && date.startsWith('2026')) || null;
+}
+function compName(id){ const c=((REF.recipes&&REF.recipes.components)||[]).find(x=>x.id===id); return c?c.name:id; }
+
+/* ---------- Ansicht ---------- */
+function viewNutrition(){
+  let h='<h1>Ernährung</h1>';
+  if(!NUT() || !REF.food){
+    if(!ghReady()) return h+'<div class="note warn">Die Ernährungsplanung braucht deine Ernährungsdaten aus dem Datenrepo. <button class="link" data-act="ghOpen">Mit GitHub verbinden</button></div>';
+    return h+'<div class="note">'+(REF.loading?'Ernährungsdaten werden geladen …':(REF.nutError||'Ernährungsdaten noch nicht geladen.'))+' <button class="link" data-act="plReload">Neu laden</button></div>';
+  }
+  const date=ui.nutDate||todayISO(); const T=nutTargets(date); const cfg=nutDayCfg(date);
+  h+='<div class="row between no-print"><button data-act="nutDay" data-d="-1">←</button><div style="flex:1;max-width:220px">'+inp('nut-date','',date,'type="date" data-chg="nutDate" aria-label="Datum"')+'</div><button data-act="nutDay" data-d="1">→</button></div>';
+  // Tagestyp & Ziel
+  h+='<div class="section"><div class="row between"><strong>'+WD_LONG[weekdayOf(date)]+', '+fmtDate(date)+'</strong>'+badge(T.label, T.training?'ok':'')+'</div>';
+  h+='<p class="small muted">'+(T.manual?'Tagestyp von dir festgelegt (automatisch: '+esc(NUT().day_types[T.auto.type].label)+', '+esc(T.auto.why)+')':'Automatisch: '+esc(T.auto.why))+'</p>';
+  h+='<div class="fields">'+sel('nut-type','Tagestyp',[['','automatisch']].concat(Object.entries(NUT().day_types).map(([k,v])=>[k,v.label])),cfg.type||'','data-chg="nutType"')+
+     (T.training?sel('nut-time','Trainingszeit',Object.entries(NUT().training_times),T.time,'data-chg="nutTime"'):'')+'</div>';
+  h+='<div class="kpis"><div><span class="small muted">Energie</span><strong>≈ '+fmtK(T.kcal)+' kcal</strong></div><div><span class="small muted">Protein</span><strong>'+T.P+' g</strong></div><div><span class="small muted">Kohlenhydrate</span><strong>'+T.K+' g</strong></div><div><span class="small muted">Fett</span><strong>'+T.F+' g</strong></div></div>';
+  const notes=[];
+  if(T.entry) notes.push(NUT().entry.note);
+  notes.push('Berechnet mit '+fmtNum(Math.round(T.w.kg*10)/10)+' kg ('+T.w.basis+')'+(T.w.provisional?'. Für stabile Ziele morgens nüchtern wiegen, 3–7× pro Woche.':'.'));
+  if(NUT().status!=='bestätigt') notes.push('Die Makroziele sind noch vorläufig (Spezifikation 10/1: nach der Gewichtsmessung bestätigen).');
+  h+='<p class="small muted">'+notes.map(esc).join(' ')+' <button class="link" data-act="editBw">Gewicht eintragen</button></p></div>';
+
+  // Mahlzeiten
+  const plan=nutMealPlan(T); const box=nutPrepBox(date); const prepStart=(NUT().mealprep||{}).start;
+  const all=[]; let doneN=0;
+  h+='<h2>Mahlzeiten</h2>';
+  plan.forEach(({slot,P,K,F})=>{
+    const m=nutMeal(date, slot.id); const items=m?m.items:[]; items.forEach(i=>all.push(i)); if(m&&m.done) doneN++;
+    const ist=sumMac(items);
+    h+='<div class="ex"><div class="ex-head"><span class="ex-name"><button class="chip" style="min-height:30px;padding:2px 9px;margin:0 6px 0 0" data-act="nutDone" data-s="'+slot.id+'" aria-pressed="'+(m&&m.done?'true':'false')+'" aria-label="gegessen">'+(m&&m.done?'☑':'☐')+'</button>'+esc(slot.time+' · '+slot.name)+'</span><span class="plan-hint">Ziel P '+P+' · KH '+K+' · F '+F+'</span></div>';
+    if(slot.lunch && box && (!prepStart || date>=prepStart)) h+='<div class="note small">Meal-Prep-Box: '+esc(box.components.map(compName).join(' + '))+' ('+box.macros.kcal+' kcal · P '+box.macros.P+' · KH '+box.macros.K+' · F '+box.macros.F+'). <button class="link" data-act="nutBox" data-s="'+slot.id+'">Box übernehmen</button></div>';
+    else if(slot.lunch && prepStart && date<prepStart) h+='<div class="small muted">Bis zum Meal-Prep-Start ('+fmtDate(prepStart)+'): Kantine klein/mittel/groß wählen.</div>';
+    if(slot.tags && slot.tags.includes('pre')) h+='<div class="small muted">Vor dem Training: wenig Fett und Ballaststoffe, gut verträglich.</div>';
+    items.forEach((it,j)=>{ const f=nutFood(it.food); const mm=itemMac(it);
+      h+='<div class="setrow" style="grid-template-columns:1fr 92px auto"><span>'+esc(f?f.name:it.food)+(it.fixed?' <span class="small muted" title="von dir festgelegt">📌</span>':'')+'<br><span class="small muted">P '+fmtNum(Math.round(mm.P))+' · KH '+fmtNum(Math.round(mm.K))+' · F '+fmtNum(Math.round(mm.F))+' · '+Math.round(mm.kcal)+' kcal</span></span>'+
+        '<input inputmode="decimal" aria-label="Menge" value="'+(it.g==null?'':fmtNum(it.g))+'" data-chg="nutG" data-s="'+slot.id+'" data-j="'+j+'"><button class="small" data-act="nutDel" data-s="'+slot.id+'" data-j="'+j+'" aria-label="entfernen">✕</button></div>'; });
+    h+='<div class="small">Ist: P '+Math.round(ist.P)+' · KH '+Math.round(ist.K)+' · F '+Math.round(ist.F)+' · '+Math.round(ist.kcal)+' kcal</div>';
+    h+='<div class="row" style="margin-top:6px"><button class="small" data-act="nutPick" data-s="'+slot.id+'">+ Lebensmittel</button>'+(items.some(i=>!i.fixed)?'<button class="small" data-act="nutCalc" data-s="'+slot.id+'">Mengen neu berechnen</button>':'')+(items.some(i=>i.fixed)?'<button class="small" data-act="nutUnfix" data-s="'+slot.id+'">Festlegungen lösen</button>':'')+'</div></div>';
+  });
+  const day=sumMac(all); const pct=(a,b)=>b?Math.round((a/b-1)*100):0; const tol=(NUT().tolerance||{}).day_pct||5;
+  const line=(l,a,b,u)=>'<div><span class="small muted">'+l+'</span><strong>'+Math.round(a)+(u||' g')+'</strong><span class="small muted"> / '+b+(u||' g')+(all.length?' ('+(pct(a,b)>0?'+':'')+pct(a,b)+' %'+(Math.abs(pct(a,b))<=tol?' ✓':'')+')':'')+'</span></div>';
+  h+='<div class="section"><strong>Tag gesamt'+(plan.length?' · '+doneN+'/'+plan.length+' abgehakt':'')+'</strong><div class="kpis">'+line('Energie',day.kcal,T.kcal,' kcal')+line('Protein',day.P,T.P)+line('KH',day.K,T.K)+line('Fett',day.F,T.F)+'</div><p class="small muted">Toleranz ± '+tol+' % pro Tag. Abweichungen sind Information, keine Wertung.</p></div>';
+
+  // Supplements
+  const sup=(NUT().supplements||[]).filter(s=>s.active);
+  if(sup.length) h+='<h2>Supplements</h2><div class="section">'+sup.map(s=>chipBtn('nutSupp','supp',s.id,(cfg.supp&&cfg.supp[s.id]?'☑ ':'☐ ')+s.name+' · '+s.dose,!!(cfg.supp&&cfg.supp[s.id]))).join('')+
+    '<p class="small muted">'+esc(NUT().caffeine||'')+'</p></div>';
+  h+='<div class="row no-print"><button data-act="nutKeep">Tag für Google Keep</button><button data-act="nutPrep">Meal-Prep & Einkauf</button></div>';
+  // Lebensmittel verwalten
+  h+='<details style="margin-top:16px"><summary><strong>Lebensmittel bewerten & ergänzen</strong></summary>'+nutFoodAdmin()+'</details>';
+  h+='<p class="small muted" style="margin-top:16px">Nicht im Plan: '+esc((NUT().exclusions||[]).join(', '))+'. Richtwerte aus Nährwerttabellen – Packungsangaben haben Vorrang. Keine medizinische Beratung.</p>';
+  return h;
+}
+function nutFoodAdmin(){
+  const cats={}; nutFoods(true).forEach(f=>{ (cats[f.category]=cats[f.category]||[]).push(f); });
+  let h='<p class="small muted">Bewertung 1 = schlägt AOS nicht mehr vor. Ausblenden entfernt ein Lebensmittel aus der Auswahl, alte Einträge bleiben erhalten.</p>';
+  Object.entries(cats).forEach(([c,l])=>{ h+='<h3>'+esc(c.replace(/_/g,' '))+'</h3><div class="table-wrap"><table><tbody>'+l.map(f=>'<tr><td>'+esc(f.name)+(f.tags.includes('favorit')?' ★':'')+'<br><span class="small muted">'+esc(f.per)+': '+f.kcal+' kcal · P '+fmtNum(f.protein_g)+' · KH '+fmtNum(f.carbs_g)+' · F '+fmtNum(f.fat_g)+'</span></td>'+
+    '<td style="width:84px">'+sel('fr-'+f.id,'',[['','–'],['1','1'],['2','2'],['3','3'],['4','4'],['5','5']],f.user_rating==null?'':String(f.user_rating),'data-chg="nutRate" data-f="'+esc(f.id)+'" aria-label="Bewertung"')+'</td>'+
+    '<td><button class="small" data-act="nutHide" data-f="'+esc(f.id)+'">'+(f.active===false?'einblenden':'ausblenden')+'</button></td></tr>').join('')+'</tbody></table></div>'; });
+  h+='<button data-act="nutOwn">+ Eigenes Lebensmittel (Packungsangaben)</button>';
+  return h;
+}
+
+/* ---------- Aktionen ---------- */
+const nutDate = ()=>ui.nutDate||todayISO();
+function nutRecalc(slotId){ const date=nutDate(); const T=nutTargets(date); const t=nutMealPlan(T).find(x=>x.slot.id===slotId); const m=nutMeal(date, slotId); if(t&&m) nutCalc(m.items, t); }
+ACT.nutDay = el=>{ ui.nutDate=addDays(nutDate(), +el.dataset.d); render(); };
+CHG.nutDate = el=>{ if(el.value){ ui.nutDate=el.value; render(); } };
+CHG.nutType = el=>{ nutSetDay(nutDate(), { type:el.value||null }); save(); render(); };
+CHG.nutTime = el=>{ nutSetDay(nutDate(), { time:el.value }); save(); render(); };
+ACT.nutDone = el=>{ const m=nutEnsureMeal(nutDate(), el.dataset.s); m.done=!m.done; save(); render(); };
+ACT.nutSupp = el=>{ const c=nutDayCfg(nutDate()); const s=Object.assign({}, c.supp||{}); s[el.dataset.v]=!s[el.dataset.v]; if(!s[el.dataset.v]) delete s[el.dataset.v]; nutSetDay(nutDate(), { supp:Object.keys(s).length?s:null }); save(); render(); };
+ACT.nutDel = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; m.items.splice(+el.dataset.j,1); nutRecalc(el.dataset.s); save(); render(); };
+ACT.nutCalc = el=>{ nutRecalc(el.dataset.s); save(); render(); toast('Mengen auf das Ziel der Mahlzeit berechnet.'); };
+ACT.nutUnfix = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; m.items.forEach(i=>{ delete i.fixed; }); nutRecalc(el.dataset.s); save(); render(); };
+CHG.nutG = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; const it=m.items[+el.dataset.j]; const v=num(el.value);
+  if(v==null || v<0){ toast('Bitte eine Zahl eingeben.'); render(); return; } it.g=v; it.fixed=true; nutRecalc(el.dataset.s); save(); render(); };
+ACT.nutBox = el=>{ const box=nutPrepBox(nutDate()); if(!box) return; const m=nutEnsureMeal(nutDate(), el.dataset.s);
+  m.items=box.items_raw_g.map(([food,g])=>({ food, g, fixed:true })); m.box=box.components; save(); render(); toast('Box übernommen (Rohgewichte).'); };
+ACT.nutPick = el=>{ ui.nutSlot=el.dataset.s;
+  const slot=nutMealPlan(nutTargets(nutDate())).find(x=>x.slot.id===el.dataset.s);
+  openDlg('Lebensmittel – '+(slot?slot.slot.name:''), inp('fd-q','Suchen','','autocomplete="off" placeholder="z. B. Reis, Skyr, Huhn"')+'<div id="fd-list">'+nutPickList('')+'</div>', '<button data-act="closeDlg">Fertig</button>'); };
+function nutPickList(q){
+  const slot=(NUT().meal_plans[nutTargets(nutDate()).time]||[]).find(s=>s.id===ui.nutSlot)||{};
+  const pre=(slot.tags||[]).includes('pre');
+  const ql=q.trim().toLowerCase();
+  let l=nutFoods(false).filter(f=>!ql || f.name.toLowerCase().includes(ql) || f.category.includes(ql));
+  l=l.filter(f=>f.category!=='kantine' || (slot.lunch && !(NUT().mealprep && nutDate()>=NUT().mealprep.start)));
+  const score=f=>(f.user_rating||0)*2+(f.tags.includes('favorit')?5:0)+(pre&&(f.tags.includes('pre')||f.tags.includes('fettarm_ballaststoffarm'))?8:0);
+  l.sort((a,b)=>score(b)-score(a) || a.name.localeCompare(b.name,'de'));
+  if(!l.length) return '<p class="small muted">Nichts gefunden. Eigene Lebensmittel legst du unten unter „Lebensmittel bewerten & ergänzen“ an.</p>';
+  return l.slice(0,40).map(f=>'<button class="chip" data-act="nutAdd" data-f="'+esc(f.id)+'">'+esc(f.name)+(f.tags.includes('favorit')?' ★':'')+(pre&&f.tags.includes('pre')?' · vor Training':'')+'</button>').join('');
+}
+document.addEventListener('input', e=>{ if(e.target && e.target.id==='fd-q'){ const el=document.getElementById('fd-list'); if(el) el.innerHTML=nutPickList(e.target.value); } });
+ACT.nutAdd = el=>{ const m=nutEnsureMeal(nutDate(), ui.nutSlot); m.items.push({ food:el.dataset.f, g:null }); nutRecalc(ui.nutSlot); save();
+  const f=nutFood(el.dataset.f); toast((f?f.name:'Lebensmittel')+' hinzugefügt'); el.setAttribute('aria-pressed','true'); render(); };
+CHG.nutRate = el=>{ const id=el.dataset.f; let p=(S.nutrition.items||[]).find(i=>i.ref===id); if(!p){ p={ id:'pref-'+id, ref:id, rating:null, active:true }; S.nutrition.items.push(p); }
+  p.rating=el.value?Number(el.value):null; save(); toast('Bewertung gespeichert.'); };
+ACT.nutHide = el=>{ const id=el.dataset.f; const own=(S.nutrition.items||[]).find(i=>i.custom && i.id===id);
+  if(own){ own.active=own.active===false; save(); render(); return; }
+  let p=(S.nutrition.items||[]).find(i=>i.ref===id); if(!p){ p={ id:'pref-'+id, ref:id, rating:null, active:true }; S.nutrition.items.push(p); }
+  p.active=p.active===false; save(); render(); };
+ACT.nutOwn = ()=>openDlg('Eigenes Lebensmittel', '<p class="small muted">Nährwerte von der Packung, pro 100 g bzw. 100 ml.</p>'+inp('no-name','Name *','')+
+  '<div class="fields">'+sel('no-per','Bezug',[['100 g','pro 100 g'],['100 ml','pro 100 ml']],'100 g')+inp('no-kcal','kcal *','','inputmode="decimal"')+'</div>'+
+  '<div class="fields">'+inp('no-p','Protein g *','','inputmode="decimal"')+inp('no-k','Kohlenhydrate g *','','inputmode="decimal"')+inp('no-f','Fett g *','','inputmode="decimal"')+'</div>'+
+  '<div class="fields">'+inp('no-por','Standardportion (g/ml)','','inputmode="decimal"')+sel('no-main','Hauptsächlich',[['P','Protein'],['K','Kohlenhydrate'],['F','Fett'],['G','Gemüse/Obst']],'K')+'</div>',
+  '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="nutOwnOk">Speichern</button>');
+ACT.nutOwnOk = ()=>{ const n=val('no-name'), kc=num(val('no-kcal')), p=num(val('no-p')), k=num(val('no-k')), f=num(val('no-f'));
+  if(!n || [kc,p,k,f].some(v=>v==null||v<0)){ toast('Bitte Name und alle Nährwerte als Zahl eingeben.'); return; }
+  const ex=(NUT().exclusions||[]).map(x=>x.split(' ')[0].toLowerCase()); if(ex.some(x=>x.length>3 && n.toLowerCase().includes(x))) { toast('Steht auf deiner Liste der Lebensmittel, die du nicht isst.'); return; }
+  S.nutrition.items.push({ id:uid('own'), custom:true, name:n, category:'eigene', per:val('no-per'), kcal:kc, protein_g:p, carbs_g:k, fat_g:f, fiber_g:null,
+    default_portion_g:num(val('no-por')), portion_label:'', main_block:val('no-main'), grams_per_block:{}, tags:[], source:'Packung (eigene Angabe)', active:true, createdAt:new Date().toISOString() });
+  save(); closeDlg(); render(); toast('Lebensmittel angelegt.'); };
+
+function nutKeepText(date){
+  const T=nutTargets(date); const L=[];
+  L.push('AOS Nutrition · '+fmtDateShort(date)+' · '+T.label+(T.training?' · '+NUT().training_times[T.time]:''));
+  L.push('Ziel heute'+(T.entry?' (Einstieg)':'')+': P '+T.P+' g · KH '+T.K+' g · F '+T.F+' g · ≈ '+fmtK(T.kcal)+' kcal');
+  L.push('Gewicht morgens: __ kg'); L.push('');
+  const all=[];
+  nutMealPlan(T).forEach(({slot,P,K,F})=>{ const m=nutMeal(date, slot.id); const it=m?m.items:[]; it.forEach(i=>all.push(i));
+    L.push((m&&m.done?'☑ ':'☐ ')+slot.time+' '+slot.name+' – Ziel P '+P+' / KH '+K+' / F '+F);
+    if(it.length) L.push('   '+it.map(i=>{ const f=nutFood(i.food); return (f?f.name:i.food)+' '+amountTxt(i); }).join(' · ')); });
+  const d=sumMac(all); L.push('Ist (berechnet): P ≈ '+Math.round(d.P)+' · KH ≈ '+Math.round(d.K)+' · F ≈ '+Math.round(d.F)+' · ≈ '+fmtK(r10(d.kcal))+' kcal');
+  const sup=(NUT().supplements||[]).filter(s=>s.active); const c=nutDayCfg(date);
+  if(sup.length) L.push('Supplements: '+sup.map(s=>(c.supp&&c.supp[s.id]?'☑ ':'☐ ')+s.name+' '+s.dose).join(' · '));
+  L.push('Notiz:'); return L.join('\n');
+}
+ACT.nutKeep = ()=>openDlg('Text für Google Keep','<pre class="out" id="keep-out">'+esc(nutKeepText(nutDate()))+'</pre>','<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="keep-out">Kopieren</button>');
+
+function nutPrepText(){
+  const R=REF.recipes; if(!R) return ''; const L=[]; const F=id=>{ const f=nutFood(id); return f?f.name:id; };
+  const rounds={}; (R.beispiel_woche_23_27_11||[]).forEach(b=>{ (rounds[b.prep_round]=rounds[b.prep_round]||[]).push(b); });
+  Object.entries(rounds).forEach(([r,boxes])=>{
+    const comps=[...new Set(boxes.flatMap(b=>b.components))];
+    L.push('AOS Meal-Prep · '+r+' · für '+boxes.map(b=>b.day.split(' ')[0]).join('–'));
+    L.push('Kochen: '+comps.map(c=>'☐ '+compName(c)).join(' '));
+    L.push('Einkauf (roh): '+Object.entries((R.prep_mengen_roh_g||{})[r]||{}).sort((a,b)=>b[1]-a[1]).map(([k,g])=>F(k)+' '+g+' g').join(' · '));
+    L.push('Boxen:');
+    boxes.forEach(b=>L.push('☐ '+b.day+' · '+((NUT().day_types[b.day_type]||{}).label||b.day_type)+' · '+b.items_raw_g.map(([k,g])=>F(k)+' '+g+' g').join(', ')+' → '+b.macros.kcal+' kcal, P '+b.macros.P+' / KH '+b.macros.K+' / F '+b.macros.F));
+    L.push('');
+  });
+  const rg=R.regeln||{}; L.push('Haltbarkeit: '+(rg.haltbarkeit||'')); L.push('Aufwärmen: '+(rg.aufwaermen||''));
+  return L.join('\n');
+}
+ACT.nutPrep = ()=>openDlg('Meal-Prep & Einkauf','<p class="small muted">Erste Prep-Woche laut Rezeptdatenbank (Komponenten frei kombiniert, Mengen roh). Vorräte vor dem Einkauf abhaken.</p><pre class="out" id="prep-out">'+esc(nutPrepText())+'</pre>',
+  '<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="prep-out">Kopieren</button>');
+
+'use strict';
+/* ===== AOS – Plan: Ansicht des aktuellen Plans (planner/plan.json, nur lesend) ===== */
+const METHOD_LABEL={ rpe_linear:'RPE-gesteuert linear', wave:'Wochenwelle', double:'Doppelprogression', bodyweight_reps:'Wdh steigern (KG)', velocity:'Tempo („alle schnell?“)',
+  contacts:'Bodenkontakte', quality:'Qualität', reps_rom:'Wdh/Bewegungsumfang', reps_load:'Wdh/Last', load_distance:'Last/Strecke', load_time:'Last/Zeit', time:'Zeit' };
+function plCurrentLoad(slot, exId, b){
+  const e=REF.exMap[exId]; const H=plHistory(exId); const dec=lastDecision(exId);
+  if(!['rpe_linear','velocity','double','load_distance','load_time','reps_load'].includes(slot.method)) return 'Körpergewicht';
+  const last=H[0]; const lastAt=last?((last.s.log&&last.s.log.loggedAt)||last.date):'';
+  if(dec && (!last || dec.at>lastAt)) return fmtNum(dec.kg)+' kg (bestätigt)';
+  if(last && topKg(last.le)!=null) return fmtNum(topKg(last.le))+' kg ('+fmtDateShort(last.date)+')';
+  const st=(b.start_loads||{})[exId]; return st!=null ? fmtNum(st)+' kg (Start)' : 'kalibrieren';
+}
+function viewPlan(){
+  if(ui.planLegacy) return '<div class="row no-print"><button data-act="planLegacy">← Zurück zum aktuellen Plan</button></div>'+viewPlanLegacy();
+  let h='<h1>Plan</h1>';
+  if(!REF.plan){
+    if(!ghReady()) return h+'<div class="note warn">Der Plan liegt in deinem privaten Datenrepo. <button class="link" data-act="ghOpen">Mit GitHub verbinden</button></div>'+planLegacyLink();
+    return h+'<div class="note">'+(REF.loading?'Plan wird geladen …':(REF.error||'Plan noch nicht geladen.'))+' <button class="link" data-act="plReload">Neu laden</button></div>'+planLegacyLink();
+  }
+  const P=REF.plan, today=todayISO();
+  const fg=(P.season&&P.season.first_game)||[]; const weeksLeft=fg[0]?Math.ceil(daysBetween(today, fg[0])/7):null;
+  h+='<div class="section"><strong>Saison 2027</strong>'+(fg[0]?' · erstes Spiel '+fg.map(d=>fmtDateShort(d)).join('/')+(weeksLeft>0?' · noch '+weeksLeft+' Wochen':''):'')+
+    '<p class="small muted">Planversion '+esc(P.version)+' · Stand '+fmtDate(P.stand)+' · geladen '+(REF.at?ghTime(REF.at):'—')+' <button class="link" data-act="plReload">neu laden</button></p></div>';
+  // Phasen
+  h+='<h2>Phasen bis zum ersten Spiel</h2><div class="section table-wrap"><table><tbody>'+P.phases.map(ph=>{
+    const cur=today>=ph.start && today<=ph.end; const w=Math.round((daysBetween(ph.start,ph.end)+1)/7);
+    const hasBlock=P.blocks.some(b=>b.phase===ph.id);
+    return '<tr'+(cur?' style="background:var(--accent-soft)"':'')+'><td><strong>'+esc(ph.name)+'</strong>'+(cur?' '+badge('aktuell','ok'):'')+'<br><span class="small muted">'+fmtDate(ph.start)+' – '+fmtDate(ph.end)+' · '+w+' Wochen · RPE ≤ '+fmtNum(ph.rpe_cap[ph.rpe_cap.length-1])+'</span></td>'+
+      '<td>'+badge(ph.status, ph.status==='bestätigt'?'ok':'warn')+(hasBlock?'':'<br><span class="small muted">noch keine Templates</span>')+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  // Aktueller (oder nächster) Block
+  const b=plBlockAt(today) || P.blocks.find(x=>x.start>today) || P.blocks[P.blocks.length-1];
+  if(!b) return h+planLegacyLink();
+  const conf=(S.suggestionDecisions||{})['plan|'+b.id];
+  h+='<h2>'+esc(b.name)+'</h2><div class="section"><p class="small">'+fmtDate(b.start)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+' · '+b.weeks+' Wochen · RPE-Cap '+fmtNum(b.rpe_cap[0])+'–'+fmtNum(b.rpe_cap[b.rpe_cap.length-1])+
+    ' · max. '+((b.limits||{}).contacts_per_session||[])[1]+' Bodenkontakte/Einheit · '+((P.rules||{}).max_session_min||65)+' min</p>'+
+    '<p class="small">'+(b.status==='bestätigt'||conf?badge('bestätigt','ok')+(conf?' am '+fmtDate(conf.at.slice(0,10)):''):badge('Vorschlag','warn')+' <button class="link" data-act="plConfirmB" data-b="'+esc(b.id)+'">Vorlagen bestätigen</button>')+'</p>';
+  // Wochenraster
+  const days=['MON','TUE','WED','THU','FRI','SAT','SUN'], dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const mine=plSessions().filter(s=>s.planner.blockId===b.id);
+  h+='<div class="table-wrap"><table class="small"><thead><tr><th>Woche</th>'+dn.map(d=>'<th>'+d+'</th>').join('')+'</tr></thead><tbody>';
+  for(let w=1; w<=b.weeks; w++){
+    const ov=(b.week_overrides||{})[w]; const sched=(ov&&ov.schedule)||b.week_schedule; const mon=addDays(b.start,(w-1)*7);
+    h+='<tr><td><strong>W'+w+'</strong><br><span class="muted">'+esc((b.week_wave||{})[w]||'')+'</span></td>';
+    days.forEach((k,i)=>{ const d=addDays(mon,i); const t=sched[k];
+      const s=mine.find(x=>sessionDate(x)===d && x.status!=='ausgelassen') || mine.find(x=>x.plannedDate===d);
+      let cell='';
+      if(s){ const st=isDone(s)?'✓':(s.status==='ausgelassen'?'–':'○'); cell='<button class="link" data-act="startLog" data-id="'+s.id+'">'+st+' '+esc(s.planner.templateId)+'</button>'; }
+      else if(t){ cell = d<today ? '<span class="muted" title="nicht erfasst">'+t+' ✗</span>' : (d===today?'<strong>'+t+'</strong>':t); }
+      h+='<td'+(d===today?' style="background:var(--accent-soft)"':'')+'>'+cell+'</td>'; });
+    h+='</tr>';
+    if(ov&&ov.note) h+='<tr><td></td><td colspan="7" class="muted">'+esc(ov.note)+'</td></tr>';
+  }
+  h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ geplant · ✗ nicht erfasst (wird nicht nachgeholt) · fett = heute</p>';
+  Object.entries(b.week_notes||{}).forEach(([w,l])=>l.forEach(n=>{ h+='<p class="small"><strong>W'+w+':</strong> '+esc(n)+'</p>'; }));
+  h+='</div>';
+  // Templates
+  h+='<h2>Einheiten</h2>';
+  b.templates.forEach(t=>{
+    const weeks=Array.from({length:b.weeks},(_,i)=>String(i+1));
+    h+='<details class="section"><summary><strong>'+esc(t.id+' – '+t.name)+'</strong> <span class="small muted">'+(t.group==='lower'?'Unterkörper':'Oberkörper')+' · ca. '+t.time_min+' min</span></summary>';
+    h+='<p class="small muted">'+esc(t.goal||'')+'</p><div class="table-wrap"><table class="small"><thead><tr><th>Übung (Ersatz)</th>'+weeks.map(w=>'<th>W'+w+'</th>').join('')+'<th>Last</th></tr></thead><tbody>';
+    t.slots.forEach(s=>{ const ex=REF.exMap[s.candidates[0]]; const alt=s.candidates.slice(1).map(id=>(REF.exMap[id]||{}).name_de||id);
+      h+='<tr><td><strong>'+esc(ex?ex.name_de:s.candidates[0])+'</strong> '+badge(ROLE_LABEL[s.role]||s.role, s.role==='main'?'ok':(s.role==='power'?'info':''))+
+        (alt.length?'<br><span class="muted">Ersatz: '+esc(alt.join(' / '))+'</span>':'')+'<br><span class="muted">'+esc(METHOD_LABEL[s.method]||s.method)+(s.range?' '+s.range[0]+'–'+s.range[1]:'')+' · Pause '+s.rest[0]+(s.rest[1]!==s.rest[0]?'–'+s.rest[1]:'')+' s'+(s.rpe?' · RPE '+esc(s.rpe):'')+'</span></td>'+
+        weeks.map(w=>{ const d=(s.dose||{})[w]; return '<td>'+(d?d[0]+'×'+esc(d[1]):'–')+'</td>'; }).join('')+
+        '<td>'+esc(plCurrentLoad(s, s.candidates[0], b))+'</td></tr>'; });
+    h+='</tbody></table></div></details>';
+  });
+  h+='<p class="small muted">Den Plan änderst du nicht hier, sondern gemeinsam mit Claude: Neue Planversionen (z. B. Phase 2) landen im Datenrepo und erscheinen hier automatisch. Laststeigerungen bestätigst du im Training.</p>';
+  return h+planLegacyLink();
+}
+function planLegacyLink(){ return S.blocks.length ? '<p class="small muted" style="margin-top:16px">Früher von Hand angelegte Blöcke und Trainingstage: <button class="link" data-act="planLegacy">anzeigen</button></p>' : ''; }
+ACT.planLegacy = ()=>{ ui.planLegacy=!ui.planLegacy; render(); window.scrollTo(0,0); };
+ACT.plConfirmB = ()=>{ ui.pl=ui.pl||plDefaults(); ACT.plConfirm(); };
 
 'use strict';
 /* ===== AOS – Speicherung im privaten GitHub-Datenrepo =====
