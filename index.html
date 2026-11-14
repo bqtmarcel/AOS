@@ -802,9 +802,9 @@ ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f
 function renderShell(){
   const b=activeBlock();
   document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+'>'+t+'</button>').join('');
-  let info = b ? '<span class="small muted">'+esc(b.name)+'</span> '+capBadge(b)+' ' : '';
+  let info = b ? '<span class="small muted">'+esc(b.name)+'</span> ' : '';
   if(typeof REF!=='undefined' && REF.plan){ const td=todayISO(), pb=plCurrentBlock(td), ph=pb?(plPhase(td)||REF.plan.phases.find(x=>x.id===pb.phase)):null;
-    if(pb) info='<span class="small muted">'+esc((ph?ph.id+' · ':'')+(pb.start>td?'ab '+fmtDateShort(pb.start).slice(3):'Woche '+plWeek(pb,td)))+'</span> <span class="cap" title="RPE-Obergrenze laut Plan">RPE ≤ '+fmtNum(pb.rpe_cap[0])+(pb.rpe_cap.length>1&&pb.rpe_cap[1]!==pb.rpe_cap[0]?'–'+fmtNum(pb.rpe_cap[1]):'')+'</span> '; }
+    if(pb) info='<span class="small muted">'+esc((ph?ph.id+' · ':'')+(pb.start>td?'ab '+fmtDateShort(pb.start).slice(3):'Woche '+plWeek(pb,td)))+'</span> '; }
   document.getElementById('topinfo').innerHTML = info+'<span id="syncchip">'+ghChip()+'</span>';
 }
 function render(){
@@ -830,12 +830,12 @@ function viewOverview(){
   } else {
     const wk=blockWeek(b,today); const pb=(typeof REF!=='undefined'&&REF.plan)?plCurrentBlock(today):null;
     if(pb){ const ph=plPhase(today)||REF.plan.phases.find(x=>x.id===pb.phase); const before=pb.start>today; const w=before?0:plWeek(pb,today);
-      h+='<div class="section"><div class="row between"><div><div class="muted small">'+(before?'Nächster Block':'Aktueller Block')+(ph?' · '+esc(ph.name):'')+'</div><strong style="font-size:1.1rem">'+esc(pb.name)+'</strong></div>'+capBadge(b)+'</div>';
+      h+='<div class="section"><div class="row between"><div><div class="muted small">'+(before?'Nächster Block':'Aktueller Block')+(ph?' · '+esc(ph.name):'')+'</div><strong style="font-size:1.1rem">'+esc(pb.name)+'</strong></div>'+'</div>';
       if(before){ const first=plFirstSession(pb);
         h+='<p class="small">Startet am '+WD_LONG[weekdayOf(pb.start)]+', '+fmtDate(pb.start)+(first?' · erste Einheit '+esc(first.tpl)+' am '+WD_LONG[weekdayOf(first.date)]+', '+fmtDate(first.date):'')+' · <button class="link" data-act="go" data-view="plan">Plan ansehen</button></p></div>'; }
       else h+='<p class="small">Woche '+w+' von '+pb.weeks+((pb.week_wave||{})[w]?' ('+esc(pb.week_wave[w])+')':'')+' · Block endet am '+fmtDate(addDays(pb.start,pb.weeks*7-1))+' · <button class="link" data-act="go" data-view="plan">Plan ansehen</button></p></div>';
     } else {
-    h+='<div class="section"><div class="row between"><div><div class="muted small">Aktueller Block</div><strong style="font-size:1.1rem">'+esc(b.name)+'</strong></div>'+capBadge(b)+'</div>';
+    h+='<div class="section"><div class="row between"><div><div class="muted small">Aktueller Block</div><strong style="font-size:1.1rem">'+esc(b.name)+'</strong></div>'+'</div>';
     h+='<p class="small">'+(wk?'Woche '+wk+(b.end?' · Block endet am '+fmtDate(b.end):''):'<span class="badge warn">Startdatum fehlt – Blockwoche unbekannt</span>')+'</p>';
     if(b.rules) h+='<p class="small muted">Regeln: '+esc(b.rules)+'</p>';
     h+='</div>';
@@ -890,7 +890,7 @@ ACT.exportJSON = ()=>{ exportJSON(); toast('Sicherung wird heruntergeladen.'); r
 function bySessionDate(a,b){ const x=a.plannedDate||'9999', y=b.plannedDate||'9999'; return x<y?-1:x>y?1:0; }
 function sessionCard(s){
   const b=blockById(s.blockId); const loc=locById(s.location);
-  return '<div class="section"><div class="row between"><div><strong>'+esc(s.name)+'</strong> <span class="muted small">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+(loc?' · '+esc(loc.name):'')+'</span></div>'+capBadge(b)+'</div>'+
+  return '<div class="section"><div class="row between"><div><strong>'+esc(s.name)+'</strong> <span class="muted small">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+(loc?' · '+esc(loc.name):'')+'</span></div>'+'</div>'+
     (s.plan.length?'<ul class="small" style="margin:8px 0;padding-left:20px">'+s.plan.map(e=>'<li>'+esc(exTitle(e))+(exPlanText(e)?' – '+esc(exPlanText(e)):'')+'</li>').join('')+'</ul>':'<p class="small muted">Für diesen Trainingstag sind noch keine Übungen eingetragen.</p>')+
     '<div class="row"><button class="primary" data-act="startLog" data-id="'+s.id+'">Training erfassen</button><button data-act="openSession" data-id="'+s.id+'">Verschieben / Auslassen</button></div></div>';
 }
