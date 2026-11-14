@@ -91,6 +91,7 @@ th{color:var(--muted);font-weight:600;font-size:.83rem}
 .sess.st-teilweise{background:var(--info-soft);border-color:transparent}
 .sess.st-ausgelassen{background:var(--surface);text-decoration:line-through;color:var(--muted)}
 .sess.overdue{border-color:var(--warn);border-width:2px}
+button.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
 button.chip{display:inline-block;min-height:38px;padding:6px 12px;margin:3px 4px 3px 0;border-radius:99px;font-size:.9rem;background:var(--surface)}
 button.chip.pref-favorit{border-color:var(--accent)}
 button.chip.pref-nicht{color:var(--muted);border-style:dashed}
@@ -639,7 +640,11 @@ function decideSuggestion(sg, status, note){
 function keepText(s){
   const b=blockById(s.blockId); const loc=locById(s.location);
   const L=[];
-  L.push('AOS – '+(b?b.name:'Ohne Block')+' – '+s.name);
+  if(s.planner){ const pl=s.planner, ci=pl.checkin||{};
+    L.push('AOS · '+(pl.phase||'')+' · Woche '+pl.week+(pl.wave?' ('+pl.wave+')':'')+' · '+s.name+(s.plannedDate?' · '+fmtDateShort(s.plannedDate):''));
+    L.push('Readiness: '+(ci.readiness!=null?ci.readiness:'__')+' /5  Schlaf: '+(ci.sleep!=null?fmtNum(ci.sleep):'__')+' h  Beschwerden: '+(ci.pain!=null?ci.pain:'__')+' /10');
+    L.push('Ziel: RPE ≤ '+fmtNum(pl.cap)+' · keine Grind-Reps · ca. '+pl.estMin+' min'+(pl.contacts?' · Kontakte '+pl.contacts:''));
+  } else L.push('AOS – '+(b?b.name:'Ohne Block')+' – '+s.name);
   L.push('Datum: '+(s.plannedDate?WD_LONG[weekdayOf(s.plannedDate)]+', '+fmtDate(s.plannedDate):'___'));
   L.push('Trainingsort: '+(loc?loc.name:'___'));
   if(s.focus) L.push('Schwerpunkt: '+s.focus);
@@ -665,6 +670,7 @@ function keepText(s){
     }
     if(pe && pe.alternatives && pe.alternatives.length) L.push('   Alternative (optional): '+pe.alternatives.map(a=>a.name).join(' / '));
     if(pe && pe.notes) L.push('   Hinweis: '+pe.notes);
+    if(pe && pe.planner && pe.planner.fastCheck) L.push('   Alle Wdh schnell? '+(le && le.fast!=null ? (le.fast?'ja':'nein') : 'ja / nein'));
     L.push('   Notiz / RPE: '+(le && le.note ? le.note : '___'));
   });
   L.push('');
@@ -850,6 +856,7 @@ window.addEventListener('hashchange', ()=>{ const h=location.hash.slice(1); if(h
 function viewOverview(){
   const b=activeBlock(); const today=todayISO(); const mon=mondayOf(today);
   let h='<h1>Übersicht</h1>';
+  h+=plOverviewNote();
   if(!ghReady()) h+='<div class="note warn"><strong>Noch nicht mit deinem Datenrepo verbunden.</strong> Deine Daten liegen im privaten GitHub-Repo und kommen erst nach dem Verbinden auf dieses Gerät. <button class="link" data-act="ghOpen">Jetzt verbinden</button></div>';
   if(isIOS() && !isStandalone() && location.protocol==='https:' && !S.settings.hideInstallHint)
     h+='<div class="note warn"><strong>Als App installieren:</strong> In Safari unten auf <em>Teilen</em> (Quadrat mit Pfeil) tippen → <em>Zum Home-Bildschirm</em>. Öffne AOS danach immer über das neue Symbol. <strong>Wichtig:</strong> Die App auf dem Home-Bildschirm hat einen eigenen Speicher – trage deine Daten erst dort ein (oder importiere dort deine Sicherung). <button class="link small" data-act="hideInstall">Ausblenden</button></div>';
@@ -1282,6 +1289,7 @@ function viewTraining(){
   if(ui.sessionId && sessionById(ui.sessionId)) return logForm();
   const today=todayISO(); const b=activeBlock();
   let h='<h1>Training</h1>';
+  h+=plSection();
   const open=S.sessions.filter(s=>s.status==='geplant' && (!s.plannedDate || s.plannedDate<=addDays(today,6))).sort(bySessionDate);
   h+='<h2>Offene Einheiten</h2>';
   if(!open.length) h+='<div class="empty">Keine offenen Einheiten in den nächsten Tagen. Lege im <button class="link" data-act="go" data-view="plan">Plan</button> eine Woche an oder erfasse unten eine Einheit für heute.</div>';
@@ -1307,16 +1315,17 @@ ACT.startLog = el=>{ closeDlg(); startLog(el.dataset.id); };
 function startLog(id){
   const s=sessionById(id); ui.sessionId=id; ui.view='training'; location.hash='training';
   if(s.log) ui.draft=Object.assign(clone(s.log),{date:s.plannedDate||todayISO(), location:s.location||''});
-  else ui.draft={ date:s.plannedDate||todayISO(), location:s.location||'', form:null, durationMin:null, pain:'', notes:'',
-    exercises:s.plan.map(pe=>({planExId:pe.id, name:pe.name, variant:pe.variant, metric:pe.metric||'kraft', sets:Array.from({length:pe.sets||1},emptySet), note:''})) };
+  else ui.draft={ date:s.plannedDate||todayISO(), location:s.location||'', form:(s.planner&&s.planner.checkin&&s.planner.checkin.readiness)||null, durationMin:null, pain:'', notes:'',
+    exercises:s.plan.map(pe=>({planExId:pe.id, name:pe.name, variant:pe.variant, metric:pe.metric||'kraft', sets:Array.from({length:pe.sets||1},emptySet), note:'', fast:null})) };
   render(); window.scrollTo(0,0);
 }
 
 function logForm(){
-  const s=sessionById(ui.sessionId); const b=blockById(s.blockId); const dr=ui.draft; const cap=capMax(b);
+  const s=sessionById(ui.sessionId); const b=blockById(s.blockId); const dr=ui.draft; const cap=(s.planner&&s.planner.cap!=null)?s.planner.cap:capMax(b);
   const day=b?dayById(b,s.dayId):null;
   let h='<div class="row no-print"><button data-act="logBack">← Zurück</button></div>';
-  h+='<h1>'+esc(s.name)+'</h1><div class="row">'+capBadge(b)+' '+statusBadge(s)+'</div>';
+  h+='<h1>'+esc(s.name)+'</h1><div class="row">'+(s.planner?'<span class="cap">RPE ≤ '+fmtNum(cap)+'</span> <span class="small muted">'+esc((s.planner.phase||'')+' · Woche '+s.planner.week)+'</span>':capBadge(b))+' '+statusBadge(s)+'</div>';
+  if(s.planner && !s.log) (s.planner.notes||[]).forEach(n=>{ h+='<div class="note small">'+esc(n)+'</div>'; });
   if(b && b.rules) h+='<p class="small muted">Blockregeln: '+esc(b.rules)+'</p>';
   if(day && !s.log && day.version!==s.dayVersion) h+='<div class="note">Die Vorgaben von „'+esc(day.name)+'“ wurden seit dem Anlegen dieser Einheit geändert. <button class="link" data-act="refreshPlan">Aktuelle Vorgaben übernehmen</button></div>';
   h+='<div class="fields">'+inp('lg-date','Datum',dr.date,'type="date" data-log="meta" data-f="date"')+
@@ -1338,6 +1347,7 @@ function logForm(){
     h+='<div class="row" style="margin-top:4px"><button class="small" data-act="addSet" data-e="'+i+'">+ Satz</button><button class="small" data-act="delSet" data-e="'+i+'" '+(e.sets.length<=1?'disabled':'')+'>− Satz</button>'+
       (pe && e.metric==='kraft' && (repMin(pe.reps)!=null||pe.loadKg!=null)?'<button class="small" data-act="sollToIst" data-e="'+i+'" title="Leere Wdh- und kg-Felder mit der Vorgabe füllen">Soll in leere Felder</button>':'')+
       (!e.planExId?'<button class="small danger" data-act="delLogEx" data-e="'+i+'">Übung entfernen</button>':'')+'</div>';
+    if(pe && pe.planner && pe.planner.fastCheck) h+=sel('fs-'+i,'Alle Wdh schnell und sauber?',[['','— nicht angegeben —'],['ja','ja'],['nein','nein']],e.fast==null?'':(e.fast?'ja':'nein'),'data-log="fast" data-e="'+i+'"');
     h+=inp('en-'+i,'Notiz zur Übung (optional)',e.note,'data-log="exnote" data-e="'+i+'"')+'</div>';
   });
   h+='<button data-act="addLogEx">+ Übung hinzufügen</button>';
@@ -1355,8 +1365,9 @@ function updateDraftFromInput(t){
   const dr=ui.draft; if(!dr) return; const k=t.dataset.log;
   if(k==='set'){ const f=t.dataset.f; const v=t.value.trim(); const n = f==='reps' ? (v===''?null:(/^\d+$/.test(v)?parseInt(v,10):NaN)) : (v===''?null:(num(v)==null?NaN:num(v)));
     dr.exercises[+t.dataset.e].sets[+t.dataset.s][f]=n;
-    if(f==='rpe'){ const s=sessionById(ui.sessionId); const cap=capMax(blockById(s.blockId)); const over=cap!=null&&typeof n==='number'&&n>cap; t.style.borderColor=over?'var(--warn)':''; t.style.borderWidth=over?'2px':''; t.title=over?'über der RPE-Obergrenze':''; } }
+    if(f==='rpe'){ const s=sessionById(ui.sessionId); const cap=(s.planner&&s.planner.cap!=null)?s.planner.cap:capMax(blockById(s.blockId)); const over=cap!=null&&typeof n==='number'&&n>cap; t.style.borderColor=over?'var(--warn)':''; t.style.borderWidth=over?'2px':''; t.title=over?'über der RPE-Obergrenze':''; } }
   else if(k==='exnote') dr.exercises[+t.dataset.e].note=t.value;
+  else if(k==='fast') dr.exercises[+t.dataset.e].fast = t.value==='' ? null : t.value==='ja';
   else if(k==='meta'){ const f=t.dataset.f;
     if(f==='form') dr.form=t.value===''?null:Number(t.value);
     else if(f==='durationMin') dr.durationMin=t.value.trim()===''?null:(/^\d+$/.test(t.value.trim())?parseInt(t.value,10):NaN);
@@ -1827,6 +1838,369 @@ ACT.resetAll = ()=>{
 ACT.resetOk = ()=>{ if(val('rs-conf')!=='LÖSCHEN'){ toast('Bitte LÖSCHEN eingeben.'); return; } S=freshData(); syncInit(); ui.posDraft=null; ui.blockId=null; save(); closeDlg(); toast('Zurückgesetzt.'); render(); if(ghReady()) ghSync('reset'); };
 
 'use strict';
+/* ===== AOS – Sessionplaner =====
+   Regeln laut AOS_Sessionplaner_Spezifikation (v11). Persönliche Planerdaten (Phasen, Block, Templates, Startlasten)
+   und die Übungsdatenbank kommen aus dem privaten Datenrepo (planner/plan.json, db/AOS_Uebungsdatenbank.json),
+   werden nur gelesen und für den Offline-Betrieb auf dem Gerät zwischengespeichert.
+   Grundsätze: AOS erfindet keine Zahlen (ohne Wert → Kalibrieren), Steigerungen brauchen eine Bestätigung,
+   Reduktionen wegen Readiness/Zeit/Beschwerden passieren automatisch und werden begründet. */
+
+const REF_KEY = 'aos-ref-v1';
+const REF = { plan:null, ex:null, exMap:{}, at:null, error:'', loading:false };
+function refSet(plan, ex, at){ REF.plan=plan; REF.ex=ex; REF.at=at; REF.exMap={}; ((ex&&ex.exercises)||[]).forEach(e=>{ REF.exMap[e.id]=e; }); }
+function refInit(){ try{ const c=JSON.parse(localStorage.getItem(REF_KEY)||'null'); if(c&&c.plan&&c.ex) refSet(c.plan, c.ex, c.at); }catch(e){} }
+async function ghRaw(path){
+  let res;
+  try{ res = await fetch(ghRepoUrl('/contents/'+path.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(gh.cfg.branch)),
+    { cache:'no-store', headers:{ 'Accept':'application/vnd.github.raw+json', 'Authorization':'Bearer '+gh.cfg.token, 'X-GitHub-Api-Version':'2022-11-28' } }); }
+  catch(e){ const err=new Error('Keine Verbindung zu GitHub'); err.offline=true; throw err; }
+  if(!res.ok){ const err=new Error(res.status===404?'„'+path+'“ fehlt im Datenrepo.':'HTTP '+res.status); err.status=res.status; throw err; }
+  return res.text();
+}
+async function refLoad(force){
+  if(!ghReady() || REF.loading) return false;
+  if(!force && REF.at && Date.now()-new Date(REF.at).getTime() < 10*60*1000) return true;
+  REF.loading=true;
+  try{
+    const [p, x] = await Promise.all([ ghRaw('planner/plan.json'), ghRaw('db/AOS_Uebungsdatenbank.json') ]);
+    let plan, ex; try{ plan=JSON.parse(p); ex=JSON.parse(x); }catch(e){ throw new Error('Planerdaten im Datenrepo sind kein gültiges JSON.'); }
+    if(!plan.blocks || !ex.exercises) throw new Error('Planerdaten unvollständig.');
+    refSet(plan, ex, new Date().toISOString()); REF.error='';
+    try{ localStorage.setItem(REF_KEY, JSON.stringify({ plan, ex, at:REF.at })); }catch(e){}
+    return true;
+  }catch(e){ REF.error = e.offline ? '' : (e.status ? ghErrText(e) : e.message); return false; }
+  finally{ REF.loading=false; const dlg=document.getElementById('dlg'); if((ui.view==='training'||ui.view==='uebersicht') && !ui.sessionId && !(dlg&&dlg.open)) render(); }
+}
+
+/* ---------- Kalender ---------- */
+const WDKEY=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const ROLE_LABEL={ power:'Power', main:'Haupt', assistance:'Ergänzung', optional:'optional', sprint:'Sprint' };
+function plPhase(date){ return ((REF.plan&&REF.plan.phases)||[]).find(p=>date>=p.start && date<=p.end) || null; }
+function plBlockAt(date){ return ((REF.plan&&REF.plan.blocks)||[]).find(b=>date>=b.start && date<=addDays(b.start, b.weeks*7-1)) || null; }
+function plWeek(b, date){ return Math.floor(daysBetween(b.start, date)/7)+1; }
+function plTemplate(b, id){ return (b.templates||[]).find(t=>t.id===id) || null; }
+function plCap(b){ const c=b.rpe_cap||[]; return c.length?c[c.length-1]:null; }
+function plSessions(){ return S.sessions.filter(s=>s.planner); }
+const isDone = s=>s.status==='absolviert'||s.status==='teilweise';
+
+/* Welche Einheit ist an diesem Tag fällig? (Spezifikation 5.1) */
+function plDue(date){
+  const phase=plPhase(date), b=plBlockAt(date);
+  const r={ date, phase, block:b, week:null, wave:'', tpl:null, why:'', offday:false, doneToday:null, plannedToday:null, warnings:[], remaining:[] };
+  if(!b) return r;
+  r.week=plWeek(b,date); r.wave=(b.week_wave||{})[r.week]||'';
+  const ov=(b.week_overrides||{})[r.week]||null;
+  const sched=(ov&&ov.schedule)||b.week_schedule||{};
+  const skipped=(ov&&ov.skipped)||[];
+  const mine=plSessions().filter(s=>s.planner.blockId===b.id);
+  r.doneToday=mine.find(s=>isDone(s) && sessionDate(s)===date) || null;
+  r.plannedToday=mine.find(s=>s.status==='geplant' && s.plannedDate===date) || null;
+  const done=mine.filter(s=>isDone(s) && s.planner.week===r.week).map(s=>s.planner.templateId);
+  r.remaining=(b.session_order||[]).filter(t=>!skipped.includes(t) && !done.includes(t));
+  const scheduled=sched[WDKEY[weekdayOf(date)]]||null;
+  if(scheduled && r.remaining.includes(scheduled)){ r.tpl=scheduled; r.why='laut Wochenplan ('+WD_LONG[weekdayOf(date)]+(ov?', '+ov.note:'')+')'; }
+  else if(scheduled){ r.tpl=r.remaining[0]||null; r.why=scheduled+' ist diese Woche schon erledigt'+(r.tpl?' → nächste offene Einheit '+r.tpl:'')+'. Verpasstes wird nicht nachgeholt.'; }
+  else { r.offday=true; r.tpl=r.remaining[0]||null; r.why='Heute ist laut Wochenplan kein Trainingstag.'+(r.tpl?' Du kannst die nächste offene Einheit ('+r.tpl+') trotzdem starten.':''); }
+  if(skipped.length) r.warnings.push('Diese Woche entfällt '+skipped.join(', ')+' (kein Nachholen).');
+  // Gleicher Schwerpunkt an aufeinanderfolgenden Tagen (5.1 Punkt 4)
+  const t=plTemplate(b, r.tpl); const yest=mine.find(s=>isDone(s) && sessionDate(s)===addDays(date,-1));
+  if(t && yest){ const yt=plTemplate(b, yest.planner.templateId); if(yt && yt.group===t.group) r.warnings.push('Gestern war schon eine '+(t.group==='lower'?'Unterkörper':'Oberkörper')+'-Einheit ('+yt.id+'). Überleg, ob du heute pausierst oder tauschst.'); }
+  return r;
+}
+
+/* ---------- Historie & Lasten ---------- */
+function plHistory(dbId, beforeDate){
+  const out=[];
+  loggedSessions().forEach(s=>{ const d=sessionDate(s); if(beforeDate && d>=beforeDate) return;
+    (s.log.exercises||[]).forEach(le=>{ const pe=(s.plan||[]).find(p=>p.id===le.planExId); if(pe&&pe.planner&&pe.planner.dbId===dbId) out.push({ s, pe, le, date:d }); }); });
+  return out.sort((a,b)=>a.date<b.date?1:-1);
+}
+const workSets = le=>(le.sets||[]).filter(x=>x.reps!=null||x.kg!=null);
+function topKg(le){ const k=workSets(le).map(x=>x.kg).filter(v=>v!=null); return k.length?Math.max(...k):null; }
+function maxRpe(le){ const r=workSets(le).map(x=>x.rpe).filter(v=>v!=null); return r.length?Math.max(...r):null; }
+function setsTxt(le){ return workSets(le).map(x=>(x.reps!=null?x.reps:'?')+(x.kg!=null?'×'+fmtNum(x.kg):'')+(x.rpe!=null?' @'+fmtNum(x.rpe):'')).join(', ')||'keine Satzdaten'; }
+function repTargets(pe){ // "5/4/4/4" → [5,4,4,4]; "6–8/S" → min 6
+  const r=String(pe.reps||''); if(/^\d+(\/\d+)+$/.test(r)) return r.split('/').map(Number);
+  const m=repMin(r); return Array.from({length:pe.sets||0}, ()=>m);
+}
+function allMet(h){ const t=repTargets(h.pe); const ws=workSets(h.le); if(!t.length || t[0]==null) return null;
+  if(ws.length<t.length) return false;
+  return t.every((n,i)=>ws[i].reps!=null && ws[i].reps>=n && (h.pe.loadKg==null || (ws[i].kg!=null && ws[i].kg>=h.pe.loadKg))); }
+function lastDecision(dbId){
+  const l=Object.entries(S.suggestionDecisions||{}).filter(([k,d])=>k.startsWith('last|'+dbId+'|') && d.status==='bestätigt' && d.kg!=null).map(([,d])=>d).sort((a,b)=>a.at<b.at?1:-1);
+  return l[0]||null;
+}
+function plInc(id){ const r=(REF.plan.rules||{}).increments_kg||{}; const e=REF.exMap[id]; return r[id] || (e&&e.min_increment_kg) || 2.5; }
+const roundDown=(x,inc)=>Math.floor(x/inc+1e-9)*inc;
+
+/* Last für einen Slot (Spezifikation 3.4, 6.3) */
+function plLoad(slot, exId, ctx){
+  const out={ kg:null, text:'', reasons:[], suggest:null, calibrate:false, decrease:false };
+  const m=slot.method, inc=plInc(exId), cap=ctx.cap;
+  const weighted=['rpe_linear','velocity','double','load_distance','load_time','reps_load'].includes(m);
+  if(!weighted){ out.text='Körpergewicht'; return out; }
+  const H=plHistory(exId, ctx.date); const last=H[0]; const dec=lastDecision(exId);
+  let base=null;
+  if(last && topKg(last.le)!=null){ base=topKg(last.le); out.reasons.push('Letzte Einheit '+fmtDate(last.date)+': '+setsTxt(last.le)+'.'); }
+  // Eine Bestätigung zählt nur, wenn sie nach dem letzten Protokoll dieser Übung erfolgt ist (Zeitpunkt, nicht nur Datum)
+  const lastAt = last ? ((last.s.log&&last.s.log.loggedAt) || last.date+'T23:59:59') : '';
+  const decAfterLast = !!(dec && (!last || dec.at > lastAt));
+  if(decAfterLast){ base=dec.kg; out.reasons.push('Steigerung auf '+fmtNum(dec.kg)+' kg bestätigt am '+fmtDate(dec.at.slice(0,10))+'.'); }
+  const start=(ctx.block.start_loads||{})[exId];
+  if(base==null && start!=null){ base=start; out.reasons.push('Bestätigte Startlast.'); }
+  if(base==null){ out.calibrate=true; out.text='kalibrieren';
+    out.reasons.push(slot.rpe&&/6/.test(slot.rpe) ? 'Noch kein Wert: leicht einsteigen und bis RPE ≤ 6 steigern, jede Wdh schnell. Arbeitsgewicht notieren.' : 'Noch kein Wert: aufwärmen bis Ziel-RPE ~7, Arbeitsgewicht notieren.');
+    return out; }
+  out.kg=base;
+  const noUp = ctx.noIncrease;
+  if(last && !decAfterLast){
+    const r=maxRpe(last.le), met=allMet(last);
+    if(m==='rpe_linear'){
+      const prev=H[1]; const prevOver=prev && maxRpe(prev.le)!=null && maxRpe(prev.le)>cap;
+      if(r==null) out.reasons.push('Kein RPE erfasst → Last halten.');
+      else if(r>cap && prevOver){ const ok=H.find(h=>maxRpe(h.le)!=null && maxRpe(h.le)<=cap && topKg(h.le)!=null);
+        out.kg = ok ? topKg(ok.le) : roundDown(base*0.95, inc); out.decrease=true;
+        out.reasons.push('Zweimal in Folge über RPE '+fmtNum(cap)+' → zurück auf '+fmtNum(out.kg)+' kg. Deload-Signal (zusammen mit anderen Signalen Vorschlag für eine leichtere Woche).'); }
+      else if(r>cap || met===false){ { const r=Math.round(base*0.975/inc)*inc; out.kg = r<base ? r : base-inc; } out.decrease=true;
+        out.reasons.push((r>cap?'RPE '+fmtNum(r)+' über der Obergrenze '+fmtNum(cap):'Vorgabe nicht ganz geschafft')+' → automatisch auf '+fmtNum(out.kg)+' kg reduziert.'); }
+      else if(met && r<=cap-0.5){ if(noUp) out.reasons.push('Steigerung wäre möglich, heute aber nicht ('+noUp+').');
+        else out.suggest={ kg:base+inc, basis:fmtDate(last.date)+': '+setsTxt(last.le) }; }
+      else out.reasons.push('RPE '+fmtNum(r)+' nahe der Obergrenze → halten.');
+    } else if(m==='velocity'){
+      if(last.le.fast===true && met!==false){ if(noUp) out.reasons.push('Steigerung wäre möglich, heute aber nicht ('+noUp+').'); else out.suggest={ kg:base+inc, basis:fmtDate(last.date)+': alle Wdh schnell' }; }
+      else if(last.le.fast===false) out.reasons.push('Letztes Mal nicht alle Wdh schnell → halten.');
+      else out.reasons.push('„Alle schnell?“ letztes Mal nicht erfasst → halten.');
+    } else if(m==='double'){
+      const hi=(slot.range||[])[1]; const ws=workSets(last.le);
+      if(hi && ws.length>=(last.pe.sets||1) && ws.every(x=>x.reps!=null && x.reps>=hi && x.kg!=null && x.kg>=base)){
+        if(noUp) out.reasons.push('Obergrenze erreicht, Steigerung heute aber nicht ('+noUp+').');
+        else out.suggest={ kg:base+inc, basis:fmtDate(last.date)+': alle Sätze '+hi+' Wdh', resetReps:slot.range[0] }; }
+      else if(hi) out.reasons.push('Gleiche Last, Ziel: in allen Sätzen '+hi+' Wdh, dann steigern.');
+    }
+  }
+  if(ctx.readiness===2 && slot.role==='main' && out.kg!=null){ const k=roundDown(out.kg*0.95, inc); if(k<out.kg){ out.kg=k; out.decrease=true; out.reasons.push('Readiness 2 → Hauptlast ca. −5 %.'); } }
+  return out;
+}
+
+/* ---------- Einheit zusammenstellen (Spezifikation 5) ---------- */
+const EQUIP_LABEL={ barbell:'Langhantel', rack:'Rack', ssb:'Safety Squat Bar', trap_bar:'Trap Bar', dumbbell:'Kurzhanteln', kettlebell:'Kettlebell', bench:'Bank', box:'Box',
+  medball:'Medizinball', wall:'Wurfwand', landmine:'Landmine', pull_up_bar:'Klimmzugstange', cable:'Kabelzug', lat_pulldown:'Latzug', foot_anchor:'Fußfixierung (Nordics)',
+  belt_squat:'Belt Squat', leg_curl:'Beinbeuger', plate:'Hantelscheibe', band:'Band', back_extension_bench:'Rückenstrecker-Bank', step:'Stufe', dip_bars:'Dip-Barren', dip_belt:'Dip-Gürtel' };
+const REGION_LABEL={ knee:'Knie', hip:'Hüfte', lower_back:'unterer Rücken', hamstrings:'Oberschenkel hinten', adductors:'Leiste/Adduktoren', ankle:'Sprunggelenk', calf:'Wade', achilles:'Achillessehne',
+  shin:'Schienbein', shoulder:'Schulter', elbow:'Ellbogen', wrist:'Handgelenk', neck:'Nacken', trunk:'Rumpf', grip:'Griff/Hand' };
+function metricOf(ex, slot){ if(ex.pattern==='jump'||ex.pattern==='jump_loaded') return ex.pattern==='jump_loaded'?'kraft':'sprung';
+  if(/ m$/.test(slot.doseTxt||'')) return 'distanz'; if(/ s(\/S)?$/.test(slot.doseTxt||'')) return 'zeit'; return 'kraft'; }
+function repsNum(txt){ const m=String(txt).match(/\d+/); return m?Number(m[0]):0; }
+function perSide(txt){ return /\/S$/.test(String(txt)); }
+function slotSec(x){ const work = x.role==='power'?15:(x.role==='main'?45:40); const per=perSide(x.reps)?2:1;
+  const ramp = (x.role==='main' && x.method!=='bodyweight_reps') ? 240 : (x.method==='velocity' ? 180 : 0);   // Aufwärmsätze vor Hauptübungen und Gewichtheber-Übungen
+  return x.sets*work*per + Math.max(0,x.sets-1)*((x.rest[0]+x.rest[1])/2) + 120 + ramp; }   // + Umbau/Wechsel
+function contactsOf(x){ const e=REF.exMap[x.dbId]; const c=e?e.contacts_per_rep:0; return c? x.sets*repsNum(x.reps)*(perSide(x.reps)?2:1)*c : 0; }
+
+function plBuild(inp){
+  const due=plDue(inp.date); const b=due.block;
+  if(!b || !inp.tpl) return { due, items:[], dropped:[], notes:[], error: !b ? (due.phase ? 'Für '+due.phase.name+' gibt es noch keine Templates. Den nächsten Block planst du mit Claude; danach liegt er im Datenrepo.' : 'Für dieses Datum gibt es keinen Block im Plan.') : 'In dieser Woche ist keine Einheit mehr offen.' };
+  const t=plTemplate(b, inp.tpl); const week=due.week; const cap=plCap(b);
+  const rules=REF.plan.rules||{}; const thr=rules.pain_threshold||3;
+  const pain=inp.pain||0, regions=inp.regions||[], rd=inp.readiness;
+  const painOn = pain>=thr;
+  const legPain = painOn && regions.some(r=>(rules.leg_regions||[]).includes(r));
+  const notes=[], dropped=[], items=[];
+  const noIncrease = painOn ? 'Beschwerden '+pain+'/10' : (rd!=null && rd<=2 ? 'Readiness '+rd : '');
+  if(due.phase && due.phase.status!=='bestätigt') notes.push('Phase '+due.phase.id+' ist noch ein Vorschlag.');
+  if(b.status!=='bestätigt' && !(S.suggestionDecisions||{})['plan|'+b.id]) notes.push('Die Vorlagen von „'+b.name+'“ sind noch ein Vorschlag. Du kannst sie unten bestätigen.');
+  ((b.week_notes||{})[week]||[]).forEach(n=>notes.push(n));
+  if(rd===1) notes.push('Readiness 1: Empfehlung ist eine Recovery-/Technik-Einheit oder Pause. Falls du trotzdem trainierst, ist die Einheit unten stark reduziert.');
+  if(painOn) notes.push('Beschwerden '+pain+'/10'+(regions.length?' ('+regions.map(r=>REGION_LABEL[r]||r).join(', ')+')':'')+': Übungen, die diese Region belasten, werden ersetzt oder weggelassen. Keine Steigerungen. AOS stellt keine Diagnose.');
+  const recentUse = slotId=>{ const s=plSessions().filter(x=>x.planner.blockId===b.id && isDone(x) && sessionDate(x)<inp.date).sort((a,c)=>sessionDate(a)<sessionDate(c)?1:-1);
+    for(const x of s){ const pe=(x.plan||[]).find(p=>p.planner&&p.planner.slotId===slotId); if(pe) return pe.planner.dbId; } return null; };
+
+  t.slots.forEach(slot=>{
+    const d=(slot.dose||{})[week]; if(!d){ return; }
+    if(slot.role==='optional' && !(rd==null || rd>=4)){ dropped.push({ slot, why:'optional – nur bei Readiness 4–5' }); return; }
+    // Kandidaten: Ausstattung, Beschwerden, Kontinuität (5.2)
+    const cands=slot.candidates.map(id=>REF.exMap[id]).filter(Boolean);
+    const filt=[], skipWhy=[];
+    cands.forEach(e=>{
+      const miss=(e.equipment||[]).filter(q=>(inp.noEquip||[]).includes(q));
+      if(miss.length){ skipWhy.push(e.name_de+': '+miss.map(q=>EQUIP_LABEL[q]||q).join(', ')+' nicht verfügbar'); return; }
+      const hit=painOn ? (e.regions||[]).filter(r=>regions.includes(r)) : [];
+      if(hit.length){ skipWhy.push(e.name_de+' belastet '+hit.map(r=>REGION_LABEL[r]||r).join(', ')); return; }
+      if(legPain && (e.pattern==='jump'||e.pattern==='jump_loaded')){ skipWhy.push(e.name_de+': intensive Sprünge entfallen bei Beschwerden in Bein/Hüfte/Leiste'); return; }
+      filt.push(e);
+    });
+    if(!filt.length){ dropped.push({ slot, why: skipWhy.join('; ')||'keine passende Übung' }); return; }
+    const prev=recentUse(slot.id);
+    const ex = (prev && filt.find(e=>e.id===prev)) || filt[0];
+    const reasons=[];
+    if(ex.id!==slot.candidates[0]) reasons.push('Ersatz für '+(REF.exMap[slot.candidates[0]]?REF.exMap[slot.candidates[0]].name_de:slot.candidates[0])+(skipWhy.length?' ('+skipWhy.join('; ')+')':' (im Block bisher so gemacht)')+'.');
+    let sets=d[0], reps=d[1];
+    const x={ slot, slotId:slot.id, dbId:ex.id, ex, role:slot.role, method:slot.method, sets, reps, rest:slot.rest||[60,90], rpe:slot.rpe||'', reasons, note:slot.note||'', alternatives: filt.filter(e=>e.id!==ex.id).map(e=>e.name_de) };
+    // Readiness (7)
+    if(rd!=null && rd<=3 && x.role==='assistance' && x.sets>1){ x.sets--; reasons.push('Readiness '+rd+' → 1 Satz weniger.'); }
+    if(rd!=null && rd<=2 && x.role==='power'){ const n=Math.max(1, Math.round(x.sets*0.75)); if(n<x.sets){ reasons.push('Readiness '+rd+' → Power-Volumen ca. −25 % ('+x.sets+' → '+n+' Sätze).'); x.sets=n; } }
+    if(slot.grip && inp.grip && x.sets>1){ x.sets--; reasons.push('Griff ermüdet → 1 Satz weniger.'); }
+    // Last
+    const L=plLoad(slot, ex.id, { date:inp.date, cap, block:b, readiness:rd, noIncrease });
+    x.load=L; x.loadKg=L.kg; L.reasons.forEach(r=>reasons.push(r));
+    if(L.suggest){ x.suggestKey='last|'+ex.id+'|'+inp.date; if((inp.accept||{})[x.suggestKey]){ x.loadKg=L.suggest.kg; x.accepted=true; if(L.suggest.resetReps) x.reps=String(x.reps).replace(/^\d+(–\d+)?/, String(L.suggest.resetReps)); } }
+    items.push(x);
+  });
+
+  // Kontakte gegen Blocklimit (6.5) – autonom kürzen
+  const lim=((b.limits||{}).contacts_per_session||[])[1];
+  const cSum=()=>items.reduce((a,x)=>a+contactsOf(x),0);
+  if(lim){ for(let i=items.length-1; i>=0 && cSum()>lim; i--){ const x=items[i]; while(contactsOf(x)>0 && x.sets>1 && cSum()>lim){ x.sets--; x.reasons.push('Bodenkontakte über dem Blocklimit '+lim+' → 1 Satz weniger.'); } } }
+
+  // Zeitbudget (8)
+  const limitMin=Math.min(inp.avail||rules.max_session_min||65, rules.max_session_min||65);
+  const est=()=>Math.round((rules.warmup_min||7) + items.reduce((a,x)=>a+slotSec(x),0)/60);
+  if(est()>limitMin){
+    const steps=[];
+    for(let i=items.length-1;i>=0 && est()>limitMin;i--) if(items[i].role==='optional'){ dropped.push({slot:items[i].slot, why:'Zeitbudget'}); items.splice(i,1); steps.push('optionale Übung gestrichen'); }
+    if(est()>limitMin){ let any=false; items.forEach(x=>{ if(x.role==='assistance' && x.sets>1){ x.sets--; x.reasons.push('Zeitbudget → 1 Satz weniger.'); any=true; } }); if(any) steps.push('Ergänzung −1 Satz'); }
+    for(let i=items.length-1;i>=0 && est()>limitMin;i--) if(items[i].role==='assistance'){ dropped.push({slot:items[i].slot, why:'Zeitbudget'}); steps.push(items[i].ex.name_de+' gestrichen'); items.splice(i,1); }
+    const firstPower=items.findIndex(x=>x.role==='power');
+    if(est()>limitMin) items.forEach((x,i)=>{ if(x.role==='power' && x.sets>1 && est()>limitMin){ x.sets--; x.reasons.push('Zeitbudget → 1 Satz weniger.'); } });
+    notes.push('Zeit: '+limitMin+' min verfügbar → gekürzt ('+(steps.join(', ')||'Sätze reduziert')+'). Hauptübungen'+(firstPower>=0?' und der erste Power-Block':'')+' bleiben'+(est()>limitMin?', deshalb dauert die Einheit trotzdem ca. '+est()+' min':'')+'.');
+  }
+  // Validierung (9)
+  const valid=[];
+  if(lim && cSum()>lim) valid.push('Bodenkontakte '+cSum()+' über dem Limit '+lim+'.');
+  items.forEach(x=>{ const m=String(x.rpe).match(/[\d,]+(?=\s*$)/); if(m && num(m[0])>cap) valid.push(x.ex.name_de+': Ziel-RPE über dem Cap.'); });
+  return { due, tpl:t, block:b, week, cap, items, dropped, notes, valid, contacts:cSum(), estMin:est(), limitMin, inp };
+}
+
+/* Plan → Einheit im App-Format (Snapshot inkl. Eingaben und Begründungen, Spezifikation 10) */
+function plToSession(P){
+  const b=P.block, t=P.tpl, date=P.inp.date;
+  const plan=P.items.map(x=>({
+    id:uid('ex'), name:x.ex.name_de, variant:'', sets:x.sets, reps:x.reps, loadKg:x.loadKg,
+    loadNote: x.load.calibrate ? 'kalibrieren' : (x.loadKg==null ? (x.load.text||'') : ''),
+    rpeTarget:x.rpe, rest:x.rest[0]===x.rest[1] ? x.rest[0]+' s' : x.rest[0]+'–'+x.rest[1]+' s',
+    metric:metricOf(x.ex, Object.assign({doseTxt:x.reps}, x.slot)), positionTag:'allgemein', equipment:[], alternatives:x.alternatives.map(n=>({name:n, note:''})),
+    notes:[x.note].concat(x.reasons).filter(Boolean).join(' '),
+    planner:{ dbId:x.dbId, slotId:x.slotId, method:x.method, role:x.role, fastCheck:x.method==='velocity', range:x.slot.range||null }
+  }));
+  const appBlock=activeBlock();
+  return { id:uid('ses'), blockId:appBlock?appBlock.id:null, dayId:null, name:t.id+' – '+t.name, focus:t.goal||'', plannedDate:date, week:mondayOf(date),
+    status:'geplant', location:'', plan, dayVersion:null, log:null, skipReason:'', moves:[], createdAt:new Date().toISOString(),
+    planner:{ planVersion:REF.plan.version, blockId:b.id, phase:P.due.phase?P.due.phase.id:null, week:P.week, wave:P.due.wave, templateId:t.id, cap:P.cap,
+      checkin:{ readiness:P.inp.readiness, sleep:P.inp.sleep, pain:P.inp.pain, regions:P.inp.regions, avail:P.inp.avail, grip:!!P.inp.grip, noEquip:P.inp.noEquip },
+      notes:P.notes, dropped:P.dropped.map(d=>({ slot:d.slot.id, why:d.why })), contacts:P.contacts, estMin:P.estMin, generatedAt:new Date().toISOString() } };
+}
+
+/* ---------- Sessionplaner: Oberfläche ---------- */
+function plDefaults(){ return { date:todayISO(), readiness:null, sleep:null, pain:0, regions:[], avail:null, grip:false, noEquip:[], accept:{}, tpl:null }; }
+function plInput(){ const p=ui.pl; const due=plDue(p.date); return Object.assign({}, p, { tpl: p.tpl && due.block && plTemplate(due.block,p.tpl) ? p.tpl : due.tpl }); }
+function chipBtn(act, k, v, label, on){ return '<button class="chip" data-act="'+act+'" data-k="'+k+'" data-v="'+esc(v)+'" aria-pressed="'+(on?'true':'false')+'">'+esc(label)+'</button>'; }
+function plPlaceholders(){ return S.sessions.filter(s=>!s.planner && s.status==='geplant' && !s.log && !(s.plan||[]).length); }
+
+function plSection(){
+  let h='<h2>Einheit planen</h2>';
+  if(!REF.plan){
+    if(!ghReady()) return h+'<div class="note warn">Der Sessionplaner braucht die Planerdaten aus deinem Datenrepo. <button class="link" data-act="ghOpen">Mit GitHub verbinden</button></div>';
+    return h+'<div class="note">'+(REF.loading?'Planerdaten werden geladen …':(REF.error?esc(REF.error):'Planerdaten noch nicht geladen.'))+' <button class="link" data-act="plReload">Neu laden</button></div>';
+  }
+  ui.pl=ui.pl||plDefaults(); const p=ui.pl; const inp=plInput(); const due=plDue(p.date); const b=due.block;
+  h+='<div class="section">';
+  h+='<p class="small">'+(due.phase?'<strong>'+esc(due.phase.name)+'</strong>':'keine Phase')+(b?' · Woche '+due.week+' von '+b.weeks+(due.wave?' ('+esc(due.wave)+')':''):'')+
+     (b&&inp.tpl?' · fällig: <strong>'+esc(inp.tpl+' – '+plTemplate(b,inp.tpl).name)+'</strong>':'')+'</p>';
+  if(due.why) h+='<p class="small muted">'+esc(due.why)+'</p>';
+  due.warnings.forEach(w=>{ h+='<div class="note warn small">'+esc(w)+'</div>'; });
+  if(due.doneToday) h+='<div class="note small">Heute bereits erledigt: <strong>'+esc(due.doneToday.name)+'</strong>. Pro Tag gibt es höchstens eine Einheit. <button class="link" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button></div>';
+  h+='<div class="fields">'+inp_('pl-date','Datum',p.date,'type="date" data-chg="plIn"')+
+     (b ? sel('pl-tpl','Einheit',b.templates.map(t=>[t.id, t.id+' – '+t.name+(t.id===due.tpl?' (fällig)':(due.remaining.includes(t.id)?'':' (diese Woche erledigt/entfällt)'))]), inp.tpl||'', 'data-chg="plIn"') : '')+'</div>';
+  h+='<label>Wie fit fühlst du dich heute? (Readiness)</label><div>'+[1,2,3,4,5].map(n=>chipBtn('plChip','readiness',n,FORM_LABEL[n],p.readiness===n)).join('')+'</div>';
+  h+='<div class="fields">'+inp_('pl-sleep','Schlaf (h, optional)',p.sleep==null?'':fmtNum(p.sleep),'inputmode="decimal" data-chg="plIn"')+
+     inp_('pl-avail','Verfügbare Zeit (min)',p.avail==null?'':p.avail,'inputmode="numeric" placeholder="'+((REF.plan.rules||{}).max_session_min||65)+'" data-chg="plIn"')+'</div>';
+  h+=sel('pl-pain','Beschwerden heute (0 = keine, 10 = stark)',Array.from({length:11},(_,i)=>[i,String(i)]),p.pain,'data-chg="plIn"');
+  if(p.pain>0) h+='<label>Wo?</label><div>'+Object.keys(REGION_LABEL).map(r=>chipBtn('plChip','regions',r,REGION_LABEL[r],p.regions.includes(r))).join('')+'</div>';
+  if(b && inp.tpl){
+    const t=plTemplate(b, inp.tpl);
+    const eq=[...new Set(t.slots.filter(s=>(s.dose||{})[due.week]).flatMap(s=>{ const e=REF.exMap[s.candidates[0]]; return e?e.equipment:[]; }))].filter(q=>q!=='floor_space' && EQUIP_LABEL[q]);
+    if(eq.length) h+='<details'+(p.noEquip.length?' open':'')+'><summary class="small">Gerät heute nicht verfügbar?</summary><div>'+eq.map(q=>chipBtn('plChip','noEquip',q,EQUIP_LABEL[q],p.noEquip.includes(q))).join('')+'</div></details>';
+    if(t.slots.some(s=>s.grip && (s.dose||{})[due.week])) h+='<div>'+chipBtn('plChip','grip','1','Griff stark ermüdet',p.grip)+'</div>';
+  }
+  h+='</div>';
+  if(!b || !inp.tpl){ const P=plBuild(inp); return h+'<div class="note">'+esc(P.error||'')+'</div>'+plPlaceholderNote(); }
+  if(p.readiness==null) return h+'<p class="small muted">Wähle deine Readiness, dann erstellt AOS die Einheit.</p>'+plPlaceholderNote();
+  return h+plPreview(plBuild(inp))+plPlaceholderNote();
+}
+function inp_(id,label,value,attrs){ return inp(id,label,value,attrs); }
+function plPlaceholderNote(){ const n=plPlaceholders().length; return n ? '<p class="small muted">'+n+' leere Einheit(en) aus der manuellen Planung ohne Übungen. <button class="link" data-act="plCleanup">Entfernen</button></p>' : ''; }
+
+function plPreview(P){
+  if(P.error) return '<div class="note">'+esc(P.error)+'</div>';
+  const b=P.block;
+  let h='<div class="section"><div class="row between"><strong>'+esc(P.tpl.id+' – '+P.tpl.name)+'</strong><span class="cap">RPE ≤ '+fmtNum(P.cap)+'</span></div>';
+  h+='<p class="small muted">ca. '+P.estMin+' min inkl. Aufwärmen'+(P.contacts?' · Bodenkontakte '+P.contacts:'')+' · '+esc(P.tpl.goal||'')+'</p>';
+  P.notes.forEach(n=>{ h+='<div class="note small">'+esc(n)+'</div>'; });
+  P.items.forEach((x,i)=>{
+    const load = x.loadKg!=null ? fmtNum(x.loadKg)+' kg' : (x.load.calibrate?'kalibrieren':(x.load.text||''));
+    h+='<div class="ex"><div class="ex-head"><span class="ex-name">'+(i+1)+'. '+esc(x.ex.name_de)+'</span>'+badge(ROLE_LABEL[x.role]||x.role, x.role==='main'?'ok':(x.role==='power'?'info':''))+'</div>';
+    h+='<div><strong>'+x.sets+' × '+esc(x.reps)+'</strong>'+(load?' · '+esc(load):'')+(x.rpe?' · RPE '+esc(x.rpe):'')+' · Pause '+(x.rest[0]===x.rest[1]?x.rest[0]:x.rest[0]+'–'+x.rest[1])+' s</div>';
+    if(x.load.suggest){ const k=x.suggestKey; const on=!!(ui.pl.accept||{})[k];
+      h+='<div class="note '+(on?'':'warn')+' small">Steigerung auf <strong>'+fmtNum(x.load.suggest.kg)+' kg</strong> möglich (Grundlage: '+esc(x.load.suggest.basis)+'). '+
+        (on?'Übernommen. <button class="link" data-act="plAccept" data-k="'+esc(k)+'">Rückgängig</button>':'Ohne Bestätigung bleibt die Last gleich. <button class="link" data-act="plAccept" data-k="'+esc(k)+'">Steigerung übernehmen</button>')+'</div>'; }
+    const why=[x.note].concat(x.reasons).filter(Boolean);
+    if(why.length) h+='<div class="small muted">'+why.map(esc).join(' ')+'</div>';
+    if(x.alternatives.length) h+='<div class="small muted">Ersatz möglich: '+esc(x.alternatives.join(' / '))+'</div>';
+    h+='</div>';
+  });
+  if(P.dropped.length) h+='<p class="small"><strong>Weggelassen:</strong> '+P.dropped.map(d=>esc((REF.exMap[d.slot.candidates[0]]||{}).name_de||d.slot.id)+' ('+esc(d.why)+')').join('; ')+'</p>';
+  P.valid.forEach(v=>{ h+='<div class="note bad small">'+esc(v)+'</div>'; });
+  h+='<div class="row" style="margin-top:12px"><button class="primary" data-act="plTake">Übernehmen & erfassen</button><button data-act="plKeep">Für Google Keep</button><button data-act="plSave">Nur speichern</button></div>';
+  if(b.status!=='bestätigt' && !(S.suggestionDecisions||{})['plan|'+b.id]) h+='<p class="small muted" style="margin-top:10px">Planversion '+esc(b.id)+' ist ein Vorschlag. <button class="link" data-act="plConfirm">Vorlagen bestätigen</button></p>';
+  return h+'</div>';
+}
+
+CHG.plIn = el=>{ const p=ui.pl; const d=val('pl-date');
+  if(el && el.id==='pl-date'){ if(d && d!==p.date){ p.date=d; p.tpl=null; p.accept={}; } }
+  else { const t=document.getElementById('pl-tpl'); if(el && el.id==='pl-tpl' && t){ p.tpl=t.value; p.accept={}; } }
+  const sl=num(val('pl-sleep')); p.sleep=sl; const av=num(val('pl-avail')); p.avail=av&&av>0?Math.round(av):null;
+  const pa=document.getElementById('pl-pain'); if(pa){ p.pain=Number(pa.value)||0; if(!p.pain) p.regions=[]; }
+  render(); };
+ACT.plChip = el=>{ const p=ui.pl, k=el.dataset.k, v=el.dataset.v;
+  if(k==='readiness') p.readiness=Number(v);
+  else if(k==='grip') p.grip=!p.grip;
+  else { const a=p[k]; const i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); }
+  render(); };
+ACT.plAccept = el=>{ const k=el.dataset.k; ui.pl.accept=ui.pl.accept||{}; if(ui.pl.accept[k]) delete ui.pl.accept[k]; else ui.pl.accept[k]=true; render(); };
+ACT.plReload = async ()=>{ const ok=await refLoad(true); toast(ok?'Planerdaten aktualisiert.':(REF.error||'Keine Verbindung – es wird der zuletzt geladene Stand verwendet.')); render(); };
+ACT.plConfirm = ()=>{ const b=plDue(ui.pl.date).block; if(!b) return;
+  const ov=Object.entries(b.week_overrides||{}).filter(([,o])=>o.note).map(([w,o])=>'Woche '+w+': '+o.note);
+  confirmDlg('Vorlagen bestätigen?', 'Damit übernimmst du die Einheiten '+esc(b.templates.map(t=>t.id).join(', '))+' der Planversion '+esc(b.id)+(ov.length?' (inkl. '+esc(ov.join('; '))+')':'')+' als aktuellen Plan. Laststeigerungen brauchen weiterhin jeweils deine Bestätigung.', 'Bestätigen', ()=>{
+    S.suggestionDecisions['plan|'+b.id]={ at:new Date().toISOString(), title:'Planversion '+b.id+' ('+b.name+')', status:'bestätigt' }; save(); render(); }); };
+ACT.plCleanup = ()=>{ const l=plPlaceholders(); confirmDlg('Leere Einheiten entfernen?', l.length+' geplante Einheit(en) ohne Übungen und ohne Protokoll werden entfernt. Der Sessionplaner ersetzt sie.', 'Entfernen', ()=>{
+  const ids=new Set(l.map(s=>s.id)); S.sessions=S.sessions.filter(s=>!ids.has(s.id)); save(); render(); }, true); };
+
+function plCommit(){
+  const P=plBuild(plInput()); if(P.error || !P.items.length){ toast(P.error||'Keine Übungen in dieser Einheit.'); return null; }
+  if(P.due.doneToday && P.due.doneToday.planner && P.due.doneToday.planner.templateId!==P.tpl.id && P.inp.date===P.due.doneToday.plannedDate){ toast('Für diesen Tag ist schon eine Einheit erledigt – höchstens eine Einheit pro Tag.'); return null; }
+  P.items.filter(x=>x.accepted).forEach(x=>{ S.suggestionDecisions[x.suggestKey]={ at:new Date().toISOString(), title:'Steigerung '+x.ex.name_de+' auf '+fmtNum(x.loadKg)+' kg', status:'bestätigt', kg:x.loadKg, dbId:x.dbId, note:x.load.suggest.basis }; });
+  const s=plToSession(P);
+  // Bestehende, noch nicht protokollierte Einheit desselben Tages ersetzen (Planer-Einheit oder leerer Platzhalter)
+  const old=S.sessions.find(o=>o.status==='geplant' && !o.log && o.plannedDate===P.inp.date && (o.planner || !(o.plan||[]).length));
+  if(old){ s.id=old.id; s.createdAt=old.createdAt; S.sessions[S.sessions.indexOf(old)]=s; } else S.sessions.push(s);
+  ui.pl.accept={}; save(); return s;
+}
+ACT.plTake = ()=>{ const s=plCommit(); if(s){ toast('Einheit angelegt.'); startLog(s.id); } };
+ACT.plSave = ()=>{ const s=plCommit(); if(s){ toast('Einheit für '+fmtDateShort(s.plannedDate)+' gespeichert.'); render(); } };
+ACT.plKeep = ()=>{ const P=plBuild(plInput()); if(P.error) return; const s=plToSession(P);
+  P.items.forEach((x,i)=>{ if(x.accepted) s.plan[i].loadKg=x.loadKg; });
+  openDlg('Text für Google Keep','<pre class="out" id="keep-out">'+esc(keepText(s))+'</pre>','<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="keep-out">Kopieren</button>'); };
+
+function plOverviewNote(){
+  if(!REF.plan) return '';
+  const due=plDue(todayISO()); if(!due.block || !due.tpl || due.doneToday) return '';
+  const t=plTemplate(due.block, due.tpl); if(due.offday) return '';
+  const planned=due.plannedToday;
+  return '<div class="note"><strong>Heute: '+esc(t.id+' – '+t.name)+'</strong> · '+esc(due.phase?due.phase.id:'')+' Woche '+due.week+'. '+
+    (planned?'<button class="link" data-act="startLog" data-id="'+planned.id+'">Erfassen</button>':'<button class="link" data-act="go" data-view="training">Einheit planen</button>')+'</div>';
+}
+
+'use strict';
 /* ===== AOS – Speicherung im privaten GitHub-Datenrepo =====
    Ablauf eines Abgleichs: Datei aus dem Datenrepo laden → mit dem Stand auf diesem Gerät zusammenführen
    (pro Datensatz gewinnt die jüngste Änderung, siehe mergeData) → Ergebnis zurückschreiben, falls sich etwas geändert hat.
@@ -1982,27 +2356,27 @@ ACT.ghSave = async ()=>{
   Object.assign(gh.cfg, { owner, repo, branch, path }); if(token) gh.cfg.token=token;
   ghStore(); render();
   const ok = await ghSync('einrichten');
-  if(ok) toast('Verbunden. Deine Daten sind jetzt im Datenrepo gespeichert.');
+  if(ok){ toast('Verbunden. Deine Daten sind jetzt im Datenrepo gespeichert.'); refLoad(true); }
   render();
 };
-ACT.ghSyncNow = async ()=>{ const ok=await ghSync('manuell'); if(ok) toast('Abgeglichen.'); };
+ACT.ghSyncNow = async ()=>{ const ok=await ghSync('manuell'); if(ok){ toast('Abgeglichen.'); refLoad(true); } };
 ACT.ghForget = ()=>confirmDlg('Token entfernen?', 'AOS speichert auf diesem Gerät dann nur noch lokal, bis du wieder einen Token einträgst. Die Daten im Datenrepo bleiben unverändert.'+(gh.dirty?' <strong>Achtung: Es gibt noch nicht abgeglichene Änderungen.</strong>':''), 'Entfernen', ()=>{ gh.cfg.token=''; ghStore(); ghSetState('aus'); render(); }, true);
 
 /* Automatisch abgleichen: beim Start, beim Zurückkehren in die App, wenn wieder Netz da ist, und vor dem Verlassen */
 document.addEventListener('visibilitychange', ()=>{
   if(!ghReady()) return;
-  if(document.visibilityState==='visible'){ if(!gh.lastOk || Date.now()-new Date(gh.lastOk).getTime()>20000 || gh.dirty) ghSync('fokus'); }
+  if(document.visibilityState==='visible'){ refLoad(); if(!gh.lastOk || Date.now()-new Date(gh.lastOk).getTime()>20000 || gh.dirty) ghSync('fokus'); }
   else if(gh.dirty) ghSync('verlassen');
 });
 window.addEventListener('online', ()=>{ if(ghReady()) ghSync('online'); });
 window.addEventListener('offline', ()=>{ if(ghReady()) ghSetState('offline'); });
 
 (function init(){
-  ghLoad();
+  ghLoad(); refInit();
   load();
   const h=location.hash.slice(1); if(VIEWS.some(v=>v[0]===h)||h==='druck') ui.view=h;
   render();
-  if(ghReady()) ghSync('start');
+  if(ghReady()){ ghSync('start'); refLoad(); }
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') && document.querySelector('link[rel=manifest]')){
     const hadController = !!navigator.serviceWorker.controller;
