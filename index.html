@@ -807,7 +807,7 @@ function renderShell(){
   let info = b ? '<span class="small muted">'+esc(b.name)+'</span> ' : '';
   if(typeof REF!=='undefined' && REF.plan){ const td=todayISO(), pb=plCurrentBlock(td), ph=pb?(plPhase(td)||REF.plan.phases.find(x=>x.id===pb.phase)):null;
     if(pb) info='<span class="small muted">'+esc((ph?ph.id+' · ':'')+(pb.start>td?'ab '+fmtDateShort(pb.start).slice(3):'Woche '+plWeek(pb,td)))+'</span> '; }
-  document.getElementById('topinfo').innerHTML = info+'<span id="syncchip">'+ghChip()+'</span>';
+  document.getElementById('topinfo').innerHTML = info;
 }
 function render(){
   if(window.__aosUpdate && typeof aosApplyUpdate==='function'){ aosApplyUpdate(); }
@@ -2203,6 +2203,7 @@ ACT.plConfirmB = ()=>{ ui.pl=ui.pl||plDefaults(); ACT.plConfirm(); };
 function viewOverview(){
   const today=todayISO();
   let h='<h1>Übersicht</h1>';
+  h+='<div id="syncwarn">'+ghWarn()+'</div>';
   if(!ghReady()) h+='<div class="note warn"><strong>Noch nicht verbunden.</strong> Deine Daten liegen im privaten Datenrepo. <button class="link" data-act="ghOpen">Jetzt verbinden</button></div>';
   if(isIOS() && !isStandalone() && location.protocol==='https:' && !S.settings.hideInstallHint)
     h+='<div class="note warn"><strong>Als App installieren:</strong> In Safari auf <em>Teilen</em> → <em>Zum Home-Bildschirm</em>, danach AOS immer über das Symbol öffnen. <button class="link small" data-act="hideInstall">Ausblenden</button></div>';
@@ -2458,9 +2459,13 @@ function ghSetState(st){
   gh.state=st;
   const el=document.getElementById('syncchip'); if(el) el.innerHTML=ghChip();
   const box=document.getElementById('gh-status'); if(box) box.innerHTML=ghStatusText();
+  const w=document.getElementById('syncwarn'); if(w) w.innerHTML=ghWarn();
 }
+/* Übersicht: nur melden, wenn Speichern wirklich fehlschlägt (offline ist normal und wird nachgeholt) */
+function ghWarn(){ return gh.state==='fehler' ? '<div class="note bad"><strong>Speichern fehlgeschlagen.</strong> '+esc(gh.lastError||'')+' <button class="link" data-act="ghOpen">Details</button></div>' : ''; }
 function ghStatusText(){
   if(!ghReady()) return '<span class="muted">Noch nicht verbunden.</span>';
+  if(gh.state!=='aus') return ghChip().replace('data-act="ghOpen"','data-act="ghSyncNow"').replace(/title="[^"]*"/,'title="Jetzt abgleichen"')+(gh.lastError?'<br><span style="color:var(--bad)">'+esc(gh.lastError)+'</span>':'');
   return 'Status: <strong>'+esc({laeuft:'speichert …',ok:'aktuell',ausstehend:'Änderungen ausstehend',offline:'offline',fehler:'Fehler',aus:'aus'}[gh.state]||gh.state)+'</strong>'+
     (gh.lastOk?' · zuletzt abgeglichen: '+esc(ghTime(gh.lastOk)):'')+(gh.lastError?'<br><span style="color:var(--bad)">'+esc(gh.lastError)+'</span>':'');
 }
