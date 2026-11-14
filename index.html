@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AOS">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src https://api.github.com; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>AOS – Athlete Operating System</title>
 <style>
@@ -57,6 +57,8 @@ p{margin:6px 0}
 .badge.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
 .badge.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
 .badge.info{background:var(--info-soft);color:var(--info);border-color:transparent}
+.syncchip{font:inherit;font-size:.78rem;line-height:1.3;min-height:0;height:auto;padding:3px 10px;border-radius:99px;border:1px solid transparent;cursor:pointer;white-space:nowrap;background:var(--surface2);color:var(--text)}
+.syncchip.ok{background:var(--accent-soft)}.syncchip.warn{background:var(--warn-soft);color:var(--warn)}.syncchip.bad{background:var(--bad-soft);color:var(--bad)}.syncchip.info{background:var(--info-soft);color:var(--info)}
 .cap{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:.85rem;background:var(--warn-soft);color:var(--warn);padding:3px 10px;border-radius:99px}
 .note{border-left:4px solid var(--info);background:var(--info-soft);padding:8px 12px;border-radius:6px;margin:10px 0;font-size:.92rem}
 .note.warn{border-color:var(--warn);background:var(--warn-soft)}
@@ -184,60 +186,24 @@ function num(v){ if(v===null||v===undefined) return null; const s=String(v).trim
 function fmtNum(n){ if(n===null||n===undefined||n==='') return ''; return String(Math.round(n*100)/100).replace('.',','); }
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 
-/* ---------- Ausgangsdaten (aus der Produktbeschreibung, klar gekennzeichnet) ---------- */
+/* ---------- Ausgangsdaten ----------
+   Bewusst neutral: Dieses Repo ist öffentlich. Persönliche Werte (Profil, Tests, Ziele, Blöcke …)
+   liegen ausschließlich im privaten Datenrepo und kommen beim ersten Abgleich auf das Gerät. */
 function seedData(){
   const now = new Date().toISOString();
-  const SRC = 'ausgangsdaten';
-  const t = (name, category, value, unit, extra) => Object.assign({
-    id: 'seed-test-'+slug(name)+'-'+(value==null?'x':value), name, category, date:null, value, unit, reps:null, detail:'', conditions:'', rpe:null, note:'', source:SRC, createdAt:SEED_TIME
-  }, extra||{});
-  const day = (n, weekday) => ({ id: 'seed-block-1-day-'+n, name:'Trainingstag '+n, order:n, weekday, location:'', focus:'', notes:'', exercises:[], version:1 });
   return {
     schemaVersion: SCHEMA_VERSION,
     meta: { createdAt: now, updatedAt: now, app:'AOS – Athlete Operating System' },
-    profile: {
-      name:'', sex:'männlich', age:33, birthYear:null, heightCm:182, targetWeightKg:null,
-      positions:[
-        { id: 'seed-pos-rb', code:'RB', name:'Running Back', weight:70 },
-        { id: 'seed-pos-de', code:'DE', name:'Defensive End', weight:30 }
-      ],
-      positionHistory:[
-        { replacedAt: '2026-11-13', note:'Frühere Gewichtung laut erster Produktbeschreibung, durch RB 70 % / DE 30 % ersetzt.',
-          positions:[{code:'DE',name:'Defensive End',weight:50},{code:'OLB',name:'Outside Linebacker',weight:30},{code:'3-Tech',name:'3-Tech Defensive Tackle',weight:20}] }
-      ],
-      locations:[
-        { id:'loc-own', name:'Eigenes Gym', equipment:['SSB (Safety Squat Bar)','Trap Bar','Floor Press'], note:'Ausgangsdaten: Liste unvollständig („unter anderem“).', source:SRC },
-        { id:'loc-public', name:'Public Gym', equipment:['Trap Bar','Belt Squat'], note:'Ausgangsdaten: Liste unvollständig („unter anderem“).', source:SRC }
-      ]
-    },
-    goals: [
-      ['Bankdrücken',120,'kg','Bankdrücken'],['Kniebeuge',200,'kg','High-Bar Squat'],['Kreuzheben',220,'kg','Trap-Bar-Kreuzheben'],
-      ['Klimmzüge',20,'Wdh','Klimmzüge'],['Liegestütze',80,'Wdh/min','Liegestütze'],['40-Yard-Sprint',4.8,'s','40-Yard-Sprint']
-    ].map(([name,target,unit,testName])=>({ id:'seed-goal-'+slug(name), name, target, unit, testName, status:'aktiv', note: name==='Kreuzheben'?'Bezugstest (Trap Bar oder Langhantel) bei Bedarf anpassen.':'', createdAt:SEED_TIME, source:SRC })),
-    tests: [
-      t('Broad Jump','Sprung & Power',220,'cm',{note:'Erster genannter Wert.'}),
-      t('Broad Jump','Sprung & Power',240,'cm',{note:'„Später“ genannt – Reihenfolge laut Beschreibung nach 220 cm.'}),
-      t('High-Bar Squat','Kraft',110,'kg',{reps:5,rpe:7}),
-      t('Bankdrücken','Kraft',70,'kg',{reps:5,note:'RPE nicht bekannt.'}),
-      t('Klimmzüge','Kraft',null,'Wdh',{detail:'5 / 5 / 3 Wdh (Satzverteilung)'}),
-      t('Trap-Bar-Kreuzheben','Kraft',120,'kg',{reps:5,rpe:7})
-    ],
-    bodyweight: [ { id:'seed-bw-1', date:null, kg:92, approx:true, note:'„ungefähr 92 kg“', source:SRC, createdAt:SEED_TIME } ],
-    blocks: [ {
-      id: 'seed-block-1', name:'Block 1 – Foundation / Re-Entry', goal:'Foundation / Re-Entry', start:null, end:null, status:'aktiv',
-      rhythm:'bis zu 4 Einheiten pro Woche (grundsätzlich Mo, Di, Mi, Fr); Verfügbarkeit variiert wöchentlich',
-      rpeCapMin:7, rpeCapMax:7.5, rules:'', source:SRC,
-      days:[ day(1,1), day(2,2), day(3,3), day(4,5) ],
-      changelog:[]
-    } ],
-    sessions: [],
-    unavailable: [],
-    suggestionDecisions: {},
+    profile: { name:'', sex:'', age:null, birthYear:null, heightCm:null, targetWeightKg:null, positions:[], positionHistory:[], locations:[] },
+    goals: [], tests: [], bodyweight: [], blocks: [], sessions: [],
+    unavailable: [], suggestionDecisions: {},
     nutrition: defaultNutrition(),
     settings: { seededAt: now }
   };
 }
-function freshData(){ const d=seedData(); syncStampAll(d, SEED_TIME); return d; }
+/* Neue Geräte bekommen ältere Zeitstempel als alles im Datenrepo: Beim ersten Abgleich gewinnt immer der gespeicherte Stand. */
+const FRESH_TIME = '0000-01-01T00:00:00.000Z';
+function freshData(){ const d=seedData(); syncStampAll(d, FRESH_TIME); return d; }
 
 /* ---------- Speicher ---------- */
 let S = null;
@@ -259,10 +225,11 @@ function load(){
 }
 function save(silent){
   S.meta.updatedAt = new Date().toISOString();
-  syncTrack();
+  const changed = syncTrack();
+  if(changed && typeof ghOnLocalChange==='function') ghOnLocalChange();
   if(!storageOK) return false;
   try{ localStorage.setItem(AOS_KEY, JSON.stringify(S)); return true; }
-  catch(e){ storageOK=false; if(!silent) toast('Speichern fehlgeschlagen – bitte jetzt eine JSON-Sicherung exportieren.'); return false; }
+  catch(e){ storageOK=false; if(!silent) toast('Speichern auf dem Gerät fehlgeschlagen'+(ghReady()?' – der Abgleich mit GitHub läuft weiter.':' – bitte jetzt eine JSON-Sicherung exportieren.')); return false; }
 }
 function migrate(d){
   // Platz für künftige Schema-Änderungen; fehlende Bereiche ergänzen statt Daten zu verwerfen
@@ -321,7 +288,7 @@ function missingData(){
   const out=[]; const p=S.profile; const b=activeBlock();
   if(!p.name) out.push({where:'profil', text:'Name im Profil fehlt.'});
   if(!p.birthYear) out.push({where:'profil', text:'Geburtsjahr fehlt (Alter 33 ist ein Ausgangswert und veraltet sonst).'});
-  const bw=latestBodyweight(); if(!bw || !bw.date) out.push({where:'tests', text:'Körpergewicht ohne Datum (Ausgangswert ~92 kg) – aktuelle Messung mit Datum eintragen.'});
+  const bw=latestBodyweight(); if(!bw) out.push({where:'tests', text:'Noch kein Körpergewicht erfasst – Messung mit Datum eintragen.'}); else if(!bw.date) out.push({where:'tests', text:'Körpergewicht ohne Datum (Ausgangswert ~'+fmtNum(bw.kg)+' kg) – aktuelle Messung mit Datum eintragen.'});
   if(Math.round(positionSum())!==100) out.push({where:'profil', text:'Positionsgewichtung ergibt nicht 100 %.'});
   if(!b) out.push({where:'plan', text:'Kein aktiver Trainingsblock.'});
   else {
@@ -433,12 +400,13 @@ function syncInit(){
   lastFP=new Map(); syncRecords(S).forEach((v,k)=>{ lastFP.set(k, fp(v)); if(!S.sync.stamps[k]) S.sync.stamps[k]=S.meta.updatedAt||SEED_TIME; });
 }
 function syncTrack(){
-  if(!S.sync) return;
-  const now=new Date().toISOString(); const cur=new Map();
+  if(!S.sync) return false;
+  const now=new Date().toISOString(); const cur=new Map(); let changed=false;
   syncRecords(S).forEach((v,k)=>{ const f=fp(v); cur.set(k,f);
-    if(lastFP.get(k)!==f){ S.sync.stamps[k]=now; delete S.sync.tombstones[k]; } });
-  lastFP.forEach((f,k)=>{ if(!cur.has(k)){ S.sync.tombstones[k]=now; delete S.sync.stamps[k]; } });
+    if(lastFP.get(k)!==f){ S.sync.stamps[k]=now; delete S.sync.tombstones[k]; changed=true; } });
+  lastFP.forEach((f,k)=>{ if(!cur.has(k)){ S.sync.tombstones[k]=now; delete S.sync.stamps[k]; changed=true; } });
   lastFP=cur;
+  return changed;
 }
 
 /* Ältere Daten (vor Version 3): Ausgangsdaten auf feste IDs umstellen, damit sie geräteübergreifend gleich sind */
@@ -867,7 +835,7 @@ ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f
 function renderShell(){
   const b=activeBlock();
   document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+'>'+t+'</button>').join('');
-  document.getElementById('topinfo').innerHTML = b ? '<span class="small muted">'+esc(b.name)+'</span> '+capBadge(b) : '';
+  document.getElementById('topinfo').innerHTML = (b ? '<span class="small muted">'+esc(b.name)+'</span> '+capBadge(b)+' ' : '')+'<span id="syncchip">'+ghChip()+'</span>';
 }
 function render(){
   renderShell();
@@ -882,6 +850,7 @@ window.addEventListener('hashchange', ()=>{ const h=location.hash.slice(1); if(h
 function viewOverview(){
   const b=activeBlock(); const today=todayISO(); const mon=mondayOf(today);
   let h='<h1>Übersicht</h1>';
+  if(!ghReady()) h+='<div class="note warn"><strong>Noch nicht mit deinem Datenrepo verbunden.</strong> Deine Daten liegen im privaten GitHub-Repo und kommen erst nach dem Verbinden auf dieses Gerät. <button class="link" data-act="ghOpen">Jetzt verbinden</button></div>';
   if(isIOS() && !isStandalone() && location.protocol==='https:' && !S.settings.hideInstallHint)
     h+='<div class="note warn"><strong>Als App installieren:</strong> In Safari unten auf <em>Teilen</em> (Quadrat mit Pfeil) tippen → <em>Zum Home-Bildschirm</em>. Öffne AOS danach immer über das neue Symbol. <strong>Wichtig:</strong> Die App auf dem Home-Bildschirm hat einen eigenen Speicher – trage deine Daten erst dort ein (oder importiere dort deine Sicherung). <button class="link small" data-act="hideInstall">Ausblenden</button></div>';
   if(!b){
@@ -933,7 +902,7 @@ function viewOverview(){
   h+= md.length ? '<div class="section"><ul style="margin:0;padding-left:20px">'+md.map(x=>'<li>'+esc(x.text)+' <button class="link small" data-act="go" data-view="'+x.where+'">ergänzen</button></li>').join('')+'</ul></div>' : '<p class="muted small">Alles Wesentliche ist eingetragen.</p>';
   // Sicherung
   const le=S.settings.lastExport;
-  if(!le || daysBetween(le.slice(0,10), today)>14) h+='<div class="note">'+(le?'Letzte JSON-Sicherung am '+fmtDate(le.slice(0,10))+'.':'Noch keine JSON-Sicherung erstellt.')+' Die Daten liegen nur in diesem Browser. <button class="link" data-act="exportJSON">Jetzt sichern</button></div>';
+  if(!ghReady() && (!le || daysBetween(le.slice(0,10), today)>14)) h+='<div class="note">'+(le?'Letzte JSON-Sicherung am '+fmtDate(le.slice(0,10))+'.':'Noch keine JSON-Sicherung erstellt.')+' Die Daten liegen nur in diesem Browser. <button class="link" data-act="exportJSON">Jetzt sichern</button></div>';
   return h;
 }
 ACT.hideInstall = ()=>{ S.settings.hideInstallHint=true; save(); render(); };
@@ -1517,7 +1486,7 @@ ACT.delTest = el=>{ const id=el.dataset.id; confirmDlg('Testergebnis löschen?',
 ACT.editBw = el=>{
   const x=el.dataset.id?S.bodyweight.find(b=>b.id===el.dataset.id):null;
   openDlg(x?'Körpergewicht bearbeiten':'Körpergewicht erfassen',
-    (x&&x.source==='ausgangsdaten'?'<p class="note small">Ausgangswert („ungefähr 92 kg“, Datum unbekannt). Neue Messungen bitte als eigenen Eintrag erfassen, damit der Ausgangswert erhalten bleibt.</p>':'')+
+    (x&&x.source==='ausgangsdaten'?'<p class="note small">Ausgangswert ('+esc(x.note||(fmtNum(x.kg)+' kg'))+', Datum unbekannt). Neue Messungen bitte als eigenen Eintrag erfassen, damit der Ausgangswert erhalten bleibt.</p>':'')+
     '<div class="fields">'+inp('bw-date','Datum',x?x.date||'':todayISO(),'type="date"')+inp('bw-kg','Gewicht (kg) *',x?fmtNum(x.kg):'','inputmode="decimal" required')+'</div>'+
     '<label style="display:flex;align-items:center;color:var(--text)"><input type="checkbox" id="bw-approx" '+(x&&x.approx?'checked':'')+'> ungefährer Wert</label>'+inp('bw-note','Notiz (optional)',x?x.note:'','placeholder="z. B. morgens nüchtern"'),
     (x?'<button class="danger" data-act="delBw" data-id="'+x.id+'">Löschen</button>':'')+'<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="saveBw" data-id="'+(x?x.id:'')+'">Speichern</button>');
@@ -1761,16 +1730,17 @@ function viewProfile(){
   h+='<button data-act="editGoal">+ Ziel</button>';
   // Daten
   const le=S.settings.lastExport;
+  h+=ghSection();
   h+='<h2>Daten & Sicherung</h2><div class="section">'+
-    '<p class="small">Alle Daten liegen ausschließlich im lokalen Speicher dieses Browsers (localStorage) auf diesem Gerät. AOS sendet nichts an externe Dienste. Wenn du Browserdaten löschst, einen anderen Browser oder ein anderes Gerät nutzt, sind die Daten dort nicht vorhanden – deshalb regelmäßig sichern.</p>'+
+    '<p class="small">Gespeichert wird auf diesem Gerät (localStorage) und – wenn verbunden – in deinem privaten Datenrepo auf GitHub. Andere Dienste bekommen keine Daten. Die JSON-Sicherung ist eine zusätzliche Kopie für den Notfall.</p>'+
     (isIOS()?'<p class="small muted">Auf dem iPhone öffnet sich beim Sichern das Teilen-Menü: „In Dateien sichern“ (z. B. iCloud Drive) oder per AirDrop an den Laptop.</p>':'')+'<p class="small">Letzte JSON-Sicherung: <strong>'+(le?fmtDate(le.slice(0,10)):'noch keine')+'</strong> · Datenstand: '+fmtDate(S.meta.updatedAt.slice(0,10))+(S.sync&&S.sync.lastMerge?' · Zuletzt zusammengeführt: '+fmtDate(S.sync.lastMerge.at.slice(0,10)):'')+'</p>'+
     '<div class="row"><button class="primary" data-act="exportJSON">JSON-Sicherung herunterladen</button></div>'+
-    '<h3>Zwischen Geräten abgleichen</h3><p class="small muted">Sicherung des anderen Geräts (z. B. iPhone ↔ Laptop) hier zusammenführen: Neue Einträge kommen dazu, bei Änderungen am selben Eintrag gewinnt die jüngere, Löschungen werden übernommen. Danach hier sichern und auf dem anderen Gerät ebenfalls zusammenführen – dann sind beide gleich.</p>'+
+    '<h3>Sicherung zusammenführen</h3><p class="small muted">Normalerweise nicht nötig, der Abgleich läuft über GitHub. Für alte Sicherungen: Sicherung des anderen Geräts (z. B. iPhone ↔ Laptop) hier zusammenführen: Neue Einträge kommen dazu, bei Änderungen am selben Eintrag gewinnt die jüngere, Löschungen werden übernommen. Danach hier sichern und auf dem anderen Gerät ebenfalls zusammenführen – dann sind beide gleich.</p>'+
     '<div class="row"><label class="btn" for="merge-file" style="display:inline-flex;align-items:center;color:var(--text);margin:0;font-weight:600">Sicherung zusammenführen …</label><input id="merge-file" type="file" accept=".json,application/json" class="sr-only" data-chg="mergeFile"></div>'+
     '<h3>Wiederherstellen</h3><p class="small muted">Ersetzt alle Daten auf diesem Gerät durch die Sicherung (z. B. nach Gerätewechsel).</p>'+
     '<div class="row"><label class="btn" for="imp-file" style="display:inline-flex;align-items:center;color:var(--text);margin:0">Sicherung importieren (alles ersetzen) …</label><input id="imp-file" type="file" accept=".json,application/json" class="sr-only" data-chg="importFile"></div>'+
     '<h3>CSV (für Tabellenkalkulation)</h3><div class="row"><button class="small" data-act="csv" data-k="saetze">Trainingssätze</button><button class="small" data-act="csv" data-k="tests">Tests</button><button class="small" data-act="csv" data-k="bw">Körpergewicht</button></div>'+
-    '<h3>Zurücksetzen</h3><p class="small muted">Löscht alle Einträge in diesem Browser und stellt nur die Ausgangsdaten wieder her.</p><button class="small danger" data-act="resetAll">Alle Daten zurücksetzen …</button></div>';
+    '<h3>Zurücksetzen</h3><p class="small muted">Löscht alle Einträge in diesem Browser. Ist GitHub verbunden, wird danach wieder der Stand aus dem Datenrepo geladen – im Datenrepo selbst wird nichts gelöscht.</p><button class="small danger" data-act="resetAll">Alle Daten zurücksetzen …</button></div>';
 
   h+='<p class="small muted" style="margin-top:24px">AOS ist kein Ersatz für medizinische oder sportwissenschaftliche Betreuung.</p>';
   return h;
@@ -1850,16 +1820,189 @@ CHG.mergeFile = el=>readBackup(el, (d,f)=>{
     '<button data-act="closeDlg">'+(rep.total?'Abbrechen':'Schließen')+'</button>'+(rep.total?'<button data-act="exportJSON">Vorher sichern</button><button class="primary" data-act="mergeOk">Zusammenführen</button>':''));
 });
 ACT.mergeOk = ()=>{ if(!ui.mergeResult) return; S=ui.mergeResult.data; ui.mergeResult=null; syncInit(); ui.posDraft=null; ui.blockId=null; ui.sessionId=null; ui.draft=null; save(); closeDlg(); toast('Zusammengeführt. Sichere jetzt und führe die Datei auch auf dem anderen Gerät zusammen.'); render(); };
-ACT.importOk = ()=>{ if(!ui.importData) return; S=migrate(ui.importData); syncInit(); ui.importData=null; ui.posDraft=null; ui.blockId=null; save(); closeDlg(); toast('Sicherung importiert.'); render(); };
+ACT.importOk = ()=>{ if(!ui.importData) return; S=migrate(ui.importData); syncInit(); ui.importData=null; ui.posDraft=null; ui.blockId=null; save(); closeDlg(); toast('Sicherung importiert.'+(ghReady()?' Sie wird jetzt mit dem Datenrepo zusammengeführt.':'')); render(); if(ghReady()) ghSync('import'); };
 ACT.resetAll = ()=>{
   openDlg('Alle Daten zurücksetzen?','<p>Alle Einheiten, Protokolle, Tests, Blöcke und Einstellungen in diesem Browser werden gelöscht. Nur die Ausgangsdaten werden wiederhergestellt.</p><p>Zur Bestätigung <strong>LÖSCHEN</strong> eingeben:</p>'+inp('rs-conf','Bestätigung',''),
     '<button data-act="closeDlg">Abbrechen</button><button data-act="exportJSON">Vorher sichern</button><button class="danger" data-act="resetOk">Zurücksetzen</button>'); };
-ACT.resetOk = ()=>{ if(val('rs-conf')!=='LÖSCHEN'){ toast('Bitte LÖSCHEN eingeben.'); return; } S=freshData(); syncInit(); ui.posDraft=null; ui.blockId=null; save(); closeDlg(); toast('Zurückgesetzt.'); render(); };
+ACT.resetOk = ()=>{ if(val('rs-conf')!=='LÖSCHEN'){ toast('Bitte LÖSCHEN eingeben.'); return; } S=freshData(); syncInit(); ui.posDraft=null; ui.blockId=null; save(); closeDlg(); toast('Zurückgesetzt.'); render(); if(ghReady()) ghSync('reset'); };
+
+'use strict';
+/* ===== AOS – Speicherung im privaten GitHub-Datenrepo =====
+   Ablauf eines Abgleichs: Datei aus dem Datenrepo laden → mit dem Stand auf diesem Gerät zusammenführen
+   (pro Datensatz gewinnt die jüngste Änderung, siehe mergeData) → Ergebnis zurückschreiben, falls sich etwas geändert hat.
+   Der Zugriffsschlüssel (Token) bleibt nur auf diesem Gerät (localStorage, nicht in Sicherungen) und wird
+   ausschließlich an api.github.com gesendet. */
+
+const GH_KEY = 'aos-github-v1';
+const GH_DEFAULT = { owner:'bqtmarcel', repo:'AOS_DATA', branch:'main', path:'aos-data.json', token:'' };
+const gh = { cfg:null, state:'aus', syncing:false, again:false, timer:null, lastOk:null, lastError:'', dirty:false };
+
+function ghLoad(){
+  let c=null; try{ c=JSON.parse(localStorage.getItem(GH_KEY)||'null'); }catch(e){}
+  gh.cfg = Object.assign({}, GH_DEFAULT, c&&c.cfg||{});
+  gh.lastOk = c&&c.lastOk || null; gh.dirty = !!(c&&c.dirty);
+  gh.state = ghReady() ? (gh.dirty?'ausstehend':'ok') : 'aus';
+}
+function ghStore(){ try{ localStorage.setItem(GH_KEY, JSON.stringify({ cfg:gh.cfg, lastOk:gh.lastOk, dirty:gh.dirty })); }catch(e){} }
+function ghReady(){ return !!(gh.cfg && gh.cfg.token && gh.cfg.owner && gh.cfg.repo && gh.cfg.branch && gh.cfg.path); }
+
+/* Base64 für UTF-8 (Umlaute) */
+function b64enc(str){ const b=new TextEncoder().encode(str); let bin=''; for(let i=0;i<b.length;i+=0x8000) bin+=String.fromCharCode.apply(null, b.subarray(i,i+0x8000)); return btoa(bin); }
+function b64dec(s){ const bin=atob(String(s).replace(/\s/g,'')); const b=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) b[i]=bin.charCodeAt(i); return new TextDecoder().decode(b); }
+
+function ghRepoUrl(p){ return 'https://api.github.com/repos/'+encodeURIComponent(gh.cfg.owner)+'/'+encodeURIComponent(gh.cfg.repo)+(p||''); }
+function ghFilePath(){ return gh.cfg.path.split('/').filter(Boolean).map(encodeURIComponent).join('/'); }
+async function ghFetch(method, path, body){
+  let res;
+  const headers = { 'Accept':'application/vnd.github+json', 'Authorization':'Bearer '+gh.cfg.token, 'X-GitHub-Api-Version':'2022-11-28' };
+  if(body) headers['Content-Type']='application/json';
+  try{ res = await fetch(ghRepoUrl(path), { method, headers, cache:'no-store', body: body?JSON.stringify(body):undefined }); }
+  catch(e){ const err=new Error('Keine Verbindung zu GitHub'); err.offline=true; throw err; }
+  let data=null; try{ data=await res.json(); }catch(e){}
+  if(!res.ok){ const err=new Error((data&&data.message)||('HTTP '+res.status)); err.status=res.status; throw err; }
+  return data;
+}
+function ghErrText(e){
+  if(e.offline) return 'Keine Verbindung – wird automatisch nachgeholt.';
+  if(e.status===401) return 'Der Zugriffsschlüssel (Token) ist ungültig oder abgelaufen.';
+  if(e.status===403) return 'Der Token darf auf das Datenrepo nicht zugreifen (Berechtigung „Contents: Read and write“ prüfen).';
+  if(e.status===404) return 'Repo oder Branch nicht gefunden – oder der Token hat keinen Zugriff auf dieses Repo.';
+  return e.message||String(e);
+}
+
+/* Datei laden; null, wenn sie noch nicht existiert */
+async function ghPull(){
+  let meta;
+  try{ meta = await ghFetch('GET', '/contents/'+ghFilePath()+'?ref='+encodeURIComponent(gh.cfg.branch)); }
+  catch(e){
+    if(e.status===404){ await ghFetch('GET', '/branches/'+encodeURIComponent(gh.cfg.branch)); return { data:null, sha:null }; } // Branch muss existieren
+    throw e;
+  }
+  if(Array.isArray(meta)) throw new Error('„'+gh.cfg.path+'“ ist im Datenrepo ein Ordner, keine Datei.');
+  const text = (meta.content && meta.encoding==='base64') ? b64dec(meta.content) : b64dec((await ghFetch('GET','/git/blobs/'+meta.sha)).content); // > 1 MB: über Blob laden
+  let d; try{ d=JSON.parse(text); }catch(e){ throw new Error('„'+gh.cfg.path+'“ im Datenrepo ist kein gültiges JSON – nichts überschrieben.'); }
+  const v=validateData(d); if(!v.ok) throw new Error('„'+gh.cfg.path+'“ ist keine gültige AOS-Datei ('+v.errors[0]+') – nichts überschrieben.');
+  return { data: migrate(d), sha: meta.sha };
+}
+
+/* Vergleichbarer Fingerabdruck des synchronisierten Inhalts (unabhängig von Reihenfolge und Gerät) */
+function canon(v){ if(Array.isArray(v)) return '['+v.map(canon).join(',')+']'; if(v&&typeof v==='object') return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canon(v[k])).join(',')+'}'; return JSON.stringify(v===undefined?null:v); }
+function syncSig(d){ const o={}; syncRecords(d).forEach((v,k)=>o[k]=v); return canon([o, d.sync&&d.sync.stamps||{}, d.sync&&d.sync.tombstones||{}]); }
+
+function ghDevice(){ return isIOS() ? 'iPhone/iPad' : 'Browser'; }
+function ghApplyMerged(d){
+  S=d; syncInit();
+  if(storageOK){ try{ localStorage.setItem(AOS_KEY, JSON.stringify(S)); }catch(e){} }
+  // Offene Eingaben (Dialog, Protokoll in Arbeit) nicht unter den Fingern neu zeichnen
+  const dlg=document.getElementById('dlg');
+  if((dlg && dlg.open) || ui.draft){ gh.renderPending=true; renderShell(); }
+  else { ui.posDraft=null; render(); }
+}
+
+async function ghSync(reason){
+  if(!ghReady()){ ghSetState('aus'); return false; }
+  if(gh.syncing){ gh.again=true; return false; }
+  clearTimeout(gh.timer);
+  if(navigator.onLine===false){ ghSetState('offline'); return false; }
+  gh.syncing=true; ghSetState('laeuft');
+  try{
+    for(let attempt=0; ; attempt++){
+      const { data:R, sha } = await ghPull();
+      if(R){
+        const res = mergeData(S, R);
+        if(syncSig(res.data)!==syncSig(S)) ghApplyMerged(res.data);
+        if(syncSig(S)===syncSig(R)){ gh.dirty=false; break; }   // Datenrepo ist bereits aktuell
+      }
+      try{
+        const body = { message:'AOS-Abgleich ('+ghDevice()+')', content:b64enc(JSON.stringify(S, null, 1)), branch:gh.cfg.branch };
+        if(sha) body.sha=sha;
+        await ghFetch('PUT', '/contents/'+ghFilePath(), body);
+        gh.dirty=false; break;
+      }catch(e){
+        // Ein anderes Gerät hat inzwischen gespeichert → neu laden, zusammenführen, nochmal schreiben
+        if((e.status===409 || e.status===422) && attempt<3) continue;
+        throw e;
+      }
+    }
+    gh.lastOk=new Date().toISOString(); gh.lastError=''; ghStore(); ghSetState(gh.dirty?'ausstehend':'ok');
+    return true;
+  }catch(e){
+    gh.lastError=ghErrText(e); ghStore(); ghSetState(e.offline?'offline':'fehler');
+    if(reason==='manuell' || reason==='einrichten') toast(gh.lastError);
+    return false;
+  }finally{
+    gh.syncing=false;
+    if(gh.again){ gh.again=false; ghSchedule(1000); }
+  }
+}
+function ghSchedule(ms){ if(!ghReady()) return; clearTimeout(gh.timer); gh.timer=setTimeout(()=>ghSync('auto'), ms); }
+function ghOnLocalChange(){ if(!gh.cfg) return; gh.dirty=true; ghStore(); if(ghReady()){ if(!gh.syncing) ghSetState('ausstehend'); ghSchedule(3000); } }
+
+/* ---------- Anzeige ---------- */
+function ghTime(iso){ if(!iso) return ''; const d=new Date(iso); const t=pad(d.getHours())+':'+pad(d.getMinutes()); return isoOf(d)===todayISO()?t:fmtDateShort(isoOf(d))+' '+t; }
+function ghChip(){
+  const st=gh.state;
+  const m = { aus:['Nicht mit GitHub verbunden','warn'], laeuft:['Wird gespeichert …','info'], ok:['Gespeichert '+ghTime(gh.lastOk),'ok'],
+    ausstehend:['Änderungen noch nicht gespeichert','warn'], offline:['Offline – wird später gespeichert','warn'], fehler:['Speichern fehlgeschlagen','bad'] }[st] || ['',''];
+  return '<button class="syncchip '+m[1]+'" data-act="ghOpen" title="'+esc(gh.lastError||'Datenspeicherung (GitHub)')+'">'+esc(m[0])+'</button>';
+}
+function ghSetState(st){
+  gh.state=st;
+  const el=document.getElementById('syncchip'); if(el) el.innerHTML=ghChip();
+  const box=document.getElementById('gh-status'); if(box) box.innerHTML=ghStatusText();
+}
+function ghStatusText(){
+  if(!ghReady()) return '<span class="muted">Noch nicht verbunden.</span>';
+  return 'Status: <strong>'+esc({laeuft:'speichert …',ok:'aktuell',ausstehend:'Änderungen ausstehend',offline:'offline',fehler:'Fehler',aus:'aus'}[gh.state]||gh.state)+'</strong>'+
+    (gh.lastOk?' · zuletzt abgeglichen: '+esc(ghTime(gh.lastOk)):'')+(gh.lastError?'<br><span style="color:var(--bad)">'+esc(gh.lastError)+'</span>':'');
+}
+function ghSection(){
+  const c=gh.cfg;
+  return '<h2 id="gh-sec">Datenspeicherung (GitHub)</h2><div class="section">'+
+    '<p class="small">AOS speichert deine Trainings-, Ernährungs- und Körperdaten in deinem <strong>privaten</strong> Repo <code>'+esc(c.owner+'/'+c.repo)+'</code>. Jede Änderung wird nach wenigen Sekunden abgeglichen; ohne Netz wird gepuffert und später nachgeholt. iPhone und Laptop arbeiten so mit demselben Stand.</p>'+
+    '<p id="gh-status" class="small" aria-live="polite">'+ghStatusText()+'</p>'+
+    '<div class="fields">'+inp('gh-owner','GitHub-Konto',c.owner)+inp('gh-repo','Datenrepo',c.repo)+'</div>'+
+    '<div class="fields">'+inp('gh-branch','Branch',c.branch)+inp('gh-path','Datei',c.path)+'</div>'+
+    inp('gh-token','Zugriffsschlüssel (Fine-grained Token)','','type="password" autocomplete="off" spellcheck="false" placeholder="'+(c.token?'gespeichert – leer lassen, um ihn zu behalten':'github_pat_…')+'"')+
+    '<div class="row"><button class="primary" data-act="ghSave">Speichern & verbinden</button>'+(ghReady()?'<button data-act="ghSyncNow">Jetzt abgleichen</button><button class="small danger" data-act="ghForget">Token von diesem Gerät entfernen</button>':'')+'</div>'+
+    '<details><summary class="small">So erstellst du den Token (einmal pro Gerät eintragen)</summary><ol class="small">'+
+      '<li>GitHub → Settings → Developer settings → Personal access tokens → <strong>Fine-grained tokens</strong> → Generate new token.</li>'+
+      '<li>Repository access: <strong>Only select repositories</strong> → <code>'+esc(c.repo)+'</code>.</li>'+
+      '<li>Permissions → Repository permissions → <strong>Contents: Read and write</strong> (sonst nichts).</li>'+
+      '<li>Ablaufdatum wählen, Token kopieren und hier einfügen.</li></ol>'+
+      '<p class="small muted">Der Token bleibt nur auf diesem Gerät, steht in keiner Sicherung und wird nur an api.github.com gesendet. Er kann ausschließlich das Datenrepo lesen und schreiben.</p></details>'+
+    '</div>';
+}
+ACT.ghOpen = ()=>{ ui.view='profil'; location.hash='profil'; render(); const el=document.getElementById('gh-sec'); if(el) el.scrollIntoView(); };
+ACT.ghSave = async ()=>{
+  const owner=val('gh-owner'), repo=val('gh-repo'), branch=val('gh-branch')||'main', path=val('gh-path')||'aos-data.json', token=val('gh-token');
+  if(!owner||!repo){ toast('Bitte Konto und Repo eintragen.'); return; }
+  if(!token && !gh.cfg.token){ toast('Bitte den Token einfügen.'); return; }
+  if(token && !/^(github_pat_|ghp_)[A-Za-z0-9_]+$/.test(token)){ toast('Das sieht nicht nach einem GitHub-Token aus (beginnt mit github_pat_).'); return; }
+  Object.assign(gh.cfg, { owner, repo, branch, path }); if(token) gh.cfg.token=token;
+  ghStore(); render();
+  const ok = await ghSync('einrichten');
+  if(ok) toast('Verbunden. Deine Daten sind jetzt im Datenrepo gespeichert.');
+  render();
+};
+ACT.ghSyncNow = async ()=>{ const ok=await ghSync('manuell'); if(ok) toast('Abgeglichen.'); };
+ACT.ghForget = ()=>confirmDlg('Token entfernen?', 'AOS speichert auf diesem Gerät dann nur noch lokal, bis du wieder einen Token einträgst. Die Daten im Datenrepo bleiben unverändert.'+(gh.dirty?' <strong>Achtung: Es gibt noch nicht abgeglichene Änderungen.</strong>':''), 'Entfernen', ()=>{ gh.cfg.token=''; ghStore(); ghSetState('aus'); render(); }, true);
+
+/* Automatisch abgleichen: beim Start, beim Zurückkehren in die App, wenn wieder Netz da ist, und vor dem Verlassen */
+document.addEventListener('visibilitychange', ()=>{
+  if(!ghReady()) return;
+  if(document.visibilityState==='visible'){ if(!gh.lastOk || Date.now()-new Date(gh.lastOk).getTime()>20000 || gh.dirty) ghSync('fokus'); }
+  else if(gh.dirty) ghSync('verlassen');
+});
+window.addEventListener('online', ()=>{ if(ghReady()) ghSync('online'); });
+window.addEventListener('offline', ()=>{ if(ghReady()) ghSetState('offline'); });
 
 (function init(){
+  ghLoad();
   load();
   const h=location.hash.slice(1); if(VIEWS.some(v=>v[0]===h)||h==='druck') ui.view=h;
   render();
+  if(ghReady()) ghSync('start');
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') && document.querySelector('link[rel=manifest]')){
     const hadController = !!navigator.serviceWorker.controller;
