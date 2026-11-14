@@ -57,6 +57,8 @@ p{margin:6px 0}
 .badge.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
 .badge.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
 .badge.info{background:var(--info-soft);color:var(--info);border-color:transparent}
+.weekstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:8px 0 16px}.weekstrip .day{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 2px;text-align:center;font-size:.85rem}.weekstrip .day.today{border-color:var(--accent);background:var(--accent-soft)}.weekstrip .day[data-act]{cursor:pointer}
+.chips5{display:flex;gap:6px}.chips5 .chip{flex:1;text-align:center;margin:3px 0;font-size:1.05rem}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0}.kpis>div{background:var(--surface2);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column}.kpis strong{font-size:1.1rem}
 .syncchip{font:inherit;font-size:.78rem;line-height:1.3;min-height:0;height:auto;padding:3px 10px;border-radius:99px;border:1px solid transparent;cursor:pointer;white-space:nowrap;background:var(--surface2);color:var(--text)}
 .syncchip.ok{background:var(--accent-soft)}.syncchip.warn{background:var(--warn-soft);color:var(--warn)}.syncchip.bad{background:var(--bad-soft);color:var(--bad)}.syncchip.info{background:var(--info-soft);color:var(--info)}
@@ -758,7 +760,7 @@ function exportCSV(kind){
 const ui = { view:'uebersicht', weekStart:null, sessionId:null, draft:null, testName:null, exName:null, blockId:null, filterEquip:false, importData:null };
 const ACT = {};      // Klick-Aktionen
 const CHG = {};      // Änderungs-Aktionen
-const VIEWS = [['uebersicht','Übersicht'],['plan','Plan'],['training','Training'],['tests','Tests & Verlauf'],['ernaehrung','Ernährung'],['profil','Profil']];
+const VIEWS = [['uebersicht','Übersicht'],['training','Training'],['ernaehrung','Ernährung'],['tests','Verlauf'],['plan','Plan'],['profil','Profil']];
 
 /* ---------- kleine Bausteine ---------- */
 function inp(id,label,value,attrs){ return '<div class="field"><label for="'+id+'">'+label+'</label><input id="'+id+'" value="'+esc(value==null?'':value)+'" '+(attrs||'')+'></div>'; }
@@ -818,72 +820,6 @@ ACT.go = el=>{ ui.view=el.dataset.view; if(ui.view!=='training'){ ui.sessionId=n
 window.addEventListener('hashchange', ()=>{ const h=location.hash.slice(1); if(h && h!==ui.view && (VIEWS.some(v=>v[0]===h)||h==='druck')){ ui.view=h; render(); } });
 
 /* ---------- Übersicht ---------- */
-function viewOverview(){
-  const b=activeBlock(); const today=todayISO(); const mon=mondayOf(today);
-  let h='<h1>Übersicht</h1>';
-  h+=plOverviewNote();
-  if(!ghReady()) h+='<div class="note warn"><strong>Noch nicht mit deinem Datenrepo verbunden.</strong> Deine Daten liegen im privaten GitHub-Repo und kommen erst nach dem Verbinden auf dieses Gerät. <button class="link" data-act="ghOpen">Jetzt verbinden</button></div>';
-  if(isIOS() && !isStandalone() && location.protocol==='https:' && !S.settings.hideInstallHint)
-    h+='<div class="note warn"><strong>Als App installieren:</strong> In Safari unten auf <em>Teilen</em> (Quadrat mit Pfeil) tippen → <em>Zum Home-Bildschirm</em>. Öffne AOS danach immer über das neue Symbol. <strong>Wichtig:</strong> Die App auf dem Home-Bildschirm hat einen eigenen Speicher – trage deine Daten erst dort ein (oder importiere dort deine Sicherung). <button class="link small" data-act="hideInstall">Ausblenden</button></div>';
-  if(!b){
-    h+='<div class="empty">Kein aktiver Trainingsblock. Lege unter <button class="link" data-act="go" data-view="plan">Plan</button> einen Block an oder setze einen bestehenden auf „aktiv“.</div>';
-  } else {
-    const wk=blockWeek(b,today); const pb=(typeof REF!=='undefined'&&REF.plan)?plCurrentBlock(today):null;
-    if(pb){ const ph=plPhase(today)||REF.plan.phases.find(x=>x.id===pb.phase); const before=pb.start>today; const w=before?0:plWeek(pb,today);
-      h+='<div class="section"><div class="row between"><div><div class="muted small">'+(before?'Nächster Block':'Aktueller Block')+(ph?' · '+esc(ph.name):'')+'</div><strong style="font-size:1.1rem">'+esc(pb.name)+'</strong></div>'+'</div>';
-      if(before){ const first=plFirstSession(pb);
-        h+='<p class="small">Startet am '+WD_LONG[weekdayOf(pb.start)]+', '+fmtDate(pb.start)+(first?' · erste Einheit '+esc(first.tpl)+' am '+WD_LONG[weekdayOf(first.date)]+', '+fmtDate(first.date):'')+' · <button class="link" data-act="go" data-view="plan">Plan ansehen</button></p></div>'; }
-      else h+='<p class="small">Woche '+w+' von '+pb.weeks+((pb.week_wave||{})[w]?' ('+esc(pb.week_wave[w])+')':'')+' · Block endet am '+fmtDate(addDays(pb.start,pb.weeks*7-1))+' · <button class="link" data-act="go" data-view="plan">Plan ansehen</button></p></div>';
-    } else {
-    h+='<div class="section"><div class="row between"><div><div class="muted small">Aktueller Block</div><strong style="font-size:1.1rem">'+esc(b.name)+'</strong></div>'+'</div>';
-    h+='<p class="small">'+(wk?'Woche '+wk+(b.end?' · Block endet am '+fmtDate(b.end):''):'<span class="badge warn">Startdatum fehlt – Blockwoche unbekannt</span>')+'</p>';
-    if(b.rules) h+='<p class="small muted">Regeln: '+esc(b.rules)+'</p>';
-    h+='</div>';
-    }
-    // Woche
-    const week=S.sessions.filter(s=>s.blockId===b.id && (s.plannedDate?mondayOf(s.plannedDate)===mon:s.week===mon)).sort(bySessionDate);
-    h+='<h2>Diese Woche <span class="muted small">('+fmtDate(mon)+' – '+fmtDate(addDays(mon,6))+')</span></h2>';
-    if(!week.length) h+='<div class="empty">'+(plNextText(today,true)||'Für diese Woche sind noch keine Einheiten angelegt. <button class="link" data-act="go" data-view="plan">Woche im Plan anlegen</button>')+'</div>';
-    else {
-      const c=k=>week.filter(s=>s.status===k).length;
-      h+='<p class="small">'+c('absolviert')+' absolviert · '+c('teilweise')+' teilweise · '+c('ausgelassen')+' ausgelassen · '+c('geplant')+' geplant</p>';
-      h+='<div class="section" style="padding:6px 12px"><table><tbody>'+week.map(s=>'<tr><td>'+(s.plannedDate?fmtDateShort(s.plannedDate):'<em>ohne Termin</em>')+'</td><td><button class="link" data-act="openSession" data-id="'+s.id+'">'+esc(s.name)+'</button></td><td>'+statusBadge(s)+'</td></tr>').join('')+'</tbody></table></div>';
-    }
-    // Nächste
-    const overdue=S.sessions.filter(s=>s.status==='geplant' && s.plannedDate && s.plannedDate<today).sort(bySessionDate);
-    const next=S.sessions.filter(s=>s.status==='geplant' && s.plannedDate && s.plannedDate>=today).sort(bySessionDate)[0];
-    h+='<h2>Als Nächstes</h2>';
-    if(overdue.length) h+='<div class="note warn">'+overdue.length+' vergangene Einheit(en) ohne Eintrag. Sie werden <strong>nicht</strong> automatisch verschoben – erfasse sie, verschiebe sie oder markiere sie als ausgelassen. <button class="link" data-act="go" data-view="training">Zu Training</button></div>';
-    if(next) h+=sessionCard(next);
-    else h+='<div class="empty">'+(plNextText(today,false)||'Keine kommende Einheit geplant.')+'</div>';
-  }
-  // Vorschläge
-  const sg=openSuggestions();
-  h+='<h2>Hinweise & Vorschläge</h2>';
-  if(!sg.length) h+='<p class="muted small">Keine offenen Vorschläge. Vorschläge entstehen nur aus protokollierten Einheiten und müssen von dir bestätigt werden.</p>';
-  else h+='<div class="section">'+sg.slice(0,3).map(s=>'<p>'+(s.kind==='plan'?badge('Vorschlag','info'):badge('Hinweis'))+' '+esc(s.title)+'</p>').join('')+'<button class="link" data-act="goSugg">Alle '+sg.length+' ansehen und entscheiden</button></div>';
-  // Entwicklung
-  h+='<h2>Entwicklung</h2><div class="grid2">';
-  const bw=latestBodyweight();
-  h+='<div class="section"><div class="muted small">Körpergewicht</div><strong>'+(bw?(bw.approx?'≈ ':'')+fmtNum(bw.kg)+' kg':'—')+'</strong> <span class="small muted">'+(bw?(bw.date?fmtDate(bw.date):'ohne Datum'):'')+'</span> '+srcBadge(bw)+'</div>';
-  h+='<div class="section"><div class="muted small">Positionsgewichtung</div>'+S.profile.positions.map(p=>'<strong>'+esc(p.code)+'</strong> '+p.weight+' %').join(' · ')+'</div>';
-  h+='</div>';
-  const goals=S.goals.filter(g=>g.status==='aktiv');
-  if(goals.length){
-    h+='<div class="section table-wrap"><table><thead><tr><th>Ziel</th><th>Zielmarke</th><th>Letzter Eintrag</th></tr></thead><tbody>';
-    goals.forEach(g=>{ const t=latestTest(g.testName);
-      h+='<tr><td>'+esc(g.name)+'</td><td>'+fmtNum(g.target)+' '+esc(g.unit)+'</td><td>'+(t?esc(testValueText(t))+' <span class="small muted">'+(t.date?fmtDate(t.date):'ohne Datum')+'</span>':'<span class="muted">noch kein Eintrag</span>')+'</td></tr>'; });
-    h+='</tbody></table><p class="small muted">Zielmarken sind persönliche Ziele und keine Vorgaben für das nächste Training.</p></div>';
-  }
-  // Fehlende Angaben
-  const md=missingData();
-  h+='<h2>Fehlende oder unvollständige Angaben</h2>';
-  h+= md.length ? '<div class="section"><ul style="margin:0;padding-left:20px">'+md.map(x=>'<li>'+esc(x.text)+' <button class="link small" data-act="go" data-view="'+x.where+'">ergänzen</button></li>').join('')+'</ul></div>' : '<p class="muted small">Alles Wesentliche ist eingetragen.</p>';
-  // Sicherung
-  const le=S.settings.lastExport;
-  if(!ghReady() && (!le || daysBetween(le.slice(0,10), today)>14)) h+='<div class="note">'+(le?'Letzte JSON-Sicherung am '+fmtDate(le.slice(0,10))+'.':'Noch keine JSON-Sicherung erstellt.')+' Die Daten liegen nur in diesem Browser. <button class="link" data-act="exportJSON">Jetzt sichern</button></div>';
-  return h;
-}
 ACT.hideInstall = ()=>{ S.settings.hideInstallHint=true; save(); render(); };
 ACT.goSugg = ()=>{ ui.view='plan'; location.hash='plan'; render(); setTimeout(()=>{ const e=document.getElementById('vorschlaege'); if(e) e.scrollIntoView(); },30); };
 ACT.exportJSON = ()=>{ exportJSON(); toast('Sicherung wird heruntergeladen.'); render(); };
@@ -1250,30 +1186,6 @@ const METRIC_FIELDS = {
 };
 function emptySet(){ return {reps:null,kg:null,rpe:null,time:null,dist:null,height:null}; }
 
-function viewTraining(){
-  if(ui.sessionId && sessionById(ui.sessionId)) return logForm();
-  const today=todayISO(); const b=activeBlock();
-  let h='<h1>Training</h1>';
-  h+=plSection();
-  const open=S.sessions.filter(s=>s.status==='geplant' && (!s.plannedDate || s.plannedDate<=addDays(today,6))).sort(bySessionDate);
-  h+='<h2>Offene Einheiten</h2>';
-  if(!open.length) h+='<div class="empty">Keine offenen Einheiten in den nächsten Tagen. Lege im <button class="link" data-act="go" data-view="plan">Plan</button> eine Woche an oder erfasse unten eine Einheit für heute.</div>';
-  open.forEach(s=>{ const ov=s.plannedDate&&s.plannedDate<today;
-    h+='<div class="section"><div class="row between"><div><strong>'+esc(s.name)+'</strong> <span class="small muted">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+'</span> '+(ov?badge('nicht erfasst','warn'):'')+'</div>'+capBadge(blockById(s.blockId))+'</div>'+
-      '<div class="row" style="margin-top:8px"><button class="primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button><button data-act="openSession" data-id="'+s.id+'">Verschieben / Auslassen</button></div></div>'; });
-  h+='<h2>Einheit für heute erfassen</h2><div class="section">';
-  if(b){
-    const opts=b.days.map(d=>[d.id,d.name]).concat([['__frei','Freie Einheit (ohne Vorgabe)']]);
-    h+='<div class="row"><div style="flex:1;min-width:200px">'+sel('tr-day','Trainingstag aus „'+b.name+'“',opts,opts[0][0])+'</div><button data-act="logToday" style="align-self:flex-end;margin-bottom:8px">Starten</button></div>';
-  } else h+='<p class="small muted">Kein aktiver Block – lege zuerst einen Block an.</p>';
-  h+='</div>';
-  const done=S.sessions.filter(s=>s.log && (s.status==='absolviert'||s.status==='teilweise')).sort((a,c)=>sessionDate(a)<sessionDate(c)?1:-1).slice(0,15);
-  h+='<h2>Zuletzt protokolliert</h2>';
-  if(!done.length) h+='<div class="empty">Noch keine Einheit protokolliert.</div>';
-  else h+='<div class="section table-wrap"><table><thead><tr><th>Datum</th><th>Einheit</th><th>Status</th><th>Tagesform</th><th>Beschwerden</th></tr></thead><tbody>'+
-    done.map(s=>'<tr><td>'+fmtDateShort(sessionDate(s))+'</td><td><button class="link" data-act="startLog" data-id="'+s.id+'">'+esc(s.name)+'</button></td><td>'+statusBadge(s)+'</td><td>'+(s.log.form!=null?s.log.form:'—')+'</td><td>'+(s.log.pain?badge('notiert','warn'):'—')+'</td></tr>').join('')+'</tbody></table></div>';
-  return h;
-}
 ACT.logToday = ()=>{ const b=activeBlock(); const v=val('tr-day'); const d=v==='__frei'?null:dayById(b,v);
   const s=makeSession(b,d,todayISO()); S.sessions.push(s); save(); startLog(s.id); };
 ACT.startLog = el=>{ closeDlg(); startLog(el.dataset.id); };
@@ -1292,9 +1204,7 @@ function logForm(){
   h+='<h1>'+esc(s.name)+'</h1><div class="row">'+(s.planner?'<span class="cap">RPE ≤ '+fmtNum(cap)+'</span> <span class="small muted">'+esc((s.planner.phase||'')+' · Woche '+s.planner.week)+'</span>':capBadge(b))+' '+statusBadge(s)+'</div>';
   if(s.planner && !s.log) (s.planner.notes||[]).forEach(n=>{ h+='<div class="note small">'+esc(n)+'</div>'; });
   if(b && b.rules) h+='<p class="small muted">Blockregeln: '+esc(b.rules)+'</p>';
-  if(day && !s.log && day.version!==s.dayVersion) h+='<div class="note">Die Vorgaben von „'+esc(day.name)+'“ wurden seit dem Anlegen dieser Einheit geändert. <button class="link" data-act="refreshPlan">Aktuelle Vorgaben übernehmen</button></div>';
-  h+='<div class="fields">'+inp('lg-date','Datum',dr.date,'type="date" data-log="meta" data-f="date"')+
-    sel('lg-loc','Trainingsort',[['','— nicht angegeben —']].concat(S.profile.locations.map(l=>[l.id,l.name])),dr.location,'data-log="meta" data-f="location"')+'</div>';
+  h+=inp('lg-date','Datum',dr.date,'type="date" data-log="meta" data-f="date"');
   if(!dr.exercises.length) h+='<div class="empty">Keine Übungen in dieser Einheit. Füge die Übungen hinzu, die du gemacht hast.</div>';
   dr.exercises.forEach((e,i)=>{
     const pe=(s.plan||[]).find(p=>p.id===e.planExId);
@@ -1310,7 +1220,7 @@ function logForm(){
       }).join('')+'</div>';
     });
     h+='<div class="row" style="margin-top:4px"><button class="small" data-act="addSet" data-e="'+i+'">+ Satz</button><button class="small" data-act="delSet" data-e="'+i+'" '+(e.sets.length<=1?'disabled':'')+'>− Satz</button>'+
-      (pe && e.metric==='kraft' && (repMin(pe.reps)!=null||pe.loadKg!=null)?'<button class="small" data-act="sollToIst" data-e="'+i+'" title="Leere Wdh- und kg-Felder mit der Vorgabe füllen">Soll in leere Felder</button>':'')+
+      (pe && e.metric==='kraft' && (repMin(pe.reps)!=null||pe.loadKg!=null)?'<button class="small" data-act="sollToIst" data-e="'+i+'" title="Leere Wdh- und kg-Felder mit der Vorgabe füllen">Vorgabe eintragen</button>':'')+
       (!e.planExId?'<button class="small danger" data-act="delLogEx" data-e="'+i+'">Übung entfernen</button>':'')+'</div>';
     if(pe && pe.planner && pe.planner.fastCheck) h+=sel('fs-'+i,'Alle Wdh schnell und sauber?',[['','— nicht angegeben —'],['ja','ja'],['nein','nein']],e.fast==null?'':(e.fast?'ja':'nein'),'data-log="fast" data-e="'+i+'"');
     h+=inp('en-'+i,'Notiz zur Übung (optional)',e.note,'data-log="exnote" data-e="'+i+'"')+'</div>';
@@ -1319,10 +1229,9 @@ function logForm(){
   h+='<h2>Einheit</h2><div class="fields">'+sel('lg-form','Tagesform',[['','— nicht angegeben —']].concat([1,2,3,4,5].map(n=>[n,FORM_LABEL[n]])),dr.form,'data-log="meta" data-f="form"')+
     inp('lg-dur','Dauer (min, optional)',dr.durationMin,'inputmode="numeric" data-log="meta" data-f="durationMin"')+'</div>';
   h+=ta('lg-pain','Schmerzen oder Beschwerden (optional)',dr.pain,'data-log="meta" data-f="pain" placeholder="z. B. Ort, Art, wann aufgetreten"');
-  h+='<p class="small muted">Beschwerden werden nur protokolliert. AOS stellt keine Diagnose und gibt keine Trainingsfreigabe. Bei anhaltenden oder unklaren Beschwerden bitte mit einer qualifizierten Fachperson abklären.</p>';
+  h+='<p class="small muted">Nur zur Dokumentation – keine Diagnose. Anhaltende Beschwerden bitte abklären lassen.</p>';
   h+=ta('lg-notes','Notizen (optional)',dr.notes,'data-log="meta" data-f="notes"');
-  h+='<p class="small muted">Nicht ausgefüllte Felder bleiben leer – AOS ergänzt oder schätzt nichts. Ein Abschluss erhöht keine Gewichte automatisch.</p>';
-  h+='<div class="row" style="margin-top:12px"><button class="primary" data-act="saveLog" data-st="absolviert">Als absolviert speichern</button><button data-act="saveLog" data-st="teilweise">Als teilweise absolviert speichern</button>'+
+  h+='<div class="row" style="margin-top:12px"><button class="primary" data-act="saveLog" data-st="absolviert">Speichern</button><button data-act="saveLog" data-st="teilweise">Nur teilweise geschafft</button>'+
     ''+(s.log?'<button class="danger" data-act="discardLog">Protokoll verwerfen</button>':'')+'</div>';
   return h;
 }
@@ -1386,15 +1295,16 @@ function lineChart(points, opts){
 }
 
 function viewTests(){
-  let h='<h1>Tests & Verlauf</h1><div class="row"><button class="primary" data-act="editTest">+ Testergebnis</button><button data-act="editBw">+ Körpergewicht</button></div>';
+  let h='<h1>Verlauf</h1><div class="row"><button class="primary" data-act="editBw">+ Gewicht</button><button data-act="editTest">+ Testergebnis</button></div>';
   // Körpergewicht
   const bws=S.bodyweight.slice().sort((a,b)=>(a.date||'')<(b.date||'')?-1:1);
   const goalW=S.profile.targetWeightKg;
   h+='<h2>Körpergewicht</h2><div class="section">';
   const pts=bws.filter(x=>x.date&&x.kg!=null).map(x=>({x:x.date,y:x.kg}));
   h+= pts.length>=2 ? lineChart(pts,{unit:'kg',goal:goalW,label:'Körpergewicht'}) : '<p class="small muted">Für ein Diagramm werden mindestens zwei Messungen mit Datum benötigt.</p>';
-  h+='<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Gewicht</th><th>Notiz</th><th></th></tr></thead><tbody>'+
-    bws.slice().reverse().map(x=>'<tr><td>'+(x.date?fmtDate(x.date):badge('Datum fehlt','warn'))+'</td><td>'+(x.approx?'≈ ':'')+fmtNum(x.kg)+' kg</td><td>'+esc(x.note)+' '+srcBadge(x)+'</td><td><button class="small" data-act="editBw" data-id="'+x.id+'">Bearbeiten</button></td></tr>').join('')+'</tbody></table></div></div>';
+  h+='<details><summary class="small">Alle Messungen ('+bws.length+')</summary><div class="table-wrap"><table><thead><tr><th>Datum</th><th>Gewicht</th><th>Notiz</th><th></th></tr></thead><tbody>'+
+    bws.slice().reverse().map(x=>'<tr><td>'+(x.date?fmtDate(x.date):badge('Datum fehlt','warn'))+'</td><td>'+(x.approx?'≈ ':'')+fmtNum(x.kg)+' kg</td><td>'+esc(x.note)+' '+srcBadge(x)+'</td><td><button class="small" data-act="editBw" data-id="'+x.id+'">Bearbeiten</button></td></tr>').join('')+'</tbody></table></div></details></div>';
+  h+=goalsSection();
   // Tests
   const names=[...new Set(S.tests.map(t=>t.name))];
   h+='<h2>Testergebnisse</h2>';
@@ -1500,58 +1410,6 @@ CHG.pickEx = el=>{ ui.exName=el.value; render(); };
 
 'use strict';
 /* ===== AOS – Profil & Einstellungen ===== */
-function viewProfile(){
-  const p=S.profile; const bw=latestBodyweight();
-  if(!ui.posDraft) ui.posDraft=clone(p.positions);
-  let h='<h1>Profil & Einstellungen</h1>';
-  // Stammdaten
-  h+='<h2>Athletenprofil</h2><div class="section">'+
-    '<div class="fields">'+inp('p-name','Name',p.name)+sel('p-sex','Geschlecht',[['männlich','männlich'],['weiblich','weiblich'],['divers','divers'],['','keine Angabe']],p.sex)+'</div>'+
-    '<div class="fields">'+inp('p-age','Alter',p.birthYear?'':p.age,'inputmode="numeric"'+(p.birthYear?' disabled placeholder="aus Geburtsjahr: '+profileAge()+'"':''))+inp('p-by','Geburtsjahr (empfohlen)',p.birthYear,'inputmode="numeric" placeholder="z. B. 1993"')+'</div>'+
-    '<div class="fields">'+inp('p-h','Körpergröße (cm)',p.heightCm,'inputmode="numeric"')+inp('p-tw','Zielgewicht (kg, optional)',fmtNum(p.targetWeightKg),'inputmode="decimal"')+'</div>'+
-    '<p class="small">Aktuelles Körpergewicht: <strong>'+(bw?(bw.approx?'≈ ':'')+fmtNum(bw.kg)+' kg':'—')+'</strong> '+(bw&&!bw.date?badge('ohne Datum','warn'):bw?'('+fmtDate(bw.date)+')':'')+' <button class="link" data-act="editBw">neue Messung</button></p>'+
-    '<p class="small muted">Das Körpergewicht wird als Verlauf mit Datum gespeichert (Tests & Verlauf), damit alte Werte erhalten bleiben.</p>'+
-    '<button class="primary" data-act="saveProfile">Profil speichern</button></div>';
-  // Positionen
-  const sum=ui.posDraft.reduce((a,x)=>a+(Number(x.weight)||0),0);
-  h+='<h2>Football-Positionen und Gewichtung</h2><div class="section">';
-  h+='<p class="small muted">Die Gewichtung beschreibt, wie stark die Anforderungen jeder Position in deiner Planung berücksichtigt werden sollen. Sie muss zusammen 100 % ergeben.</p>';
-  ui.posDraft.forEach((x,i)=>{
-    h+='<div class="fields" style="align-items:end">'+inp('pos-c-'+i,'Kürzel',x.code)+inp('pos-n-'+i,'Position',x.name)+inp('pos-w-'+i,'Anteil (%)',x.weight,'inputmode="numeric"')+
-      '<div class="field"><button class="small danger" data-act="delPos" data-i="'+i+'" '+(ui.posDraft.length<=1?'disabled':'')+'>Entfernen</button></div></div>'; });
-  h+='<p id="pos-sum" class="small" aria-live="polite">'+posSumText(sum)+'</p>';
-  h+='<div class="row"><button class="small" data-act="addPos">+ Position</button><button class="primary" data-act="savePos">Gewichtung speichern</button><button class="small" data-act="resetPos">Änderungen verwerfen</button></div>';
-  h+='<details><summary class="small">Begriffe</summary><div class="small">'+Object.values(GLOSSAR).map(x=>'<p>'+esc(x)+'</p>').join('')+'</div></details>';
-  if(p.positionHistory.length) h+='<details><summary class="small">Frühere Gewichtungen</summary><div class="small">'+p.positionHistory.map(x=>'<p>bis '+fmtDate(x.replacedAt)+': '+x.positions.map(y=>esc(y.code)+' '+y.weight+' %').join(', ')+(x.note?' – '+esc(x.note):'')+'</p>').join('')+'</div></details>';
-  h+='</div>';
-  // Orte & Ausstattung
-  h+='<h2>Trainingsorte und Ausstattung</h2>';
-  p.locations.forEach(l=>{
-    h+='<div class="section">'+inp('loc-n-'+l.id,'Name',l.name)+ta('loc-e-'+l.id,'Ausstattung (eine pro Zeile oder kommagetrennt)',l.equipment.join('\n'))+(l.note?'<p class="small muted">'+esc(l.note)+'</p>':'')+
-      '<div class="row"><button class="small primary" data-act="saveLoc" data-id="'+l.id+'">Speichern</button><button class="small danger" data-act="delLoc" data-id="'+l.id+'">Ort entfernen</button></div></div>'; });
-  h+='<button data-act="addLoc">+ Trainingsort</button>';
-  // Ziele
-  h+='<h2>Persönliche Ziele</h2><p class="small muted">Zielmarken sind langfristige Ziele und werden nie automatisch als Trainingsvorgabe verwendet. Archivieren löscht keine Messungen.</p>';
-  ['aktiv','archiviert'].forEach(st=>{ const gl=S.goals.filter(g=>g.status===st); if(!gl.length) return;
-    h+='<div class="section"><strong>'+(st==='aktiv'?'Aktive Ziele':'Archivierte Ziele')+'</strong><div class="table-wrap"><table><tbody>'+gl.map(g=>'<tr><td>'+esc(g.name)+'</td><td>'+fmtNum(g.target)+' '+esc(g.unit)+'</td><td class="small muted">Bezugstest: '+esc(g.testName||'—')+'</td><td><button class="small" data-act="editGoal" data-id="'+g.id+'">Bearbeiten</button> <button class="small" data-act="toggleGoal" data-id="'+g.id+'">'+(st==='aktiv'?'Archivieren':'Aktivieren')+'</button></td></tr>').join('')+'</tbody></table></div></div>'; });
-  h+='<button data-act="editGoal">+ Ziel</button>';
-  // Daten
-  const le=S.settings.lastExport;
-  h+=ghSection();
-  h+='<h2>Daten & Sicherung</h2><div class="section">'+
-    '<p class="small">Gespeichert wird auf diesem Gerät (localStorage) und – wenn verbunden – in deinem privaten Datenrepo auf GitHub. Andere Dienste bekommen keine Daten. Die JSON-Sicherung ist eine zusätzliche Kopie für den Notfall.</p>'+
-    (isIOS()?'<p class="small muted">Auf dem iPhone öffnet sich beim Sichern das Teilen-Menü: „In Dateien sichern“ (z. B. iCloud Drive) oder per AirDrop an den Laptop.</p>':'')+'<p class="small">Letzte JSON-Sicherung: <strong>'+(le?fmtDate(le.slice(0,10)):'noch keine')+'</strong> · Datenstand: '+fmtDate(S.meta.updatedAt.slice(0,10))+(S.sync&&S.sync.lastMerge?' · Zuletzt zusammengeführt: '+fmtDate(S.sync.lastMerge.at.slice(0,10)):'')+'</p>'+
-    '<div class="row"><button class="primary" data-act="exportJSON">JSON-Sicherung herunterladen</button></div>'+
-    '<h3>Sicherung zusammenführen</h3><p class="small muted">Normalerweise nicht nötig, der Abgleich läuft über GitHub. Für alte Sicherungen: Sicherung des anderen Geräts (z. B. iPhone ↔ Laptop) hier zusammenführen: Neue Einträge kommen dazu, bei Änderungen am selben Eintrag gewinnt die jüngere, Löschungen werden übernommen. Danach hier sichern und auf dem anderen Gerät ebenfalls zusammenführen – dann sind beide gleich.</p>'+
-    '<div class="row"><label class="btn" for="merge-file" style="display:inline-flex;align-items:center;color:var(--text);margin:0;font-weight:600">Sicherung zusammenführen …</label><input id="merge-file" type="file" accept=".json,application/json" class="sr-only" data-chg="mergeFile"></div>'+
-    '<h3>Wiederherstellen</h3><p class="small muted">Ersetzt alle Daten auf diesem Gerät durch die Sicherung (z. B. nach Gerätewechsel).</p>'+
-    '<div class="row"><label class="btn" for="imp-file" style="display:inline-flex;align-items:center;color:var(--text);margin:0">Sicherung importieren (alles ersetzen) …</label><input id="imp-file" type="file" accept=".json,application/json" class="sr-only" data-chg="importFile"></div>'+
-    '<h3>CSV (für Tabellenkalkulation)</h3><div class="row"><button class="small" data-act="csv" data-k="saetze">Trainingssätze</button><button class="small" data-act="csv" data-k="tests">Tests</button><button class="small" data-act="csv" data-k="bw">Körpergewicht</button></div>'+
-    '<h3>Zurücksetzen</h3><p class="small muted">Löscht alle Einträge in diesem Browser. Ist GitHub verbunden, wird danach wieder der Stand aus dem Datenrepo geladen – im Datenrepo selbst wird nichts gelöscht.</p><button class="small danger" data-act="resetAll">Alle Daten zurücksetzen …</button></div>';
-
-  h+='<p class="small muted" style="margin-top:24px">AOS ist kein Ersatz für medizinische oder sportwissenschaftliche Betreuung.</p>';
-  return h;
-}
 function posSumText(sum){ return Math.round(sum)===100 ? 'Summe: <strong>100 %</strong> ✓' : '<span style="color:var(--bad)">Summe: <strong>'+fmtNum(sum)+' %</strong> – die Anteile müssen zusammen genau 100 % ergeben ('+(sum<100?'es fehlen '+fmtNum(100-sum):'es sind '+fmtNum(sum-100)+' zu viel')+' Prozentpunkte).</span>'; }
 function readPosDraft(){ ui.posDraft.forEach((x,i)=>{ x.code=val('pos-c-'+i); x.name=val('pos-n-'+i); const w=num(val('pos-w-'+i)); x.weight=w==null?0:w; }); }
 function updatePosSum(){ const el=document.getElementById('pos-sum'); if(!el) return; readPosDraft(); el.innerHTML=posSumText(ui.posDraft.reduce((a,x)=>a+x.weight,0)); }
@@ -1821,8 +1679,6 @@ function plBuild(inp){
   const legPain = painOn && regions.some(r=>(rules.leg_regions||[]).includes(r));
   const notes=[], dropped=[], items=[];
   const noIncrease = painOn ? 'Beschwerden '+pain+'/10' : (rd!=null && rd<=2 ? 'Readiness '+rd : '');
-  if(due.phase && due.phase.status!=='bestätigt') notes.push('Phase '+due.phase.id+' ist noch ein Vorschlag.');
-  if(b.status!=='bestätigt' && !(S.suggestionDecisions||{})['plan|'+b.id]) notes.push('Die Vorlagen von „'+b.name+'“ sind noch ein Vorschlag. Du kannst sie unten bestätigen.');
   ((b.week_notes||{})[week]||[]).forEach(n=>notes.push(n));
   if(rd===1) notes.push('Readiness 1: Empfehlung ist eine Recovery-/Technik-Einheit oder Pause. Falls du trotzdem trainierst, ist die Einheit unten stark reduziert.');
   if(painOn) notes.push('Beschwerden '+pain+'/10'+(regions.length?' ('+regions.map(r=>REGION_LABEL[r]||r).join(', ')+')':'')+': Übungen, die diese Region belasten, werden ersetzt oder weggelassen. Keine Steigerungen. AOS stellt keine Diagnose.');
@@ -1910,45 +1766,13 @@ function plInput(){ const p=ui.pl; const due=plDue(p.date); return Object.assign
 function chipBtn(act, k, v, label, on){ return '<button class="chip" data-act="'+act+'" data-k="'+k+'" data-v="'+esc(v)+'" aria-pressed="'+(on?'true':'false')+'">'+esc(label)+'</button>'; }
 function plPlaceholders(){ return S.sessions.filter(s=>!s.planner && s.status==='geplant' && !s.log && !(s.plan||[]).length); }
 
-function plSection(){
-  let h='<h2>Einheit planen</h2>';
-  if(!REF.plan){
-    if(!ghReady()) return h+'<div class="note warn">Der Sessionplaner braucht die Planerdaten aus deinem Datenrepo. <button class="link" data-act="ghOpen">Mit GitHub verbinden</button></div>';
-    return h+'<div class="note">'+(REF.loading?'Planerdaten werden geladen …':(REF.error?esc(REF.error):'Planerdaten noch nicht geladen.'))+' <button class="link" data-act="plReload">Neu laden</button></div>';
-  }
-  ui.pl=ui.pl||plDefaults(); const p=ui.pl; const inp=plInput(); const due=plDue(p.date); const b=due.block;
-  h+='<div class="section">';
-  h+='<p class="small">'+(due.phase?'<strong>'+esc(due.phase.name)+'</strong>':'keine Phase')+(b?' · Woche '+due.week+' von '+b.weeks+(due.wave?' ('+esc(due.wave)+')':''):'')+
-     (b&&inp.tpl?' · fällig: <strong>'+esc(inp.tpl+' – '+plTemplate(b,inp.tpl).name)+'</strong>':'')+'</p>';
-  if(due.why) h+='<p class="small muted">'+esc(due.why)+'</p>';
-  due.warnings.forEach(w=>{ h+='<div class="note warn small">'+esc(w)+'</div>'; });
-  if(due.doneToday) h+='<div class="note small">Heute bereits erledigt: <strong>'+esc(due.doneToday.name)+'</strong>. Pro Tag gibt es höchstens eine Einheit. <button class="link" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button></div>';
-  h+='<div class="fields">'+inp_('pl-date','Datum',p.date,'type="date" data-chg="plIn"')+
-     (b ? sel('pl-tpl','Einheit',b.templates.map(t=>[t.id, t.id+' – '+t.name+(t.id===due.tpl?' (fällig)':(due.remaining.includes(t.id)?'':' (diese Woche erledigt/entfällt)'))]), inp.tpl||'', 'data-chg="plIn"') : '')+'</div>';
-  h+='<label>Wie fit fühlst du dich heute? (Readiness)</label><div>'+[1,2,3,4,5].map(n=>chipBtn('plChip','readiness',n,FORM_LABEL[n],p.readiness===n)).join('')+'</div>';
-  h+='<div class="fields">'+inp_('pl-sleep','Schlaf (h, optional)',p.sleep==null?'':fmtNum(p.sleep),'inputmode="decimal" data-chg="plIn"')+
-     inp_('pl-avail','Verfügbare Zeit (min)',p.avail==null?'':p.avail,'inputmode="numeric" placeholder="'+((REF.plan.rules||{}).max_session_min||65)+'" data-chg="plIn"')+'</div>';
-  h+=sel('pl-pain','Beschwerden heute (0 = keine, 10 = stark)',Array.from({length:11},(_,i)=>[i,String(i)]),p.pain,'data-chg="plIn"');
-  if(p.pain>0) h+='<label>Wo?</label><div>'+Object.keys(REGION_LABEL).map(r=>chipBtn('plChip','regions',r,REGION_LABEL[r],p.regions.includes(r))).join('')+'</div>';
-  if(b && inp.tpl){
-    const t=plTemplate(b, inp.tpl);
-    const eq=[...new Set(t.slots.filter(s=>(s.dose||{})[due.week]).flatMap(s=>{ const e=REF.exMap[s.candidates[0]]; return e?e.equipment:[]; }))].filter(q=>q!=='floor_space' && EQUIP_LABEL[q]);
-    if(eq.length) h+='<details'+(p.noEquip.length?' open':'')+'><summary class="small">Gerät heute nicht verfügbar?</summary><div>'+eq.map(q=>chipBtn('plChip','noEquip',q,EQUIP_LABEL[q],p.noEquip.includes(q))).join('')+'</div></details>';
-    if(t.slots.some(s=>s.grip && (s.dose||{})[due.week])) h+='<div>'+chipBtn('plChip','grip','1','Griff stark ermüdet',p.grip)+'</div>';
-  }
-  h+='</div>';
-  if(!b || !inp.tpl){ const P=plBuild(inp); return h+'<div class="note">'+esc(P.error||'')+'</div>'+plPlaceholderNote(); }
-  if(p.readiness==null) return h+'<p class="small muted">Wähle deine Readiness, dann erstellt AOS die Einheit.</p>'+plPlaceholderNote();
-  return h+plPreview(plBuild(inp))+plPlaceholderNote();
-}
 function inp_(id,label,value,attrs){ return inp(id,label,value,attrs); }
 function plPlaceholderNote(){ const n=plPlaceholders().length; return n ? '<p class="small muted">'+n+' leere Einheit(en) aus der manuellen Planung ohne Übungen. <button class="link" data-act="plCleanup">Entfernen</button></p>' : ''; }
 
 function plPreview(P){
   if(P.error) return '<div class="note">'+esc(P.error)+'</div>';
   const b=P.block;
-  let h='<div class="section"><div class="row between"><strong>'+esc(P.tpl.id+' – '+P.tpl.name)+'</strong><span class="cap">RPE ≤ '+fmtNum(P.cap)+'</span></div>';
-  h+='<p class="small muted">ca. '+P.estMin+' min inkl. Aufwärmen'+(P.contacts?' · Bodenkontakte '+P.contacts:'')+' · '+esc(P.tpl.goal||'')+'</p>';
+  let h='<div class="section"><div class="row between"><span class="small muted">ca. '+P.estMin+' min inkl. Aufwärmen'+(P.contacts?' · '+P.contacts+' Bodenkontakte':'')+'</span><span class="cap">RPE ≤ '+fmtNum(P.cap)+'</span></div>';
   P.notes.forEach(n=>{ h+='<div class="note small">'+esc(n)+'</div>'; });
   P.items.forEach((x,i)=>{
     const load = x.loadKg!=null ? fmtNum(x.loadKg)+' kg' : (x.load.calibrate?'kalibrieren':(x.load.text||''));
@@ -1957,15 +1781,16 @@ function plPreview(P){
     if(x.load.suggest){ const k=x.suggestKey; const on=!!(ui.pl.accept||{})[k];
       h+='<div class="note '+(on?'':'warn')+' small">Steigerung auf <strong>'+fmtNum(x.load.suggest.kg)+' kg</strong> möglich (Grundlage: '+esc(x.load.suggest.basis)+'). '+
         (on?'Übernommen. <button class="link" data-act="plAccept" data-k="'+esc(k)+'">Rückgängig</button>':'Ohne Bestätigung bleibt die Last gleich. <button class="link" data-act="plAccept" data-k="'+esc(k)+'">Steigerung übernehmen</button>')+'</div>'; }
-    const why=[x.note].concat(x.reasons).filter(Boolean);
-    if(why.length) h+='<div class="small muted">'+why.map(esc).join(' ')+'</div>';
-    if(x.alternatives.length) h+='<div class="small muted">Ersatz möglich: '+esc(x.alternatives.join(' / '))+'</div>';
+    // Wichtiges direkt zeigen (Anleitung, Ersatz, Reduktion), Herkunft der Last nur auf Nachfrage
+    const info=r=>/^(Letzte Einheit|Bestätigte Startlast|Steigerung auf .* bestätigt)/.test(r);
+    const main=[x.note].concat(x.reasons.filter(r=>!info(r))).filter(Boolean), more=x.reasons.filter(info);
+    if(main.length) h+='<div class="small muted">'+main.map(esc).join(' ')+'</div>';
+    if(more.length || x.alternatives.length) h+='<details><summary class="small muted">Details</summary><div class="small muted">'+more.map(esc).join(' ')+(x.alternatives.length?' Ersatz möglich: '+esc(x.alternatives.join(' / '))+'.':'')+'</div></details>';
     h+='</div>';
   });
   if(P.dropped.length) h+='<p class="small"><strong>Weggelassen:</strong> '+P.dropped.map(d=>esc((REF.exMap[d.slot.candidates[0]]||{}).name_de||d.slot.id)+' ('+esc(d.why)+')').join('; ')+'</p>';
   P.valid.forEach(v=>{ h+='<div class="note bad small">'+esc(v)+'</div>'; });
-  h+='<div class="row" style="margin-top:12px"><button class="primary" data-act="plTake">Übernehmen & erfassen</button><button data-act="plSave">Nur speichern</button></div>';
-  if(b.status!=='bestätigt' && !(S.suggestionDecisions||{})['plan|'+b.id]) h+='<p class="small muted" style="margin-top:10px">Planversion '+esc(b.id)+' ist ein Vorschlag. <button class="link" data-act="plConfirm">Vorlagen bestätigen</button></p>';
+  h+='<div class="row" style="margin-top:12px"><button class="primary" data-act="plTake">Einheit starten</button><button class="link" data-act="plSave">für später speichern</button></div>';
   return h+'</div>';
 }
 
@@ -1977,6 +1802,7 @@ CHG.plIn = el=>{ const p=ui.pl; const d=val('pl-date');
   render(); };
 ACT.plChip = el=>{ const p=ui.pl, k=el.dataset.k, v=el.dataset.v;
   if(k==='readiness') p.readiness=Number(v);
+  else if(k==='painLvl'){ p.pain=Number(v); if(!p.pain) p.regions=[]; }
   else if(k==='grip') p.grip=!p.grip;
   else { const a=p[k]; const i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); }
   render(); };
@@ -2118,15 +1944,11 @@ function viewNutrition(){
   h+='<div class="row between no-print"><button data-act="nutDay" data-d="-1">←</button><div style="flex:1;max-width:220px">'+inp('nut-date','',date,'type="date" data-chg="nutDate" aria-label="Datum"')+'</div><button data-act="nutDay" data-d="1">→</button></div>';
   // Tagestyp & Ziel
   h+='<div class="section"><div class="row between"><strong>'+WD_LONG[weekdayOf(date)]+', '+fmtDate(date)+'</strong>'+badge(T.label, T.training?'ok':'')+'</div>';
-  h+='<p class="small muted">'+(T.manual?'Tagestyp von dir festgelegt (automatisch: '+esc(NUT().day_types[T.auto.type].label)+', '+esc(T.auto.why)+')':'Automatisch: '+esc(T.auto.why))+'</p>';
-  h+='<div class="fields">'+sel('nut-type','Tagestyp',[['','automatisch']].concat(Object.entries(NUT().day_types).map(([k,v])=>[k,v.label])),cfg.type||'','data-chg="nutType"')+
-     (T.training?sel('nut-time','Trainingszeit',Object.entries(NUT().training_times),T.time,'data-chg="nutTime"'):'')+'</div>';
+  h+='<p class="small muted">'+(T.manual?'von dir festgelegt':esc(T.auto.why))+'</p>';
+  if(T.training) h+='<div>'+Object.entries(NUT().training_times).map(([k,l])=>chipBtn('nutTimeChip','time',k,l.replace(/^Training /,''),T.time===k)).join('')+'</div>';
   h+='<div class="kpis"><div><span class="small muted">Energie</span><strong>≈ '+fmtK(T.kcal)+' kcal</strong></div><div><span class="small muted">Protein</span><strong>'+T.P+' g</strong></div><div><span class="small muted">Kohlenhydrate</span><strong>'+T.K+' g</strong></div><div><span class="small muted">Fett</span><strong>'+T.F+' g</strong></div></div>';
-  const notes=[];
-  if(T.entry) notes.push(NUT().entry.note);
-  notes.push('Berechnet mit '+fmtNum(Math.round(T.w.kg*10)/10)+' kg ('+T.w.basis+')'+(T.w.provisional?'. Für stabile Ziele morgens nüchtern wiegen, 3–7× pro Woche.':'.'));
-  if(NUT().status!=='bestätigt') notes.push('Die Makroziele sind noch vorläufig (Spezifikation 10/1: nach der Gewichtsmessung bestätigen).');
-  h+='<p class="small muted">'+notes.map(esc).join(' ')+' <button class="link" data-act="editBw">Gewicht eintragen</button></p></div>';
+  h+='<p class="small muted">Basis '+fmtNum(Math.round(T.w.kg*10)/10)+' kg'+(T.w.provisional?' (vorläufig – morgens wiegen in der Übersicht)':'')+(T.entry?' · Einstiegsziel bis '+fmtDate(NUT().entry.until).slice(0,6):'')+'</p>';
+  h+='<details><summary class="small muted">Tagestyp ändern</summary>'+sel('nut-type','Tagestyp',[['','automatisch']].concat(Object.entries(NUT().day_types).map(([k,v])=>[k,v.label])),cfg.type||'','data-chg="nutType"')+'</details></div>';
 
   // Mahlzeiten
   const plan=nutMealPlan(T); const box=nutPrepBox(date); const prepStart=(NUT().mealprep||{}).start;
@@ -2138,7 +1960,6 @@ function viewNutrition(){
     h+='<div class="ex"><div class="ex-head"><span class="ex-name"><button class="chip" style="min-height:30px;padding:2px 9px;margin:0 6px 0 0" data-act="nutDone" data-s="'+slot.id+'" aria-pressed="'+(m&&m.done?'true':'false')+'" aria-label="gegessen">'+(m&&m.done?'☑':'☐')+'</button>'+esc(slot.time+' · '+slot.name)+'</span><span class="plan-hint">Ziel P '+P+' · KH '+K+' · F '+F+'</span></div>';
     if(slot.lunch && box && (!prepStart || date>=prepStart)) h+='<div class="note small">Meal-Prep-Box: '+esc(box.components.map(compName).join(' + '))+' ('+box.macros.kcal+' kcal · P '+box.macros.P+' · KH '+box.macros.K+' · F '+box.macros.F+'). <button class="link" data-act="nutBox" data-s="'+slot.id+'">Box übernehmen</button></div>';
     else if(slot.lunch && prepStart && date<prepStart) h+='<div class="small muted">Bis zum Meal-Prep-Start ('+fmtDate(prepStart)+'): Kantine klein/mittel/groß wählen.</div>';
-    if(slot.tags && slot.tags.includes('pre')) h+='<div class="small muted">Vor dem Training: wenig Fett und Ballaststoffe, gut verträglich.</div>';
     items.forEach((it,j)=>{ const f=nutFood(it.food); const mm=itemMac(it);
       h+='<div class="setrow" style="grid-template-columns:1fr 92px auto"><span>'+esc(f?f.name:it.food)+(it.fixed?' <span class="small muted" title="von dir festgelegt">📌</span>':'')+'<br><span class="small muted">P '+fmtNum(Math.round(mm.P))+' · KH '+fmtNum(Math.round(mm.K))+' · F '+fmtNum(Math.round(mm.F))+' · '+Math.round(mm.kcal)+' kcal</span></span>'+
         '<input inputmode="decimal" aria-label="Menge" value="'+(it.g==null?'':fmtNum(it.g))+'" data-chg="nutG" data-s="'+slot.id+'" data-j="'+j+'"><button class="small" data-act="nutDel" data-s="'+slot.id+'" data-j="'+j+'" aria-label="entfernen">✕</button></div>'; });
@@ -2147,16 +1968,16 @@ function viewNutrition(){
   });
   const day=sumMac(all); const pct=(a,b)=>b?Math.round((a/b-1)*100):0; const tol=(NUT().tolerance||{}).day_pct||5;
   const line=(l,a,b,u)=>'<div><span class="small muted">'+l+'</span><strong>'+Math.round(a)+(u||' g')+'</strong><span class="small muted"> / '+b+(u||' g')+(all.length?' ('+(pct(a,b)>0?'+':'')+pct(a,b)+' %'+(Math.abs(pct(a,b))<=tol?' ✓':'')+')':'')+'</span></div>';
-  h+='<div class="section"><strong>Tag gesamt'+(plan.length?' · '+doneN+'/'+plan.length+' abgehakt':'')+'</strong><div class="kpis">'+line('Energie',day.kcal,T.kcal,' kcal')+line('Protein',day.P,T.P)+line('KH',day.K,T.K)+line('Fett',day.F,T.F)+'</div><p class="small muted">Toleranz ± '+tol+' % pro Tag. Abweichungen sind Information, keine Wertung.</p></div>';
+  h+='<div class="section"><strong>Tag gesamt'+(plan.length?' · '+doneN+'/'+plan.length+' abgehakt':'')+'</strong><div class="kpis">'+line('Energie',day.kcal,T.kcal,' kcal')+line('Protein',day.P,T.P)+line('KH',day.K,T.K)+line('Fett',day.F,T.F)+'</div></div>';
 
   // Supplements
   const sup=(NUT().supplements||[]).filter(s=>s.active);
   if(sup.length) h+='<h2>Supplements</h2><div class="section">'+sup.map(s=>chipBtn('nutSupp','supp',s.id,(cfg.supp&&cfg.supp[s.id]?'☑ ':'☐ ')+s.name+' · '+s.dose,!!(cfg.supp&&cfg.supp[s.id]))).join('')+
     '<p class="small muted">'+esc(NUT().caffeine||'')+'</p></div>';
-  h+='<div class="row no-print"><button data-act="nutPrep">Meal-Prep & Einkauf</button></div>';
+  h+='<p class="no-print"><button data-act="nutPrep">Meal-Prep & Einkaufsliste</button></p>';
   // Lebensmittel verwalten
-  h+='<details style="margin-top:16px"><summary><strong>Lebensmittel bewerten & ergänzen</strong></summary>'+nutFoodAdmin()+'</details>';
-  h+='<p class="small muted" style="margin-top:16px">Nicht im Plan: '+esc((NUT().exclusions||[]).join(', '))+'. Richtwerte aus Nährwerttabellen – Packungsangaben haben Vorrang. Keine medizinische Beratung.</p>';
+  h+='<details style="margin-top:16px"><summary class="small">Lebensmittel bewerten & eigene anlegen</summary>'+nutFoodAdmin()+'</details>';
+  h+='<p class="small muted" style="margin-top:16px">Richtwerte aus Nährwerttabellen, Packungsangaben haben Vorrang.</p>';
   return h;
 }
 function nutFoodAdmin(){
@@ -2176,6 +1997,7 @@ ACT.nutDay = el=>{ ui.nutDate=addDays(nutDate(), +el.dataset.d); render(); };
 CHG.nutDate = el=>{ if(el.value){ ui.nutDate=el.value; render(); } };
 CHG.nutType = el=>{ nutSetDay(nutDate(), { type:el.value||null }); save(); render(); };
 CHG.nutTime = el=>{ nutSetDay(nutDate(), { time:el.value }); save(); render(); };
+ACT.nutTimeChip = el=>{ nutSetDay(nutDate(), { time:el.dataset.v }); save(); render(); };
 ACT.nutDone = el=>{ const m=nutEnsureMeal(nutDate(), el.dataset.s); m.done=!m.done; save(); render(); };
 ACT.nutSupp = el=>{ const c=nutDayCfg(nutDate()); const s=Object.assign({}, c.supp||{}); s[el.dataset.v]=!s[el.dataset.v]; if(!s[el.dataset.v]) delete s[el.dataset.v]; nutSetDay(nutDate(), { supp:Object.keys(s).length?s:null }); save(); render(); };
 ACT.nutDel = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; m.items.splice(+el.dataset.j,1); nutRecalc(el.dataset.s); save(); render(); };
@@ -2310,9 +2132,145 @@ function viewPlan(){
   h+='<p class="small muted">Den Plan änderst du nicht hier, sondern gemeinsam mit Claude: Neue Planversionen (z. B. Phase 2) landen im Datenrepo und erscheinen hier automatisch. Laststeigerungen bestätigst du im Training.</p>';
   return h+planLegacyLink();
 }
-function planLegacyLink(){ return S.blocks.length ? '<p class="small muted" style="margin-top:16px">Früher von Hand angelegte Blöcke und Trainingstage: <button class="link" data-act="planLegacy">anzeigen</button></p>' : ''; }
+function planLegacyLink(){ return false ? '<p class="small muted" style="margin-top:16px">Früher von Hand angelegte Blöcke und Trainingstage: <button class="link" data-act="planLegacy">anzeigen</button></p>' : ''; }
 ACT.planLegacy = ()=>{ ui.planLegacy=!ui.planLegacy; render(); window.scrollTo(0,0); };
 ACT.plConfirmB = ()=>{ ui.pl=ui.pl||plDefaults(); ACT.plConfirm(); };
+
+/* ===== AOS – schlanke Hauptansichten: Übersicht, Training, Profil ===== */
+
+/* ---------- Übersicht: heute, diese Woche, Gewicht ---------- */
+function viewOverview(){
+  const today=todayISO();
+  let h='<h1>Übersicht</h1>';
+  if(!ghReady()) h+='<div class="note warn"><strong>Noch nicht verbunden.</strong> Deine Daten liegen im privaten Datenrepo. <button class="link" data-act="ghOpen">Jetzt verbinden</button></div>';
+  if(isIOS() && !isStandalone() && location.protocol==='https:' && !S.settings.hideInstallHint)
+    h+='<div class="note warn"><strong>Als App installieren:</strong> In Safari auf <em>Teilen</em> → <em>Zum Home-Bildschirm</em>, danach AOS immer über das Symbol öffnen. <button class="link small" data-act="hideInstall">Ausblenden</button></div>';
+  h+=ovToday(today)+ovWeek(today)+ovWeight(today);
+  return h;
+}
+function ovToday(today){
+  let h='<div class="section"><div class="muted small">Heute · '+WD_LONG[weekdayOf(today)]+', '+fmtDate(today)+'</div>';
+  if(typeof REF==='undefined' || !REF.plan) return h+'<p>'+(ghReady()?'Plan wird geladen …':'Nach dem Verbinden siehst du hier deine heutige Einheit.')+'</p></div>';
+  const due=plDue(today);
+  if(due.doneToday) return h+'<p style="font-size:1.1rem"><strong>✓ '+esc(due.doneToday.name)+'</strong> erledigt</p><button data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button></div>';
+  if(due.plannedToday) return h+'<p style="font-size:1.1rem"><strong>'+esc(due.plannedToday.name)+'</strong></p><button class="primary" data-act="startLog" data-id="'+due.plannedToday.id+'">Training erfassen</button></div>';
+  if(due.block && due.tpl && !due.offday){ const t=plTemplate(due.block, due.tpl);
+    return h+'<p style="font-size:1.1rem"><strong>'+esc(t.id+' – '+t.name)+'</strong></p><p class="small muted">'+esc((due.phase?due.phase.id+' · ':'')+'Woche '+due.week)+' · ca. '+t.time_min+' min</p><button class="primary" data-act="go" data-view="training">Einheit starten</button></div>'; }
+  const n=plNextTraining(addDays(today,1));
+  return h+'<p style="font-size:1.1rem"><strong>Kein Training</strong></p>'+(n?'<p class="small">Nächste Einheit: <strong>'+esc(n.tpl+' – '+n.t.name)+'</strong> am '+WD_LONG[weekdayOf(n.date)]+', '+fmtDate(n.date)+'</p>':'')+'</div>';
+}
+/* Woche als Streifen Mo–So aus dem Plan: ✓ erledigt · ○ gespeichert · ✗ nicht erfasst */
+function ovWeek(today){
+  if(typeof REF==='undefined' || !REF.plan) return '';
+  const mon=mondayOf(today); const dn=['Mo','Di','Mi','Do','Fr','Sa','So']; let any=false;
+  const cells=dn.map((d,i)=>{ const date=addDays(mon,i); const b=plBlockAt(date); let txt='', act='';
+    const s=plSessions().find(x=>(sessionDate(x)===date) && x.status!=='ausgelassen');
+    if(s){ txt=(isDone(s)?'✓ ':'○ ')+s.planner.templateId; act=' data-act="startLog" data-id="'+s.id+'"'; any=true; }
+    else if(b){ const w=plWeek(b,date); const ov=(b.week_overrides||{})[w]; const t=((ov&&ov.schedule)||b.week_schedule||{})[WDKEY[weekdayOf(date)]]; if(t){ txt=t+(date<today?' ✗':''); any=true; } }
+    return '<div class="day'+(date===today?' today':'')+'"'+act+'><div class="small muted">'+d+'</div><strong>'+esc(txt||'–')+'</strong></div>'; });
+  if(!any) return '';
+  return '<h2>Diese Woche</h2><div class="weekstrip">'+cells.join('')+'</div>';
+}
+function ovWeight(today){
+  const t=S.bodyweight.find(b=>b.date===today);
+  const w=(typeof REF!=='undefined' && REF.nut) ? nutWeight(today) : null;
+  return '<h2>Gewicht</h2><div class="section"><div class="row" style="align-items:flex-end"><div style="flex:1;min-width:120px">'+inp('ov-kg','Heute morgens (kg)',t?fmtNum(t.kg):'','inputmode="decimal" placeholder="z. B. 92,4"')+'</div><button class="primary" data-act="ovBw" style="margin-bottom:8px">'+(t?'Ändern':'Speichern')+'</button></div>'+
+    (w&&!/Standardwert|ohne Datum/.test(w.basis)?'<p class="small muted">Schnitt: '+fmtNum(Math.round(w.kg*10)/10)+' kg ('+esc(w.basis)+')</p>':'<p class="small muted">Morgens nüchtern wiegen, 3–7× pro Woche. Daraus berechnet AOS deine Ernährungsziele.</p>')+'</div>';
+}
+ACT.ovBw = ()=>{ const kg=num(val('ov-kg')); if(kg==null||kg<30||kg>300){ toast('Bitte ein Gewicht in kg eingeben.'); return; }
+  const today=todayISO(); let x=S.bodyweight.find(b=>b.date===today);
+  if(!x){ x={ id:uid('bw'), date:today, approx:false, note:'', source:'eingabe', createdAt:new Date().toISOString() }; S.bodyweight.push(x); }
+  x.kg=kg; save(); toast('Gewicht gespeichert.'); render(); };
+ACT.hideInstall = ()=>{ S.settings.hideInstallHint=true; save(); render(); };
+
+/* ---------- Training ---------- */
+function viewTraining(){
+  if(ui.sessionId && sessionById(ui.sessionId)) return logForm();
+  const today=todayISO();
+  let h='<h1>Training</h1>'+plSection();
+  const saved=S.sessions.filter(s=>s.status==='geplant' && (s.plan||[]).length && !(ui.pl && s.plannedDate===ui.pl.date)).sort(bySessionDate);
+  if(saved.length){ h+='<h2>Gespeicherte Einheiten</h2>';
+    saved.forEach(s=>{ const ov=s.plannedDate&&s.plannedDate<today;
+      h+='<div class="section"><div class="row between"><div><strong>'+esc(s.name)+'</strong> <span class="small muted">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+'</span> '+(ov?badge('nicht erfasst','warn'):'')+'</div></div>'+
+        '<div class="row" style="margin-top:8px"><button class="primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button><button data-act="openSession" data-id="'+s.id+'">Verschieben / Auslassen</button></div></div>'; }); }
+  h+='<p style="margin-top:16px"><button data-act="logFree">+ Freie Einheit erfassen</button> <span class="small muted">für Training außerhalb des Plans</span></p>';
+  const done=S.sessions.filter(s=>s.log && isDone(s)).sort((a,c)=>sessionDate(a)<sessionDate(c)?1:-1).slice(0,5);
+  if(done.length) h+='<h2>Zuletzt</h2><div class="section">'+done.map(s=>'<p style="margin:6px 0"><button class="link" data-act="startLog" data-id="'+s.id+'">'+esc(s.name)+'</button> <span class="small muted">'+fmtDateShort(sessionDate(s))+(s.status==='teilweise'?' · teilweise':'')+'</span></p>').join('')+'</div>';
+  return h;
+}
+ACT.logFree = ()=>{ const b=activeBlock(); const s={ id:uid('ses'), blockId:b?b.id:null, dayId:null, name:'Freie Einheit', focus:'', plannedDate:todayISO(), week:mondayOf(todayISO()), status:'geplant', location:'', plan:[], dayVersion:null, log:null, skipReason:'', moves:[], createdAt:new Date().toISOString() };
+  S.sessions.push(s); save(); startLog(s.id); };
+
+/* ---------- Profil ---------- */
+function viewProfile(){
+  const p=S.profile;
+  let h='<h1>Profil</h1>';
+  h+='<div class="section"><div class="fields">'+inp('p-name','Name',p.name)+inp('p-by','Geburtsjahr',p.birthYear,'inputmode="numeric" placeholder="z. B. 1993"')+'</div>'+
+    '<div class="fields">'+inp('p-h','Größe (cm)',p.heightCm,'inputmode="numeric"')+inp('p-tw','Zielgewicht (kg, optional)',fmtNum(p.targetWeightKg),'inputmode="decimal"')+'</div>'+
+    '<button class="primary" data-act="saveProfileSlim">Speichern</button></div>';
+  h+=ghSection();
+  const le=S.settings.lastExport;
+  h+='<h2>Sicherung</h2><div class="section"><p class="small muted">Deine Daten sind im Datenrepo gesichert, jeder Abgleich ist eine Version. Zusätzlich kannst du eine Datei herunterladen'+(le?' (zuletzt '+fmtDate(le.slice(0,10))+')':'')+'.</p>'+
+    '<button data-act="exportJSON">Sicherung herunterladen</button>'+
+    '<details style="margin-top:12px"><summary class="small">Erweitert</summary>'+
+      '<p class="small muted">Sicherung einspielen ersetzt die Daten auf diesem Gerät; danach wird mit dem Datenrepo abgeglichen.</p>'+
+      '<div class="row"><label class="btn" for="imp-file" style="display:inline-flex;align-items:center;color:var(--text);margin:0">Sicherung einspielen …</label><input id="imp-file" type="file" accept=".json,application/json" class="sr-only" data-chg="importFile"></div>'+
+      '<p class="small" style="margin-top:12px">Tabellen (CSV): <button class="link" data-act="csv" data-k="saetze">Trainingssätze</button> · <button class="link" data-act="csv" data-k="tests">Tests</button> · <button class="link" data-act="csv" data-k="bw">Körpergewicht</button></p>'+
+      '<p class="small" style="margin-top:12px"><button class="link" data-act="resetAll" style="color:var(--bad)">Daten auf diesem Gerät zurücksetzen …</button></p>'+
+    '</details></div>';
+  h+='<p class="small muted" style="margin-top:24px">AOS ist kein Ersatz für medizinische oder sportwissenschaftliche Betreuung.</p>';
+  return h;
+}
+ACT.saveProfileSlim = ()=>{
+  const p=S.profile; const by=val('p-by'), hgt=val('p-h'), tw=val('p-tw'); const y=new Date().getFullYear();
+  if(by && (!/^\d{4}$/.test(by)||+by<y-90||+by>y-10)){ toast('Bitte ein gültiges Geburtsjahr eingeben.'); return; }
+  if(hgt && (num(hgt)==null||num(hgt)<120||num(hgt)>230)){ toast('Größe bitte in cm.'); return; }
+  if(tw && num(tw)==null){ toast('Zielgewicht: bitte eine Zahl.'); return; }
+  p.name=val('p-name'); p.birthYear=by?+by:p.birthYear; p.heightCm=hgt?num(hgt):null; p.targetWeightKg=tw?num(tw):null;
+  save(); toast('Gespeichert.'); render(); };
+
+/* ---------- Ziele (im Verlauf) ---------- */
+function goalsSection(){
+  const gl=S.goals.filter(g=>g.status==='aktiv');
+  let h='<h2>Ziele</h2><div class="section">';
+  if(!gl.length) h+='<p class="small muted">Noch keine Ziele.</p>';
+  else h+='<div class="table-wrap"><table><tbody>'+gl.map(g=>{ const t=latestTest(g.testName);
+    return '<tr><td><button class="link" data-act="editGoal" data-id="'+g.id+'">'+esc(g.name)+'</button></td><td>'+fmtNum(g.target)+' '+esc(g.unit)+'</td><td class="small">'+(t?esc(testValueText(t)):'<span class="muted">—</span>')+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  return h+'<button class="small" data-act="editGoal">+ Ziel</button></div>';
+}
+
+function plSection(){
+  if(!REF.plan){
+    if(!ghReady()) return '<div class="note warn">Verbinde AOS mit deinem Datenrepo, dann stellt AOS hier deine Einheit zusammen. <button class="link" data-act="ghOpen">Verbinden</button></div>';
+    return '<div class="note">'+(REF.loading?'Plan wird geladen …':(REF.error?esc(REF.error):'Plan noch nicht geladen.'))+' <button class="link" data-act="plReload">Neu laden</button></div>';
+  }
+  ui.pl=ui.pl||plDefaults(); const p=ui.pl; const pin=plInput(); const due=plDue(p.date); const b=due.block; const today=todayISO();
+  const t=b&&pin.tpl?plTemplate(b,pin.tpl):null;
+  let h='<div class="section">';
+  h+='<div class="muted small">'+(p.date===today?'Heute':WD_LONG[weekdayOf(p.date)]+', '+fmtDate(p.date))+(b?' · '+esc((due.phase?due.phase.id+' · ':'')+'Woche '+due.week):'')+'</div>';
+  if(t) h+='<p style="font-size:1.1rem;margin:4px 0"><strong>'+esc(t.id+' – '+t.name)+'</strong></p>';
+  if(due.offday || (pin.tpl && due.tpl && pin.tpl!==due.tpl) || (due.why && !/^laut Wochenplan/.test(due.why))) h+='<p class="small muted">'+esc(due.why)+'</p>';
+  due.warnings.filter(w=>!/entfällt/.test(w)).forEach(w=>{ h+='<div class="note warn small">'+esc(w)+'</div>'; });
+  if(due.doneToday){ h+='<div class="note small">✓ '+esc(due.doneToday.name)+' ist erledigt. <button class="link" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button></div>'; }
+  if(t && !due.doneToday){
+    h+='<label>Wie fit fühlst du dich? (1 = sehr schlecht, 5 = sehr gut)</label><div class="chips5">'+[1,2,3,4,5].map(n=>chipBtn('plChip','readiness',n,String(n),p.readiness===n)).join('')+'</div>';
+    h+='<label>Beschwerden?</label><div>'+[[0,'keine'],[2,'leicht'],[4,'mittel'],[7,'stark']].map(([v,l])=>chipBtn('plChip','painLvl',v,l,(p.pain||0)===v)).join('')+'</div>';
+    if(p.pain>0) h+='<label>Wo?</label><div>'+Object.keys(REGION_LABEL).map(r=>chipBtn('plChip','regions',r,REGION_LABEL[r],p.regions.includes(r))).join('')+'</div>';
+  }
+  // Seltene Angaben eingeklappt
+  const more = p.date!==today || p.tpl || p.sleep!=null || p.avail!=null || p.noEquip.length || p.grip;
+  h+='<details'+(more?' open':'')+'><summary class="small">Mehr Angaben (Zeit, Schlaf, Geräte, anderer Tag)</summary>';
+  h+='<div class="fields">'+inp('pl-avail','Zeit (min)',p.avail==null?'':p.avail,'inputmode="numeric" placeholder="'+((REF.plan.rules||{}).max_session_min||65)+'" data-chg="plIn"')+inp('pl-sleep','Schlaf (h)',p.sleep==null?'':fmtNum(p.sleep),'inputmode="decimal" data-chg="plIn"')+'</div>';
+  if(t){ const eq=[...new Set(t.slots.filter(s=>(s.dose||{})[due.week]).flatMap(s=>{ const e=REF.exMap[s.candidates[0]]; return e?e.equipment:[]; }))].filter(q=>q!=='floor_space' && EQUIP_LABEL[q]);
+    if(eq.length) h+='<label>Gerät heute nicht frei?</label><div>'+eq.map(q=>chipBtn('plChip','noEquip',q,EQUIP_LABEL[q],p.noEquip.includes(q))).join('')+'</div>';
+    if(t.slots.some(s=>s.grip && (s.dose||{})[due.week])) h+='<div>'+chipBtn('plChip','grip','1','Griff stark ermüdet',p.grip)+'</div>'; }
+  h+='<div class="fields">'+inp('pl-date','Anderer Tag',p.date,'type="date" data-chg="plIn"')+(b?sel('pl-tpl','Andere Einheit',b.templates.map(x=>[x.id, x.id+' – '+x.name]), pin.tpl||'', 'data-chg="plIn"'):'')+'</div>';
+  h+='</details></div>';
+  if(!t){ const P=plBuild(pin); return h+'<div class="note">'+esc(P.error||'')+'</div>'; }
+  if(due.doneToday) return h;
+  if(p.readiness==null) return h+'<p class="small muted">Tippe deine Fitness an – dann steht deine Einheit hier.</p>';
+  return h+plPreview(plBuild(pin));
+}
 
 'use strict';
 /* ===== AOS – Speicherung im privaten GitHub-Datenrepo =====
