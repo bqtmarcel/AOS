@@ -637,51 +637,8 @@ function decideSuggestion(sg, status, note){
 }
 
 'use strict';
-/* ===== AOS – Ausgaben: Google Keep, Strong PRO, Markdown, JSON, CSV ===== */
+/* ===== AOS – Ausgaben: Strong PRO, Markdown, JSON, CSV ===== */
 
-function keepText(s){
-  const b=blockById(s.blockId); const loc=locById(s.location);
-  const L=[];
-  if(s.planner){ const pl=s.planner, ci=pl.checkin||{};
-    L.push('AOS · '+(pl.phase||'')+' · Woche '+pl.week+(pl.wave?' ('+pl.wave+')':'')+' · '+s.name+(s.plannedDate?' · '+fmtDateShort(s.plannedDate):''));
-    L.push('Readiness: '+(ci.readiness!=null?ci.readiness:'__')+' /5  Schlaf: '+(ci.sleep!=null?fmtNum(ci.sleep):'__')+' h  Beschwerden: '+(ci.pain!=null?ci.pain:'__')+' /10');
-    L.push('Ziel: RPE ≤ '+fmtNum(pl.cap)+' · keine Grind-Reps · ca. '+pl.estMin+' min'+(pl.contacts?' · Kontakte '+pl.contacts:''));
-  } else L.push('AOS – '+(b?b.name:'Ohne Block')+' – '+s.name);
-  L.push('Datum: '+(s.plannedDate?WD_LONG[weekdayOf(s.plannedDate)]+', '+fmtDate(s.plannedDate):'___'));
-  L.push('Trainingsort: '+(loc?loc.name:'___'));
-  if(s.focus) L.push('Schwerpunkt: '+s.focus);
-  if(b && capText(b)) L.push('RPE-Obergrenze: '+capText(b).replace('RPE ≤ ',''));
-  L.push('');
-  const logged = s.log ? s.log.exercises : [];
-  const items = (s.plan||[]).map(pe=>({pe, le:logged.find(e=>e.planExId===pe.id)}));
-  logged.filter(e=>!e.planExId || !(s.plan||[]).some(p=>p.id===e.planExId)).forEach(le=>items.push({pe:null, le}));
-  if(!items.length) L.push('(Für diese Einheit sind noch keine Übungen eingetragen.)');
-  items.forEach(({pe,le})=>{
-    const done = le && (le.sets||[]).some(x=>x.reps!=null||x.kg!=null||x.time!=null||x.dist!=null||x.height!=null);
-    const title = pe ? exTitle(pe) : (le.name+(le.variant?' ('+le.variant+')':''));
-    const vor = pe ? exPlanText(pe) : 'ohne Vorgabe';
-    L.push((done?'☑ ':'☐ ')+title+(vor?' – '+vor:''));
-    const pSets = pe && pe.sets ? pe.sets : 0;
-    const lSets = le ? (le.sets||[]) : [];
-    const n = Math.max(pSets, lSets.length);
-    const sollTxt = pe ? sollOf(pe) : '';
-    if(n===0) L.push('   Sätze: ___');
-    for(let i=0;i<n;i++){
-      const x=lSets[i]; const ist = x ? istOf(x, pe?pe.metric:'kraft') : '';
-      L.push('   Satz '+(i+1)+': '+(i<pSets && sollTxt?'Soll '+sollTxt+' | ':'')+'Ist '+(ist||'___'));
-    }
-    if(pe && pe.alternatives && pe.alternatives.length) L.push('   Alternative (optional): '+pe.alternatives.map(a=>a.name).join(' / '));
-    if(pe && pe.notes) L.push('   Hinweis: '+pe.notes);
-    if(pe && pe.planner && pe.planner.fastCheck) L.push('   Alle Wdh schnell? '+(le && le.fast!=null ? (le.fast?'ja':'nein') : 'ja / nein'));
-    L.push('   Notiz / RPE: '+(le && le.note ? le.note : '___'));
-  });
-  L.push('');
-  const lg=s.log||{};
-  L.push('Tagesform (1–5): '+(lg.form!=null?lg.form:'___'));
-  L.push('Dauer: '+(lg.durationMin!=null?lg.durationMin+' min':'___'));
-  L.push('Beschwerden oder Notizen: '+([lg.pain,lg.notes].filter(Boolean).join(' · ')||'___'));
-  return L.join('\n');
-}
 function sollOf(pe){
   const r = pe.reps ? pe.reps : '';
   if(pe.metric==='kraft') return (r||'?')+(pe.loadKg!=null?' × '+fmtNum(pe.loadKg)+' kg':'')+(pe.loadNote?' ('+pe.loadNote+')':'');
@@ -933,7 +890,7 @@ function sessionCard(s){
   const b=blockById(s.blockId); const loc=locById(s.location);
   return '<div class="section"><div class="row between"><div><strong>'+esc(s.name)+'</strong> <span class="muted small">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+(loc?' · '+esc(loc.name):'')+'</span></div>'+capBadge(b)+'</div>'+
     (s.plan.length?'<ul class="small" style="margin:8px 0;padding-left:20px">'+s.plan.map(e=>'<li>'+esc(exTitle(e))+(exPlanText(e)?' – '+esc(exPlanText(e)):'')+'</li>').join('')+'</ul>':'<p class="small muted">Für diesen Trainingstag sind noch keine Übungen eingetragen.</p>')+
-    '<div class="row"><button class="primary" data-act="startLog" data-id="'+s.id+'">Training erfassen</button><button data-act="keep" data-id="'+s.id+'">Für Google Keep kopieren</button><button data-act="openSession" data-id="'+s.id+'">Verschieben / Auslassen</button></div></div>';
+    '<div class="row"><button class="primary" data-act="startLog" data-id="'+s.id+'">Training erfassen</button><button data-act="openSession" data-id="'+s.id+'">Verschieben / Auslassen</button></div></div>';
 }
 function latestTest(name){ if(!name) return null; const l=S.tests.filter(t=>t.name===name); if(!l.length) return null;
   const dated=l.filter(t=>t.date).sort((a,b)=>a.date<b.date?1:-1); return dated[0]||l[l.length-1]; }
@@ -1064,7 +1021,7 @@ ACT.openSession = el=>{
     body+='<h3>Verschieben</h3><div class="row"><div style="flex:1">'+inp('mv-date','Neues Datum',s.plannedDate||'','type="date"')+'</div></div>';
     body+='<h3>Auslassen</h3>'+inp('sk-reason','Grund (optional)',s.skipReason||'','placeholder="z. B. Arbeit, Müdigkeit, Termin"');
   }
-  let foot='<button data-act="closeDlg">Schließen</button><button data-act="keep" data-id="'+s.id+'">Keep-Text kopieren</button>';
+  let foot='<button data-act="closeDlg">Schließen</button>';
   if(s.status==='geplant'){
     foot+='<button data-act="moveSession" data-id="'+s.id+'">Verschieben</button><button data-act="skipSession" data-id="'+s.id+'">Auslassen</button>';
     if(!s.log) foot+='<button class="danger" data-act="deleteSession" data-id="'+s.id+'">Löschen</button>';
@@ -1088,10 +1045,6 @@ ACT.moveSession = el=>{
 ACT.skipSession = el=>{ const s=sessionById(el.dataset.id); s.status='ausgelassen'; s.skipReason=val('sk-reason'); save(); closeDlg(); toast('Als ausgelassen markiert. Es wird nichts automatisch nachgeholt.'); render(); };
 ACT.unskipSession = el=>{ const s=sessionById(el.dataset.id); s.status='geplant'; save(); closeDlg(); render(); };
 ACT.deleteSession = el=>{ const id=el.dataset.id; confirmDlg('Einheit löschen?','Die geplante Einheit wird entfernt (noch nichts protokolliert).','Löschen',()=>{ S.sessions=S.sessions.filter(x=>x.id!==id); save(); render(); }, true); };
-ACT.keep = el=>{ const s=sessionById(el.dataset.id); const txt=keepText(s);
-  openDlg('Text für Google Keep', '<p class="small muted">Kopieren, in Google Keep als neue Notiz einfügen und im Gym die „Ist“-Werte eintragen. Danach die Werte hier unter „Training“ erfassen.</p><pre class="out" id="keep-out">'+esc(txt)+'</pre>',
-    '<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="keep-out">Kopieren</button>');
-};
 ACT.copyPre = el=>{ copyText(document.getElementById(el.dataset.src).textContent); };
 
 /* ---------- Trainingstage & Übungen ---------- */
@@ -1119,7 +1072,7 @@ function daysSection(b){
         '<button class="small danger" data-act="delEx" data-day="'+d.id+'" data-ex="'+e.id+'">Entfernen</button></div></div>';
     });
     h+='<div class="row no-print"><button class="small primary" data-act="editEx" data-day="'+d.id+'">+ Übung</button><button class="small" data-act="editDay" data-day="'+d.id+'">Tag bearbeiten</button>'+
-      '<button class="small" data-act="strong" data-day="'+d.id+'">Für Strong PRO kopieren</button><button class="small" data-act="keepTpl" data-day="'+d.id+'">Keep-Vorlage</button></div></div>';
+      '<button class="small" data-act="strong" data-day="'+d.id+'">Für Strong PRO kopieren</button></div></div>';
   });
   h+='<button class="no-print" data-act="editDay">+ Trainingstag hinzufügen</button>';
   return h;
@@ -1188,9 +1141,6 @@ ACT.delEx = el=>{ const b=planBlock(); const d=dayById(b,el.dataset.day); const 
 ACT.strong = el=>{ const b=planBlock(); const d=dayById(b,el.dataset.day);
   openDlg('Für Strong PRO', '<p class="small muted">AOS ist nicht mit Strong verbunden. Lege in Strong PRO ein neues Workout-Template an und übertrage die Übungen anhand dieses Textes. Den Text kannst du kopieren, um ihn z. B. in die Template-Notiz einzufügen.</p><pre class="out" id="strong-out">'+esc(strongText(b,d))+'</pre>',
     '<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="strong-out">Kopieren</button>'); };
-ACT.keepTpl = el=>{ const b=planBlock(); const d=dayById(b,el.dataset.day); const s=makeSession(b,d,null);
-  openDlg('Keep-Vorlage: '+d.name, '<p class="small muted">Vorlage ohne Datum. Für eine konkrete Einheit nutze „Keep-Text kopieren“ in der Wochenplanung.</p><pre class="out" id="keep-out">'+esc(keepText(s))+'</pre>',
-    '<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="keep-out">Kopieren</button>'); };
 
 /* ---------- Positionsgewichtung im Plan ---------- */
 const POS_COLORS=['var(--accent)','#c9822b','#4a78b5','#9a5bb0','#5d8a8a'];
@@ -1308,7 +1258,7 @@ function viewTraining(){
   if(!open.length) h+='<div class="empty">Keine offenen Einheiten in den nächsten Tagen. Lege im <button class="link" data-act="go" data-view="plan">Plan</button> eine Woche an oder erfasse unten eine Einheit für heute.</div>';
   open.forEach(s=>{ const ov=s.plannedDate&&s.plannedDate<today;
     h+='<div class="section"><div class="row between"><div><strong>'+esc(s.name)+'</strong> <span class="small muted">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+'</span> '+(ov?badge('nicht erfasst','warn'):'')+'</div>'+capBadge(blockById(s.blockId))+'</div>'+
-      '<div class="row" style="margin-top:8px"><button class="primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button><button data-act="keep" data-id="'+s.id+'">Für Google Keep kopieren</button><button data-act="openSession" data-id="'+s.id+'">Verschieben / Auslassen</button></div></div>'; });
+      '<div class="row" style="margin-top:8px"><button class="primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button><button data-act="openSession" data-id="'+s.id+'">Verschieben / Auslassen</button></div></div>'; });
   h+='<h2>Einheit für heute erfassen</h2><div class="section">';
   if(b){
     const opts=b.days.map(d=>[d.id,d.name]).concat([['__frei','Freie Einheit (ohne Vorgabe)']]);
@@ -1371,7 +1321,7 @@ function logForm(){
   h+=ta('lg-notes','Notizen (optional)',dr.notes,'data-log="meta" data-f="notes"');
   h+='<p class="small muted">Nicht ausgefüllte Felder bleiben leer – AOS ergänzt oder schätzt nichts. Ein Abschluss erhöht keine Gewichte automatisch.</p>';
   h+='<div class="row" style="margin-top:12px"><button class="primary" data-act="saveLog" data-st="absolviert">Als absolviert speichern</button><button data-act="saveLog" data-st="teilweise">Als teilweise absolviert speichern</button>'+
-    '<button data-act="keep" data-id="'+s.id+'">Keep-Text</button>'+(s.log?'<button class="danger" data-act="discardLog">Protokoll verwerfen</button>':'')+'</div>';
+    ''+(s.log?'<button class="danger" data-act="discardLog">Protokoll verwerfen</button>':'')+'</div>';
   return h;
 }
 function updateDraftFromInput(t){
@@ -2001,7 +1951,7 @@ function plPreview(P){
   });
   if(P.dropped.length) h+='<p class="small"><strong>Weggelassen:</strong> '+P.dropped.map(d=>esc((REF.exMap[d.slot.candidates[0]]||{}).name_de||d.slot.id)+' ('+esc(d.why)+')').join('; ')+'</p>';
   P.valid.forEach(v=>{ h+='<div class="note bad small">'+esc(v)+'</div>'; });
-  h+='<div class="row" style="margin-top:12px"><button class="primary" data-act="plTake">Übernehmen & erfassen</button><button data-act="plKeep">Für Google Keep</button><button data-act="plSave">Nur speichern</button></div>';
+  h+='<div class="row" style="margin-top:12px"><button class="primary" data-act="plTake">Übernehmen & erfassen</button><button data-act="plSave">Nur speichern</button></div>';
   if(b.status!=='bestätigt' && !(S.suggestionDecisions||{})['plan|'+b.id]) h+='<p class="small muted" style="margin-top:10px">Planversion '+esc(b.id)+' ist ein Vorschlag. <button class="link" data-act="plConfirm">Vorlagen bestätigen</button></p>';
   return h+'</div>';
 }
@@ -2038,9 +1988,6 @@ function plCommit(){
 }
 ACT.plTake = ()=>{ const s=plCommit(); if(s){ toast('Einheit angelegt.'); startLog(s.id); } };
 ACT.plSave = ()=>{ const s=plCommit(); if(s){ toast('Einheit für '+fmtDateShort(s.plannedDate)+' gespeichert.'); render(); } };
-ACT.plKeep = ()=>{ const P=plBuild(plInput()); if(P.error) return; const s=plToSession(P);
-  P.items.forEach((x,i)=>{ if(x.accepted) s.plan[i].loadKg=x.loadKg; });
-  openDlg('Text für Google Keep','<pre class="out" id="keep-out">'+esc(keepText(s))+'</pre>','<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="keep-out">Kopieren</button>'); };
 
 function plOverviewNote(){
   if(!REF.plan) return '';
@@ -2193,7 +2140,7 @@ function viewNutrition(){
   const sup=(NUT().supplements||[]).filter(s=>s.active);
   if(sup.length) h+='<h2>Supplements</h2><div class="section">'+sup.map(s=>chipBtn('nutSupp','supp',s.id,(cfg.supp&&cfg.supp[s.id]?'☑ ':'☐ ')+s.name+' · '+s.dose,!!(cfg.supp&&cfg.supp[s.id]))).join('')+
     '<p class="small muted">'+esc(NUT().caffeine||'')+'</p></div>';
-  h+='<div class="row no-print"><button data-act="nutKeep">Tag für Google Keep</button><button data-act="nutPrep">Meal-Prep & Einkauf</button></div>';
+  h+='<div class="row no-print"><button data-act="nutPrep">Meal-Prep & Einkauf</button></div>';
   // Lebensmittel verwalten
   h+='<details style="margin-top:16px"><summary><strong>Lebensmittel bewerten & ergänzen</strong></summary>'+nutFoodAdmin()+'</details>';
   h+='<p class="small muted" style="margin-top:16px">Nicht im Plan: '+esc((NUT().exclusions||[]).join(', '))+'. Richtwerte aus Nährwerttabellen – Packungsangaben haben Vorrang. Keine medizinische Beratung.</p>';
@@ -2260,21 +2207,6 @@ ACT.nutOwnOk = ()=>{ const n=val('no-name'), kc=num(val('no-kcal')), p=num(val('
     default_portion_g:num(val('no-por')), portion_label:'', main_block:val('no-main'), grams_per_block:{}, tags:[], source:'Packung (eigene Angabe)', active:true, createdAt:new Date().toISOString() });
   save(); closeDlg(); render(); toast('Lebensmittel angelegt.'); };
 
-function nutKeepText(date){
-  const T=nutTargets(date); const L=[];
-  L.push('AOS Nutrition · '+fmtDateShort(date)+' · '+T.label+(T.training?' · '+NUT().training_times[T.time]:''));
-  L.push('Ziel heute'+(T.entry?' (Einstieg)':'')+': P '+T.P+' g · KH '+T.K+' g · F '+T.F+' g · ≈ '+fmtK(T.kcal)+' kcal');
-  L.push('Gewicht morgens: __ kg'); L.push('');
-  const all=[];
-  nutMealPlan(T).forEach(({slot,P,K,F})=>{ const m=nutMeal(date, slot.id); const it=m?m.items:[]; it.forEach(i=>all.push(i));
-    L.push((m&&m.done?'☑ ':'☐ ')+slot.time+' '+slot.name+' – Ziel P '+P+' / KH '+K+' / F '+F);
-    if(it.length) L.push('   '+it.map(i=>{ const f=nutFood(i.food); return (f?f.name:i.food)+' '+amountTxt(i); }).join(' · ')); });
-  const d=sumMac(all); L.push('Ist (berechnet): P ≈ '+Math.round(d.P)+' · KH ≈ '+Math.round(d.K)+' · F ≈ '+Math.round(d.F)+' · ≈ '+fmtK(r10(d.kcal))+' kcal');
-  const sup=(NUT().supplements||[]).filter(s=>s.active); const c=nutDayCfg(date);
-  if(sup.length) L.push('Supplements: '+sup.map(s=>(c.supp&&c.supp[s.id]?'☑ ':'☐ ')+s.name+' '+s.dose).join(' · '));
-  L.push('Notiz:'); return L.join('\n');
-}
-ACT.nutKeep = ()=>openDlg('Text für Google Keep','<pre class="out" id="keep-out">'+esc(nutKeepText(nutDate()))+'</pre>','<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="keep-out">Kopieren</button>');
 
 function nutPrepText(){
   const R=REF.recipes; if(!R) return ''; const L=[]; const F=id=>{ const f=nutFood(id); return f?f.name:id; };
