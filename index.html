@@ -770,7 +770,7 @@ function statusBadge(s){ const ov = s.status==='geplant' && s.plannedDate && s.p
   if(ov) return badge('nicht erfasst','warn');
   return badge(STATUS_LABEL[s.status], s.status==='absolviert'?'ok':s.status==='teilweise'?'info':s.status==='ausgelassen'?'':''); }
 function srcBadge(o){ return o && o.source==='ausgangsdaten' ? badge('Ausgangsdaten','info') : ''; }
-function planCapText(){ if(typeof REF==='undefined' || !REF.plan) return ''; const pb=plBlockAt(todayISO()); if(!pb) return ''; const c=pb.rpe_cap; return 'RPE ≤ '+fmtNum(c[0])+(c.length>1&&c[1]!==c[0]?'–'+fmtNum(c[1]):''); }
+function planCapText(){ if(typeof REF==='undefined' || !REF.plan) return ''; const pb=plCurrentBlock(todayISO()); if(!pb) return ''; const c=pb.rpe_cap; return 'RPE ≤ '+fmtNum(c[0])+(c.length>1&&c[1]!==c[0]?'–'+fmtNum(c[1]):''); }
 function capBadge(b, raw){ const pt=(!raw && b && b.status==='aktiv') ? planCapText() : ''; const t=pt||capText(b);
   return t?'<span class="cap" title="'+(pt?'RPE-Obergrenze laut Plan':'RPE-Obergrenze dieses Blocks')+'">'+esc(t)+'</span>':''; }
 function toast(msg){ document.querySelectorAll('.toast').forEach(x=>x.remove()); const t=document.createElement('div'); t.className='toast'; t.setAttribute('role','status'); t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3200); }
@@ -803,8 +803,8 @@ function renderShell(){
   const b=activeBlock();
   document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+'>'+t+'</button>').join('');
   let info = b ? '<span class="small muted">'+esc(b.name)+'</span> '+capBadge(b)+' ' : '';
-  if(typeof REF!=='undefined' && REF.plan){ const pb=plBlockAt(todayISO()), ph=plPhase(todayISO());
-    if(pb) info='<span class="small muted">'+esc((ph?ph.id+' · ':'')+'Woche '+plWeek(pb,todayISO()))+'</span> <span class="cap" title="RPE-Obergrenze laut Plan">RPE ≤ '+fmtNum(pb.rpe_cap[0])+(pb.rpe_cap.length>1&&pb.rpe_cap[1]!==pb.rpe_cap[0]?'–'+fmtNum(pb.rpe_cap[1]):'')+'</span> '; }
+  if(typeof REF!=='undefined' && REF.plan){ const td=todayISO(), pb=plCurrentBlock(td), ph=pb?(plPhase(td)||REF.plan.phases.find(x=>x.id===pb.phase)):null;
+    if(pb) info='<span class="small muted">'+esc((ph?ph.id+' · ':'')+(pb.start>td?'ab '+fmtDateShort(pb.start).slice(3):'Woche '+plWeek(pb,td)))+'</span> <span class="cap" title="RPE-Obergrenze laut Plan">RPE ≤ '+fmtNum(pb.rpe_cap[0])+(pb.rpe_cap.length>1&&pb.rpe_cap[1]!==pb.rpe_cap[0]?'–'+fmtNum(pb.rpe_cap[1]):'')+'</span> '; }
   document.getElementById('topinfo').innerHTML = info+'<span id="syncchip">'+ghChip()+'</span>';
 }
 function render(){
@@ -828,10 +828,12 @@ function viewOverview(){
   if(!b){
     h+='<div class="empty">Kein aktiver Trainingsblock. Lege unter <button class="link" data-act="go" data-view="plan">Plan</button> einen Block an oder setze einen bestehenden auf „aktiv“.</div>';
   } else {
-    const wk=blockWeek(b,today); const pb=(typeof REF!=='undefined'&&REF.plan)?plBlockAt(today):null;
-    if(pb){ const ph=plPhase(today); const w=plWeek(pb,today);
-      h+='<div class="section"><div class="row between"><div><div class="muted small">Aktueller Block'+(ph?' · '+esc(ph.name):'')+'</div><strong style="font-size:1.1rem">'+esc(pb.name)+'</strong></div>'+capBadge(b)+'</div>';
-      h+='<p class="small">Woche '+w+' von '+pb.weeks+((pb.week_wave||{})[w]?' ('+esc(pb.week_wave[w])+')':'')+' · Block endet am '+fmtDate(addDays(pb.start,pb.weeks*7-1))+' · <button class="link" data-act="go" data-view="plan">Plan ansehen</button></p></div>';
+    const wk=blockWeek(b,today); const pb=(typeof REF!=='undefined'&&REF.plan)?plCurrentBlock(today):null;
+    if(pb){ const ph=plPhase(today)||REF.plan.phases.find(x=>x.id===pb.phase); const before=pb.start>today; const w=before?0:plWeek(pb,today);
+      h+='<div class="section"><div class="row between"><div><div class="muted small">'+(before?'Nächster Block':'Aktueller Block')+(ph?' · '+esc(ph.name):'')+'</div><strong style="font-size:1.1rem">'+esc(pb.name)+'</strong></div>'+capBadge(b)+'</div>';
+      if(before){ const first=plFirstSession(pb);
+        h+='<p class="small">Startet am '+WD_LONG[weekdayOf(pb.start)]+', '+fmtDate(pb.start)+(first?' · erste Einheit '+esc(first.tpl)+' am '+WD_LONG[weekdayOf(first.date)]+', '+fmtDate(first.date):'')+' · <button class="link" data-act="go" data-view="plan">Plan ansehen</button></p></div>'; }
+      else h+='<p class="small">Woche '+w+' von '+pb.weeks+((pb.week_wave||{})[w]?' ('+esc(pb.week_wave[w])+')':'')+' · Block endet am '+fmtDate(addDays(pb.start,pb.weeks*7-1))+' · <button class="link" data-act="go" data-view="plan">Plan ansehen</button></p></div>';
     } else {
     h+='<div class="section"><div class="row between"><div><div class="muted small">Aktueller Block</div><strong style="font-size:1.1rem">'+esc(b.name)+'</strong></div>'+capBadge(b)+'</div>';
     h+='<p class="small">'+(wk?'Woche '+wk+(b.end?' · Block endet am '+fmtDate(b.end):''):'<span class="badge warn">Startdatum fehlt – Blockwoche unbekannt</span>')+'</p>';
@@ -841,7 +843,7 @@ function viewOverview(){
     // Woche
     const week=S.sessions.filter(s=>s.blockId===b.id && (s.plannedDate?mondayOf(s.plannedDate)===mon:s.week===mon)).sort(bySessionDate);
     h+='<h2>Diese Woche <span class="muted small">('+fmtDate(mon)+' – '+fmtDate(addDays(mon,6))+')</span></h2>';
-    if(!week.length) h+='<div class="empty">Für diese Woche sind noch keine Einheiten angelegt. <button class="link" data-act="go" data-view="plan">Woche im Plan anlegen</button></div>';
+    if(!week.length) h+='<div class="empty">'+(plNextText(today,true)||'Für diese Woche sind noch keine Einheiten angelegt. <button class="link" data-act="go" data-view="plan">Woche im Plan anlegen</button>')+'</div>';
     else {
       const c=k=>week.filter(s=>s.status===k).length;
       h+='<p class="small">'+c('absolviert')+' absolviert · '+c('teilweise')+' teilweise · '+c('ausgelassen')+' ausgelassen · '+c('geplant')+' geplant</p>';
@@ -853,7 +855,7 @@ function viewOverview(){
     h+='<h2>Als Nächstes</h2>';
     if(overdue.length) h+='<div class="note warn">'+overdue.length+' vergangene Einheit(en) ohne Eintrag. Sie werden <strong>nicht</strong> automatisch verschoben – erfasse sie, verschiebe sie oder markiere sie als ausgelassen. <button class="link" data-act="go" data-view="training">Zu Training</button></div>';
     if(next) h+=sessionCard(next);
-    else h+='<div class="empty">Keine kommende Einheit geplant.</div>';
+    else h+='<div class="empty">'+(plNextText(today,false)||'Keine kommende Einheit geplant.')+'</div>';
   }
   // Vorschläge
   const sg=openSuggestions();
@@ -1678,6 +1680,15 @@ const WDKEY=['SUN','MON','TUE','WED','THU','FRI','SAT'];
 const ROLE_LABEL={ power:'Power', main:'Haupt', assistance:'Ergänzung', optional:'optional', sprint:'Sprint' };
 function plPhase(date){ return ((REF.plan&&REF.plan.phases)||[]).find(p=>date>=p.start && date<=p.end) || null; }
 function plBlockAt(date){ return ((REF.plan&&REF.plan.blocks)||[]).find(b=>date>=b.start && date<=addDays(b.start, b.weeks*7-1)) || null; }
+/* Nächste Einheit laut Plan (für Übersicht), ab heute innerhalb von 14 Tagen */
+function plNextTraining(from){ if(typeof REF==='undefined' || !REF.plan) return null;
+  for(let i=0;i<14;i++){ const d=addDays(from,i); const due=plDue(d); if(due.block && due.tpl && !due.offday && !due.doneToday) return { date:d, tpl:due.tpl, t:plTemplate(due.block,due.tpl) }; } return null; }
+function plNextText(today, weekOnly){ const n=plNextTraining(today); if(!n) return '';
+  if(weekOnly && mondayOf(n.date)!==mondayOf(today)) return 'Diese Woche ist laut Plan keine Einheit mehr vorgesehen. Nächste Einheit: <strong>'+esc(n.tpl+' – '+n.t.name)+'</strong> am '+WD_LONG[weekdayOf(n.date)]+', '+fmtDate(n.date)+'.';
+  return 'Laut Plan: <strong>'+esc(n.tpl+' – '+n.t.name)+'</strong> am '+(n.date===today?'heute':WD_LONG[weekdayOf(n.date)]+', '+fmtDate(n.date))+'. Die Einheit stellt AOS am Trainingstag unter <button class="link" data-act="go" data-view="training">Training</button> zusammen.'; }
+function plFirstSession(b){ for(let i=0;i<b.weeks*7;i++){ const d=addDays(b.start,i); const w=plWeek(b,d); const ov=(b.week_overrides||{})[w]; const sch=(ov&&ov.schedule)||b.week_schedule||{}; const t=sch[WDKEY[weekdayOf(d)]]; if(t) return { date:d, tpl:t }; } return null; }
+/* Laufender Block – oder vor dessen Start der nächste (z. B. am Wochenende vor Blockbeginn) */
+function plCurrentBlock(date){ const bl=(REF.plan&&REF.plan.blocks)||[]; return plBlockAt(date) || bl.filter(b=>b.start>date).sort((a,c)=>a.start<c.start?-1:1)[0] || null; }
 function plWeek(b, date){ return Math.floor(daysBetween(b.start, date)/7)+1; }
 function plTemplate(b, id){ return (b.templates||[]).find(t=>t.id===id) || null; }
 function plCap(b){ const c=b.rpe_cap||[]; return c.length?c[c.length-1]:null; }
@@ -1800,7 +1811,9 @@ function contactsOf(x){ const e=REF.exMap[x.dbId]; const c=e?e.contacts_per_rep:
 
 function plBuild(inp){
   const due=plDue(inp.date); const b=due.block;
-  if(!b || !inp.tpl) return { due, items:[], dropped:[], notes:[], error: !b ? (due.phase ? 'Für '+due.phase.name+' gibt es noch keine Templates. Den nächsten Block planst du mit Claude; danach liegt er im Datenrepo.' : 'Für dieses Datum gibt es keinen Block im Plan.') : 'In dieser Woche ist keine Einheit mehr offen.' };
+  const nx=!b ? plCurrentBlock(inp.date) : null; const nf=nx?plFirstSession(nx):null;
+  if(!b || !inp.tpl) return { due, items:[], dropped:[], notes:[], error: !b ? (due.phase ? 'Für '+due.phase.name+' gibt es noch keine Templates. Den nächsten Block planst du mit Claude; danach liegt er im Datenrepo.'
+      : (nx ? '„'+nx.name+'“ startet am '+WD_LONG[weekdayOf(nx.start)]+', '+fmtDate(nx.start)+(nf?'. Erste Einheit: '+nf.tpl+' am '+WD_LONG[weekdayOf(nf.date)]+', '+fmtDate(nf.date)+' – stell oben das Datum um, um sie vorab anzusehen.':'.') : 'Für dieses Datum gibt es keinen Block im Plan.')) : 'In dieser Woche ist keine Einheit mehr offen.' };
   const t=plTemplate(b, inp.tpl); const week=due.week; const cap=plCap(b);
   const rules=REF.plan.rules||{}; const thr=rules.pain_threshold||3;
   const pain=inp.pain||0, regions=inp.regions||[], rd=inp.readiness;
