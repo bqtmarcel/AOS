@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AOS">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src https://api.github.com; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src https://api.github.com https://world.openfoodfacts.org; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>AOS – Athlete Operating System</title>
 <style>
@@ -353,6 +353,14 @@ main table:not(.stack) td button{white-space:nowrap}
   .badge{white-space:normal}
   .row.between{flex-wrap:wrap;gap:4px 12px}
 }
+/* Open Food Facts */
+.off-box{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
+.off-list{display:grid;gap:6px;margin-top:8px}
+.off-item{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border-radius:14px;padding:10px 14px;width:100%}
+.off-item .off-n{font-weight:600;font-size:.88rem}
+.off-item .off-m{font-size:.72rem;color:var(--muted)}
+.off-item.picked{border-color:var(--sig)}
+.off-item.picked .off-n::after{content:' ✓';color:var(--sig)}
 @media print{
   header.top,nav.tabs,.no-print,button{display:none!important}
   .print-only{display:block}
@@ -2295,7 +2303,9 @@ ACT.nutBox = el=>{ const box=nutPrepBox(nutDate()); if(!box) return; const m=nut
   m.items=box.items_raw_g.map(([food,g])=>({ food, g, fixed:true })); m.box=box.components; save(); render(); toast('Box übernommen (Rohgewichte).'); };
 ACT.nutPick = el=>{ ui.nutSlot=el.dataset.s;
   const slot=nutMealPlan(nutTargets(nutDate())).find(x=>x.slot.id===el.dataset.s);
-  openDlg('Lebensmittel – '+(slot?slot.slot.name:''), inp('fd-q','Suchen','','autocomplete="off" placeholder="z. B. Reis, Skyr, Huhn"')+'<div id="fd-list">'+nutPickList('')+'</div>', '<button data-act="closeDlg">Fertig</button>'); };
+  openDlg('Lebensmittel – '+(slot?slot.slot.name:''), inp('fd-q','Suchen','','autocomplete="off" placeholder="z. B. Reis, Skyr, Huhn"')+'<div id="fd-list">'+nutPickList('')+'</div>'+
+    '<div class="off-box"><div class="eyebrow">Online · Open Food Facts</div><p class="small muted" style="margin:4px 0 8px">Markenprodukte nach Name oder Barcode. Ein Tipp übernimmt das Produkt in deine Lebensmittel und in diese Mahlzeit.</p>'+
+    '<button class="small" data-act="offSearch" data-mode="add">Online suchen</button><div id="off-res"></div></div>', '<button data-act="closeDlg">Fertig</button>'); };
 function nutPickList(q){
   const slot=(NUT().meal_plans[nutTargets(nutDate()).time]||[]).find(s=>s.id===ui.nutSlot)||{};
   const pre=(slot.tags||[]).includes('pre');
@@ -2304,7 +2314,7 @@ function nutPickList(q){
   l=l.filter(f=>f.category!=='kantine' || (slot.lunch && !(NUT().mealprep && nutDate()>=NUT().mealprep.start)));
   const score=f=>(f.user_rating||0)*2+(f.tags.includes('favorit')?5:0)+(pre&&(f.tags.includes('pre')||f.tags.includes('fettarm_ballaststoffarm'))?8:0);
   l.sort((a,b)=>score(b)-score(a) || a.name.localeCompare(b.name,'de'));
-  if(!l.length) return '<p class="small muted">Nichts gefunden. Eigene Lebensmittel legst du unten unter „Lebensmittel bewerten & ergänzen“ an.</p>';
+  if(!l.length) return '<p class="small muted">In deinen Lebensmitteln nichts gefunden – unten online suchen.</p>';
   return l.slice(0,40).map(f=>'<button class="chip" data-act="nutAdd" data-f="'+esc(f.id)+'">'+esc(f.name)+(f.tags.includes('favorit')?' ★':'')+(pre&&f.tags.includes('pre')?' · vor Training':'')+'</button>').join('');
 }
 document.addEventListener('input', e=>{ if(e.target && e.target.id==='fd-q'){ const el=document.getElementById('fd-list'); if(el) el.innerHTML=nutPickList(e.target.value); } });
@@ -2316,7 +2326,54 @@ ACT.nutHide = el=>{ const id=el.dataset.f; const own=(S.nutrition.items||[]).fin
   if(own){ own.active=own.active===false; save(); render(); return; }
   let p=(S.nutrition.items||[]).find(i=>i.ref===id); if(!p){ p={ id:'pref-'+id, ref:id, rating:null, active:true }; S.nutrition.items.push(p); }
   p.active=p.active===false; save(); render(); };
-ACT.nutOwn = ()=>openDlg('Eigenes Lebensmittel', '<p class="small muted">Nährwerte von der Packung, pro 100 g bzw. 100 ml.</p>'+inp('no-name','Name *','')+
+/* ---------- Open Food Facts: Markenprodukte online suchen ----------
+   Gesendet wird nur der Suchbegriff bzw. Barcode – keine persönlichen Daten. Suche nur auf Knopfdruck (Limit 10 Suchen/Minute). */
+const OFF_BASE='https://world.openfoodfacts.org';
+const OFF_FIELDS='code,product_name,product_name_de,generic_name_de,brands,nutriments,serving_quantity,quantity';
+const offCache={};
+function offMap(p){ const n=p.nutriments||{}; const g=k=>{ const v=n[k+'_100g']; return v==null||v===''?null:Math.round(Number(v)*10)/10; };
+  let kcal=g('energy-kcal'); if(kcal==null && n['energy_100g']!=null) kcal=Math.round(Number(n['energy_100g'])/4.184);
+  const P=g('proteins'), K=g('carbohydrates'), F=g('fat'); if([kcal,P,K,F].some(v=>v==null||Number.isNaN(v))) return null;
+  const name=(p.product_name_de||p.product_name||p.generic_name_de||'').trim(); if(!name) return null;
+  const brand=(p.brands||'').split(',')[0].trim();
+  const per=/\d\s*(ml|cl|l)\b/i.test(p.quantity||'')?'100 ml':'100 g';
+  const main = kcal>0 && P*4/kcal>=0.3 ? 'P' : (F*9>K*4 ? 'F' : 'K');
+  return { code:String(p.code||''), name:(brand&&!name.toLowerCase().includes(brand.toLowerCase())?name+' ('+brand+')':name), kcal:Math.round(kcal), P, K, F, per,
+    portion:p.serving_quantity?Math.round(Number(p.serving_quantity)):null, main, qty:p.quantity||'' }; }
+async function offQuery(q){
+  q=q.trim(); if(offCache[q]) return offCache[q];
+  let list;
+  if(/^\d{8,14}$/.test(q)){ const r=await fetch(OFF_BASE+'/api/v2/product/'+q+'.json?fields='+OFF_FIELDS);
+    if(r.status===404){ list=[]; } else { if(!r.ok) throw new Error('HTTP '+r.status); const j=await r.json(); list=j.product?[Object.assign({code:q},j.product)]:[]; } }
+  else { const r=await fetch(OFF_BASE+'/cgi/search.pl?action=process&json=1&search_simple=1&lc=de&page_size=20&search_terms='+encodeURIComponent(q)+'&fields='+OFF_FIELDS);
+    if(!r.ok) throw new Error(r.status===429?'zu viele Suchen – bitte eine Minute warten':'HTTP '+r.status); const j=await r.json(); list=j.products||[]; }
+  const out=list.map(offMap).filter(Boolean); offCache[q]=out; return out; }
+ACT.offSearch = async el=>{
+  const mode=el.dataset.mode; const q=(val(mode==='fill'?'off-q':'fd-q')||'').trim(); const box=document.getElementById('off-res'); if(!box) return;
+  if(q.length<2){ box.innerHTML='<p class="small muted">'+(mode==='fill'?'Bitte Name oder Barcode eingeben.':'Oben einen Suchbegriff oder Barcode eingeben.')+'</p>'; return; }
+  if(navigator.onLine===false){ box.innerHTML='<p class="small muted">Offline – Online-Suche nicht möglich.</p>'; return; }
+  box.innerHTML='<p class="small muted">Suche „'+esc(q)+'“ …</p>';
+  try{ const res=await offQuery(q); ui.offRes=res;
+    if(!res.length){ box.innerHTML='<p class="small muted">Nichts mit vollständigen Nährwerten gefunden.</p>'; return; }
+    box.innerHTML='<div class="off-list">'+res.slice(0,15).map((r,i)=>'<button class="off-item" data-act="offPick" data-mode="'+mode+'" data-i="'+i+'"><span class="off-n">'+esc(r.name)+'</span><span class="off-m">'+r.kcal+' kcal · P '+fmtNum(r.P)+' · KH '+fmtNum(r.K)+' · F '+fmtNum(r.F)+' / '+r.per+(r.qty?' · '+esc(r.qty):'')+'</span></button>').join('')+'</div><p class="small muted" style="margin-top:6px">Daten von Open Food Facts (von Nutzern gepflegt) – Werte mit der Packung vergleichen.</p>';
+  }catch(e){ box.innerHTML='<p class="small" style="color:var(--bad)">Online-Suche fehlgeschlagen: '+esc(e.message||String(e))+'</p>'; } };
+function offExcluded(name){ const ex=(NUT().exclusions||[]).map(x=>x.split(' ')[0].toLowerCase()); return ex.some(x=>x.length>3 && name.toLowerCase().includes(x)); }
+document.addEventListener('keydown', e=>{ const t=e.target; if(e.key!=='Enter' || !t || (t.id!=='off-q' && t.id!=='fd-q')) return;
+  const b=document.querySelector('[data-act="offSearch"]'); if(b){ e.preventDefault(); b.click(); } });
+ACT.offPick = el=>{ const r=(ui.offRes||[])[+el.dataset.i]; if(!r) return;
+  if(el.dataset.mode==='fill'){ ui.offPicked=r; const set=(id,v)=>{ const x=document.getElementById(id); if(x) x.value=v==null?'':String(v).replace('.',','); };
+    set('no-name',r.name); set('no-kcal',r.kcal); set('no-p',r.P); set('no-k',r.K); set('no-f',r.F); set('no-por',r.portion); set('no-per',r.per); set('no-main',r.main);
+    const n=document.getElementById('no-name'); if(n) n.scrollIntoView({block:'center'}); toast('Werte übernommen – prüfen und speichern.'); return; }
+  if(offExcluded(r.name)){ toast('Steht auf deiner Liste der Lebensmittel, die du nicht isst.'); return; }
+  let own=(S.nutrition.items||[]).find(i=>i.custom && r.code && i.off_code===r.code);
+  if(!own){ own={ id:uid('own'), custom:true, name:r.name, category:'eigene', per:r.per, kcal:r.kcal, protein_g:r.P, carbs_g:r.K, fat_g:r.F, fiber_g:null,
+      default_portion_g:r.portion, portion_label:'', main_block:r.main, grams_per_block:{}, tags:[], source:'Open Food Facts (Barcode '+r.code+')', off_code:r.code, active:true, createdAt:new Date().toISOString() };
+    S.nutrition.items.push(own); }
+  const m=nutEnsureMeal(nutDate(), ui.nutSlot); m.items.push({ food:own.id, g:null }); nutRecalc(ui.nutSlot); save();
+  el.setAttribute('aria-pressed','true'); el.classList.add('picked'); toast(r.name+' hinzugefügt'); };
+ACT.nutOwn = ()=>openDlg('Eigenes Lebensmittel', '<div class="off-box" style="margin-top:0;border-top:0;padding-top:0"><div class="eyebrow">Aus Open Food Facts übernehmen</div>'+
+  '<div class="row" style="flex-wrap:nowrap;gap:8px;align-items:flex-end"><div style="flex:1;min-width:0">'+inp('off-q','Name oder Barcode','','autocomplete="off" placeholder="z. B. Skyr Natur oder 4008…"')+'</div><button data-act="offSearch" data-mode="fill" style="margin-bottom:8px">Suchen</button></div><div id="off-res"></div></div>'+
+  '<p class="small muted">Oder Nährwerte von der Packung eintragen, pro 100 g bzw. 100 ml.</p>'+inp('no-name','Name *','')+
   '<div class="fields">'+sel('no-per','Bezug',[['100 g','pro 100 g'],['100 ml','pro 100 ml']],'100 g')+inp('no-kcal','kcal *','','inputmode="decimal"')+'</div>'+
   '<div class="fields">'+inp('no-p','Protein g *','','inputmode="decimal"')+inp('no-k','Kohlenhydrate g *','','inputmode="decimal"')+inp('no-f','Fett g *','','inputmode="decimal"')+'</div>'+
   '<div class="fields">'+inp('no-por','Standardportion (g/ml)','','inputmode="decimal"')+sel('no-main','Hauptsächlich',[['P','Protein'],['K','Kohlenhydrate'],['F','Fett'],['G','Gemüse/Obst']],'K')+'</div>',
@@ -2324,8 +2381,10 @@ ACT.nutOwn = ()=>openDlg('Eigenes Lebensmittel', '<p class="small muted">Nährwe
 ACT.nutOwnOk = ()=>{ const n=val('no-name'), kc=num(val('no-kcal')), p=num(val('no-p')), k=num(val('no-k')), f=num(val('no-f'));
   if(!n || [kc,p,k,f].some(v=>v==null||v<0)){ toast('Bitte Name und alle Nährwerte als Zahl eingeben.'); return; }
   const ex=(NUT().exclusions||[]).map(x=>x.split(' ')[0].toLowerCase()); if(ex.some(x=>x.length>3 && n.toLowerCase().includes(x))) { toast('Steht auf deiner Liste der Lebensmittel, die du nicht isst.'); return; }
+  const src=ui.offPicked && ui.offPicked.name===n ? ui.offPicked : null;
   S.nutrition.items.push({ id:uid('own'), custom:true, name:n, category:'eigene', per:val('no-per'), kcal:kc, protein_g:p, carbs_g:k, fat_g:f, fiber_g:null,
-    default_portion_g:num(val('no-por')), portion_label:'', main_block:val('no-main'), grams_per_block:{}, tags:[], source:'Packung (eigene Angabe)', active:true, createdAt:new Date().toISOString() });
+    default_portion_g:num(val('no-por')), portion_label:'', main_block:val('no-main'), grams_per_block:{}, tags:[], source:src?'Open Food Facts (Barcode '+src.code+')':'Packung (eigene Angabe)', off_code:src?src.code:undefined, active:true, createdAt:new Date().toISOString() });
+  ui.offPicked=null;
   save(); closeDlg(); render(); toast('Lebensmittel angelegt.'); };
 
 
