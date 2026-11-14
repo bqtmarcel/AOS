@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -361,6 +361,18 @@ main table:not(.stack) td button{white-space:nowrap}
 .off-item .off-m{font-size:.72rem;color:var(--muted)}
 .off-item.picked{border-color:var(--sig)}
 .off-item.picked .off-n::after{content:' ✓';color:var(--sig)}
+/* Menge wählen */
+.sel-panel{border:1px solid var(--sig);border-radius:16px;padding:12px 14px;margin:6px 0 12px;background:var(--surface2)}
+.sel-name{font-weight:600;margin-bottom:8px}
+.sel-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.sel-row #fd-n{width:96px;flex:none;text-align:center;font-size:1.1rem}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg .chip{min-height:40px;padding:6px 12px}
+.nut-row{grid-template-columns:1fr 64px 76px auto!important;align-items:center}
+.nut-row input,.nut-row select{min-height:42px;padding:6px 8px;font-size:.95rem}
+.nut-row input{text-align:center}
+.nut-row select{padding-right:24px;background-position:calc(100% - 14px) 50%,calc(100% - 9px) 50%}
+.nut-u{font-size:.8rem;color:var(--muted);text-align:center}
 @media print{
   header.top,nav.tabs,.no-print,button{display:none!important}
   .print-only{display:block}
@@ -2160,7 +2172,21 @@ function itemMac(it){ const f=nutFood(it.food); if(!f || it.g==null) return { P:
   const k = isPortion(f) ? it.g : it.g/100;
   return { P:(f.protein_g||0)*k, K:(f.carbs_g||0)*k, F:(f.fat_g||0)*k, kcal:(f.kcal||0)*k }; }
 function sumMac(items){ return items.reduce((a,it)=>{ const m=itemMac(it); a.P+=m.P; a.K+=m.K; a.F+=m.F; a.kcal+=m.kcal; return a; }, { P:0, K:0, F:0, kcal:0 }); }
-function amountTxt(it){ const f=nutFood(it.food); if(it.g==null) return '—'; return isPortion(f) ? fmtNum(it.g)+' Port.' : fmtNum(it.g)+(f&&/ml/.test(f.per)?' ml':' g'); }
+/* Mengen-Einheiten: intern immer Gramm bzw. ml (it.g); Stück nur als Anzeige/Eingabe über piece_g */
+function nutUnits(f){ if(!f) return [['g','g']]; if(isPortion(f)) return [['port','Port.']];
+  const u=[]; if(f.piece_g) u.push(['stk', f.piece_label||'Stück']);
+  if(/ml/.test(f.per)) u.push(['ml','ml'],['g','g']); else u.push(['g','g']); return u; }
+function itemUnit(it,f){ f=f||nutFood(it.food); const us=nutUnits(f).map(x=>x[0]); return us.includes(it.unit) ? it.unit : (us.includes('ml')?'ml':us.includes('port')?'port':'g'); }
+function unitDefault(f){ const us=nutUnits(f).map(x=>x[0]); if(us.includes('port')) return 'port';
+  const pref=(ui.unitPref||{})[f.id]; if(pref && us.includes(pref)) return pref;
+  if(us.includes('stk') && !['fleisch_fisch','gemuese','beilage','fett','suess','sauce','fruehstueck'].includes(f.category) && !['Handvoll','EL','TL','Schale'].includes(f.piece_label)) return 'stk';
+  return us.includes('ml')?'ml':'g'; }
+function itemQty(it,f){ f=f||nutFood(it.food); if(it.g==null) return null; return itemUnit(it,f)==='stk' && f.piece_g ? Math.round(it.g/f.piece_g*100)/100 : it.g; }
+function qtyToG(v,unit,f){ return unit==='stk' && f && f.piece_g ? v*f.piece_g : v; }
+function unitLbl(unit,f){ return unit==='stk' ? (f&&f.piece_label||'Stück') : unit==='port' ? 'Port.' : unit; }
+function amountTxt(it){ const f=nutFood(it.food); if(it.g==null) return '—'; if(isPortion(f)) return fmtNum(it.g)+' Port.';
+  const u=itemUnit(it,f); if(u==='stk') return fmtNum(itemQty(it,f))+' '+unitLbl(u,f)+' ('+fmtNum(Math.round(it.g))+(/ml/.test(f.per)?' ml':' g')+')';
+  return fmtNum(it.g)+(u==='ml'?' ml':' g'); }
 
 /* Mengenrechner (6.6): feste Einträge abziehen, dann KH-, P-, F-Lebensmittel auf das Restziel skalieren, mehrere Durchgänge, runden */
 const NUT_SIDE_CATS=['obst','gemuese','suess','getraenk','sauce','kantine'];   // Beilagen-Kategorien: Standardportion statt Hochrechnen
@@ -2182,7 +2208,9 @@ function nutCalc(items, T){
       mine.forEach(it=>{ const f=nutFood(it.food); const per=(f[MAC[m]]||0)/(isPortion(f)?1:100); it.g = per>0 ? need/mine.length/per : 0; });
     });
   }
-  free.forEach(it=>{ const f=nutFood(it.food); it.g = isPortion(f) ? Math.max(0.5, Math.round(it.g*2)/2) : Math.max(5, r5(it.g)); });
+  free.forEach(it=>{ const f=nutFood(it.food);
+    if(itemUnit(it,f)==='stk' && f.piece_g){ const step=f.piece_g>=100?0.5:1; it.g=Math.max(step, Math.round(it.g/f.piece_g/step)*step)*f.piece_g; return; }
+    it.g = isPortion(f) ? Math.max(0.5, Math.round(it.g*2)/2) : Math.max(5, r5(it.g)); });
   return items;
 }
 
@@ -2255,8 +2283,11 @@ function viewNutrition(){
     if(slot.lunch && box && (!prepStart || date>=prepStart)) h+='<div class="note small">Meal-Prep-Box: '+esc(box.components.map(compName).join(' + '))+' ('+box.macros.kcal+' kcal · P '+box.macros.P+' · KH '+box.macros.K+' · F '+box.macros.F+'). <button class="link" data-act="nutBox" data-s="'+slot.id+'">Box übernehmen</button></div>';
     else if(slot.lunch && prepStart && date<prepStart) h+='<div class="small muted">Bis zum Meal-Prep-Start ('+fmtDate(prepStart)+'): Kantine klein/mittel/groß wählen.</div>';
     items.forEach((it,j)=>{ const f=nutFood(it.food); const mm=itemMac(it);
-      h+='<div class="setrow" style="grid-template-columns:1fr 92px auto"><span>'+esc(f?f.name:it.food)+(it.fixed?' <span class="small muted" title="von dir festgelegt">📌</span>':'')+'<br><span class="small muted">P '+fmtNum(Math.round(mm.P))+' · KH '+fmtNum(Math.round(mm.K))+' · F '+fmtNum(Math.round(mm.F))+' · '+Math.round(mm.kcal)+' kcal</span></span>'+
-        '<input inputmode="decimal" aria-label="Menge" value="'+(it.g==null?'':fmtNum(it.g))+'" data-chg="nutG" data-s="'+slot.id+'" data-j="'+j+'"><button class="small" data-act="nutDel" data-s="'+slot.id+'" data-j="'+j+'" aria-label="entfernen">✕</button></div>'; });
+      const us=nutUnits(f), uu=itemUnit(it,f), q=itemQty(it,f);
+      h+='<div class="setrow nut-row"><span>'+esc(f?f.name:it.food)+(it.fixed?' <span class="small muted" title="von dir festgelegt">📌</span>':'')+'<br><span class="small muted">P '+fmtNum(Math.round(mm.P))+' · KH '+fmtNum(Math.round(mm.K))+' · F '+fmtNum(Math.round(mm.F))+' · '+Math.round(mm.kcal)+' kcal</span></span>'+
+        '<input inputmode="decimal" aria-label="Menge" value="'+(q==null?'':fmtNum(q))+'" data-chg="nutG" data-s="'+slot.id+'" data-j="'+j+'">'+
+        (us.length>1 ? '<select aria-label="Einheit" data-chg="nutU" data-s="'+slot.id+'" data-j="'+j+'">'+us.map(([k,l])=>'<option value="'+k+'"'+(k===uu?' selected':'')+'>'+esc(l)+'</option>').join('')+'</select>' : '<span class="nut-u">'+esc(us[0][1])+'</span>')+
+        '<button class="small" data-act="nutDel" data-s="'+slot.id+'" data-j="'+j+'" aria-label="entfernen">✕</button></div>'; });
     h+='<div class="small">Ist: P '+Math.round(ist.P)+' · KH '+Math.round(ist.K)+' · F '+Math.round(ist.F)+' · '+Math.round(ist.kcal)+' kcal</div>';
     h+='<div class="row" style="margin-top:6px"><button class="small" data-act="nutPick" data-s="'+slot.id+'">+ Lebensmittel</button>'+(items.some(i=>!i.fixed)?'<button class="small" data-act="nutCalc" data-s="'+slot.id+'">Mengen neu berechnen</button>':'')+(items.some(i=>i.fixed)?'<button class="small" data-act="nutUnfix" data-s="'+slot.id+'">Festlegungen lösen</button>':'')+'</div></div>';
   });
@@ -2297,15 +2328,19 @@ ACT.nutSupp = el=>{ const c=nutDayCfg(nutDate()); const s=Object.assign({}, c.su
 ACT.nutDel = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; m.items.splice(+el.dataset.j,1); nutRecalc(el.dataset.s); save(); render(); };
 ACT.nutCalc = el=>{ nutRecalc(el.dataset.s); save(); render(); toast('Mengen auf das Ziel der Mahlzeit berechnet.'); };
 ACT.nutUnfix = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; m.items.forEach(i=>{ delete i.fixed; }); nutRecalc(el.dataset.s); save(); render(); };
+CHG.nutU = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; const it=m.items[+el.dataset.j]; if(!it) return;
+  it.unit=el.value; const f=nutFood(it.food); (ui.unitPref=ui.unitPref||{})[it.food]=el.value;
+  if(el.value==='stk' && f && f.piece_g && it.g!=null){ const step=f.piece_g>=100?0.5:1; it.g=Math.max(step,Math.round(it.g/f.piece_g/step)*step)*f.piece_g; it.fixed=true; nutRecalc(el.dataset.s); }
+  save(); render(); };
 CHG.nutG = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; const it=m.items[+el.dataset.j]; const v=num(el.value);
-  if(v==null || v<0){ toast('Bitte eine Zahl eingeben.'); render(); return; } it.g=v; it.fixed=true; nutRecalc(el.dataset.s); save(); render(); };
+  if(v==null || v<0){ toast('Bitte eine Zahl eingeben.'); render(); return; } it.g=qtyToG(v,itemUnit(it),nutFood(it.food)); it.fixed=true; nutRecalc(el.dataset.s); save(); render(); };
 ACT.nutBox = el=>{ const box=nutPrepBox(nutDate()); if(!box) return; const m=nutEnsureMeal(nutDate(), el.dataset.s);
   m.items=box.items_raw_g.map(([food,g])=>({ food, g, fixed:true })); m.box=box.components; save(); render(); toast('Box übernommen (Rohgewichte).'); };
 ACT.nutPick = el=>{ ui.nutSlot=el.dataset.s;
   const slot=nutMealPlan(nutTargets(nutDate())).find(x=>x.slot.id===el.dataset.s);
-  openDlg('Lebensmittel – '+(slot?slot.slot.name:''), inp('fd-q','Suchen','','autocomplete="off" placeholder="z. B. Reis, Skyr, Huhn"')+'<div id="fd-list">'+nutPickList('')+'</div>'+
-    '<div class="off-box"><div class="eyebrow">Online · Open Food Facts</div><p class="small muted" style="margin:4px 0 8px">Markenprodukte nach Name oder Barcode. Ein Tipp übernimmt das Produkt in deine Lebensmittel und in diese Mahlzeit.</p>'+
-    '<button class="small" data-act="offSearch" data-mode="add">Online suchen</button><div id="off-res"></div></div>', '<button data-act="closeDlg">Fertig</button>'); };
+  openDlg('Lebensmittel – '+(slot?slot.slot.name:''), inp('fd-q','Suchen','','autocomplete="off" placeholder="z. B. Ei, Skyr, Huhn oder Barcode"')+'<div id="fd-amt"></div><div id="fd-list">'+nutPickList('')+'</div>'+
+    '<div class="off-box"><div class="eyebrow">Online · Open Food Facts</div><div id="off-res"><p class="small muted">Markenprodukte erscheinen hier automatisch ab 3 Zeichen (Name oder Barcode).</p></div></div>', '<button data-act="closeDlg">Fertig</button>');
+  ui.nutSel=null; };
 function nutPickList(q){
   const slot=(NUT().meal_plans[nutTargets(nutDate()).time]||[]).find(s=>s.id===ui.nutSlot)||{};
   const pre=(slot.tags||[]).includes('pre');
@@ -2314,10 +2349,30 @@ function nutPickList(q){
   l=l.filter(f=>f.category!=='kantine' || (slot.lunch && !(NUT().mealprep && nutDate()>=NUT().mealprep.start)));
   const score=f=>(f.user_rating||0)*2+(f.tags.includes('favorit')?5:0)+(pre&&(f.tags.includes('pre')||f.tags.includes('fettarm_ballaststoffarm'))?8:0);
   l.sort((a,b)=>score(b)-score(a) || a.name.localeCompare(b.name,'de'));
-  if(!l.length) return '<p class="small muted">In deinen Lebensmitteln nichts gefunden – unten online suchen.</p>';
-  return l.slice(0,40).map(f=>'<button class="chip" data-act="nutAdd" data-f="'+esc(f.id)+'">'+esc(f.name)+(f.tags.includes('favorit')?' ★':'')+(pre&&f.tags.includes('pre')?' · vor Training':'')+'</button>').join('');
+  if(!l.length) return '<p class="small muted">In deinen Lebensmitteln nichts gefunden – Treffer von Open Food Facts siehe unten.</p>';
+  return l.slice(0,40).map(f=>'<button class="chip" data-act="nutSel" data-f="'+esc(f.id)+'">'+esc(f.name)+(f.tags.includes('favorit')?' ★':'')+(pre&&f.tags.includes('pre')?' · vor Training':'')+'</button>').join('');
 }
-document.addEventListener('input', e=>{ if(e.target && e.target.id==='fd-q'){ const el=document.getElementById('fd-list'); if(el) el.innerHTML=nutPickList(e.target.value); } });
+document.addEventListener('input', e=>{ const t=e.target; if(!t) return;
+  if(t.id==='fd-q'){ const el=document.getElementById('fd-list'); if(el) el.innerHTML=nutPickList(t.value); offAuto(t.value,'add'); }
+  if(t.id==='off-q') offAuto(t.value,'fill'); });
+/* Menge wählen: Tipp auf ein Lebensmittel öffnet oben Menge + Einheit (leer = AOS berechnet) */
+function nutSelPanel(){ const f=ui.nutSel && nutFood(ui.nutSel); if(!f) return '';
+  const us=nutUnits(f); const u=ui.nutSelU && us.some(x=>x[0]===ui.nutSelU) ? ui.nutSelU : unitDefault(f);
+  return '<div class="sel-panel"><div class="sel-name">'+esc(f.name)+'</div>'+
+    '<div class="sel-row"><input id="fd-n" inputmode="decimal" autocomplete="off" aria-label="Menge" placeholder="auto">'+
+    '<div class="seg">'+us.map(([k,l])=>'<button class="chip" data-act="nutSelU" data-u="'+k+'" aria-pressed="'+(k===u)+'">'+esc(k==='stk'?l+(f.piece_g?' ('+f.piece_g+(/ml/.test(f.per)?' ml':' g')+')':''):l)+'</button>').join('')+'</div></div>'+
+    '<div class="sel-row"><span class="small muted" style="flex:1">Leer lassen = AOS berechnet die Menge passend zum Ziel.</span><button class="small" data-act="nutSelX">Abbrechen</button><button class="primary small" data-act="nutAddSel">Hinzufügen</button></div></div>'; }
+function nutSelShow(){ const box=document.getElementById('fd-amt'); if(!box) return; box.innerHTML=nutSelPanel(); const i=document.getElementById('fd-n'); if(i){ box.scrollIntoView({block:'nearest'}); i.focus(); } }
+ACT.nutSel = el=>{ ui.nutSel=el.dataset.f; ui.nutSelU=null; nutSelShow(); };
+ACT.nutSelU = el=>{ const v=val('fd-n'); ui.nutSelU=el.dataset.u; nutSelShow(); const i=document.getElementById('fd-n'); if(i) i.value=v||''; };
+ACT.nutSelX = ()=>{ ui.nutSel=null; nutSelShow(); };
+ACT.nutAddSel = ()=>{ const f=nutFood(ui.nutSel); if(!f) return;
+  const u=ui.nutSelU && nutUnits(f).some(x=>x[0]===ui.nutSelU) ? ui.nutSelU : unitDefault(f); const raw=(val('fd-n')||'').trim(); const v=raw===''?null:num(raw);
+  if(raw!=='' && (v==null||v<=0)){ toast('Bitte eine Zahl eingeben oder leer lassen.'); return; }
+  (ui.unitPref=ui.unitPref||{})[f.id]=u;
+  const m=nutEnsureMeal(nutDate(), ui.nutSlot); const it={ food:f.id, g:v==null?null:qtyToG(v,u,f), unit:u }; if(v!=null) it.fixed=true;
+  m.items.push(it); nutRecalc(ui.nutSlot); save();
+  toast(f.name+(v!=null?' · '+fmtNum(v)+' '+unitLbl(u,f):'')+' hinzugefügt'); ui.nutSel=null; nutSelShow(); render(); };
 ACT.nutAdd = el=>{ const m=nutEnsureMeal(nutDate(), ui.nutSlot); m.items.push({ food:el.dataset.f, g:null }); nutRecalc(ui.nutSlot); save();
   const f=nutFood(el.dataset.f); toast((f?f.name:'Lebensmittel')+' hinzugefügt'); el.setAttribute('aria-pressed','true'); render(); };
 CHG.nutRate = el=>{ const id=el.dataset.f; let p=(S.nutrition.items||[]).find(i=>i.ref===id); if(!p){ p={ id:'pref-'+id, ref:id, rating:null, active:true }; S.nutrition.items.push(p); }
@@ -2338,8 +2393,10 @@ function offMap(p){ const n=p.nutriments||{}; const g=k=>{ const v=n[k+'_100g'];
   const brand=(p.brands||'').split(',')[0].trim();
   const per=/\d\s*(ml|cl|l)\b/i.test(p.quantity||'')?'100 ml':'100 g';
   const main = kcal>0 && P*4/kcal>=0.3 ? 'P' : (F*9>K*4 ? 'F' : 'K');
+  const qn=parseFloat(String(p.quantity||'').replace(',','.')); const sv=p.serving_quantity?Number(p.serving_quantity):null;
+  const piece = sv && qn && Math.abs(qn-sv)<0.5 ? Math.round(sv) : null;   // Einzelpackung (z. B. Riegel): 1 Stück = Packung
   return { code:String(p.code||''), name:(brand&&!name.toLowerCase().includes(brand.toLowerCase())?name+' ('+brand+')':name), kcal:Math.round(kcal), P, K, F, per,
-    portion:p.serving_quantity?Math.round(Number(p.serving_quantity)):null, main, qty:p.quantity||'' }; }
+    portion:p.serving_quantity?Math.round(Number(p.serving_quantity)):null, piece, main, qty:p.quantity||'' }; }
 async function offQuery(q){
   q=q.trim(); if(offCache[q]) return offCache[q];
   let list;
@@ -2348,35 +2405,45 @@ async function offQuery(q){
   else { const r=await fetch(OFF_BASE+'/cgi/search.pl?action=process&json=1&search_simple=1&lc=de&page_size=20&search_terms='+encodeURIComponent(q)+'&fields='+OFF_FIELDS);
     if(!r.ok) throw new Error(r.status===429?'zu viele Suchen – bitte eine Minute warten':'HTTP '+r.status); const j=await r.json(); list=j.products||[]; }
   const out=list.map(offMap).filter(Boolean); offCache[q]=out; return out; }
-ACT.offSearch = async el=>{
-  const mode=el.dataset.mode; const q=(val(mode==='fill'?'off-q':'fd-q')||'').trim(); const box=document.getElementById('off-res'); if(!box) return;
-  if(q.length<2){ box.innerHTML='<p class="small muted">'+(mode==='fill'?'Bitte Name oder Barcode eingeben.':'Oben einen Suchbegriff oder Barcode eingeben.')+'</p>'; return; }
+/* Automatische Online-Suche: 700 ms nach dem letzten Tastendruck, ab 3 Zeichen, max. 9 Suchen pro Minute (Limit 10) */
+let offTimer=null, offSeq=0; const offTimes=[];
+function offAuto(q,mode,now){ clearTimeout(offTimer); q=(q||'').trim();
+  const box=document.getElementById('off-res'); if(!box) return;
+  if(q.length<3 && !/^\d{8,14}$/.test(q)){ box.innerHTML='<p class="small muted">'+(mode==='fill'?'Name oder Barcode eingeben – Treffer erscheinen automatisch.':'Markenprodukte erscheinen hier automatisch ab 3 Zeichen (Name oder Barcode).')+'</p>'; offSeq++; return; }
+  offTimer=setTimeout(()=>offRun(q,mode), now?0:700); }
+async function offRun(q,mode){
+  const box=document.getElementById('off-res'); if(!box) return; const my=++offSeq;
   if(navigator.onLine===false){ box.innerHTML='<p class="small muted">Offline – Online-Suche nicht möglich.</p>'; return; }
-  box.innerHTML='<p class="small muted">Suche „'+esc(q)+'“ …</p>';
-  try{ const res=await offQuery(q); ui.offRes=res;
-    if(!res.length){ box.innerHTML='<p class="small muted">Nichts mit vollständigen Nährwerten gefunden.</p>'; return; }
+  if(!offCache[q.trim()]){ const t=Date.now(); while(offTimes.length && t-offTimes[0]>60000) offTimes.shift();
+    if(offTimes.length>=9){ const wait=60000-(t-offTimes[0])+200; box.innerHTML='<p class="small muted">Kurz warten – Open Food Facts erlaubt 10 Suchen pro Minute …</p>'; clearTimeout(offTimer); offTimer=setTimeout(()=>{ if(my===offSeq) offRun(q,mode); }, wait); return; }
+    offTimes.push(t); }
+  box.innerHTML='<p class="small muted">Suche online nach „'+esc(q)+'“ …</p>';
+  try{ const res=await offQuery(q); if(my!==offSeq || !document.getElementById('off-res')) return; ui.offRes=res; ui.offMode=mode;
+    if(!res.length){ box.innerHTML='<p class="small muted">Online nichts mit vollständigen Nährwerten gefunden.</p>'; return; }
     box.innerHTML='<div class="off-list">'+res.slice(0,15).map((r,i)=>'<button class="off-item" data-act="offPick" data-mode="'+mode+'" data-i="'+i+'"><span class="off-n">'+esc(r.name)+'</span><span class="off-m">'+r.kcal+' kcal · P '+fmtNum(r.P)+' · KH '+fmtNum(r.K)+' · F '+fmtNum(r.F)+' / '+r.per+(r.qty?' · '+esc(r.qty):'')+'</span></button>').join('')+'</div><p class="small muted" style="margin-top:6px">Daten von Open Food Facts (von Nutzern gepflegt) – Werte mit der Packung vergleichen.</p>';
-  }catch(e){ box.innerHTML='<p class="small" style="color:var(--bad)">Online-Suche fehlgeschlagen: '+esc(e.message||String(e))+'</p>'; } };
+  }catch(e){ if(my===offSeq) box.innerHTML='<p class="small" style="color:var(--bad)">Online-Suche fehlgeschlagen: '+esc(e.message||String(e))+'</p>'; } }
+ACT.offSearch = el=>{ const mode=el.dataset.mode; offAuto(val(mode==='fill'?'off-q':'fd-q'),mode,true); };
 function offExcluded(name){ const ex=(NUT().exclusions||[]).map(x=>x.split(' ')[0].toLowerCase()); return ex.some(x=>x.length>3 && name.toLowerCase().includes(x)); }
-document.addEventListener('keydown', e=>{ const t=e.target; if(e.key!=='Enter' || !t || (t.id!=='off-q' && t.id!=='fd-q')) return;
-  const b=document.querySelector('[data-act="offSearch"]'); if(b){ e.preventDefault(); b.click(); } });
+document.addEventListener('keydown', e=>{ const t=e.target; if(e.key!=='Enter' || !t) return;
+  if(t.id==='fd-n'){ e.preventDefault(); ACT.nutAddSel(); return; }
+  if(t.id==='off-q' || t.id==='fd-q'){ e.preventDefault(); offAuto(t.value, t.id==='off-q'?'fill':'add', true); } });
 ACT.offPick = el=>{ const r=(ui.offRes||[])[+el.dataset.i]; if(!r) return;
   if(el.dataset.mode==='fill'){ ui.offPicked=r; const set=(id,v)=>{ const x=document.getElementById(id); if(x) x.value=v==null?'':String(v).replace('.',','); };
-    set('no-name',r.name); set('no-kcal',r.kcal); set('no-p',r.P); set('no-k',r.K); set('no-f',r.F); set('no-por',r.portion); set('no-per',r.per); set('no-main',r.main);
+    set('no-name',r.name); set('no-kcal',r.kcal); set('no-p',r.P); set('no-k',r.K); set('no-f',r.F); set('no-por',r.portion); set('no-pc',r.piece); set('no-per',r.per); set('no-main',r.main);
     const n=document.getElementById('no-name'); if(n) n.scrollIntoView({block:'center'}); toast('Werte übernommen – prüfen und speichern.'); return; }
   if(offExcluded(r.name)){ toast('Steht auf deiner Liste der Lebensmittel, die du nicht isst.'); return; }
   let own=(S.nutrition.items||[]).find(i=>i.custom && r.code && i.off_code===r.code);
   if(!own){ own={ id:uid('own'), custom:true, name:r.name, category:'eigene', per:r.per, kcal:r.kcal, protein_g:r.P, carbs_g:r.K, fat_g:r.F, fiber_g:null,
       default_portion_g:r.portion, portion_label:'', main_block:r.main, grams_per_block:{}, tags:[], source:'Open Food Facts (Barcode '+r.code+')', off_code:r.code, active:true, createdAt:new Date().toISOString() };
+    if(r.piece){ own.piece_g=r.piece; own.piece_label='Stück'; }
     S.nutrition.items.push(own); }
-  const m=nutEnsureMeal(nutDate(), ui.nutSlot); m.items.push({ food:own.id, g:null }); nutRecalc(ui.nutSlot); save();
-  el.setAttribute('aria-pressed','true'); el.classList.add('picked'); toast(r.name+' hinzugefügt'); };
+  save(); ui.nutSel=own.id; ui.nutSelU=null; nutSelShow(); el.classList.add('picked'); };
 ACT.nutOwn = ()=>openDlg('Eigenes Lebensmittel', '<div class="off-box" style="margin-top:0;border-top:0;padding-top:0"><div class="eyebrow">Aus Open Food Facts übernehmen</div>'+
-  '<div class="row" style="flex-wrap:nowrap;gap:8px;align-items:flex-end"><div style="flex:1;min-width:0">'+inp('off-q','Name oder Barcode','','autocomplete="off" placeholder="z. B. Skyr Natur oder 4008…"')+'</div><button data-act="offSearch" data-mode="fill" style="margin-bottom:8px">Suchen</button></div><div id="off-res"></div></div>'+
+  inp('off-q','Name oder Barcode','','autocomplete="off" placeholder="z. B. Skyr Natur oder 4008…"')+'<div id="off-res"></div></div>'+
   '<p class="small muted">Oder Nährwerte von der Packung eintragen, pro 100 g bzw. 100 ml.</p>'+inp('no-name','Name *','')+
   '<div class="fields">'+sel('no-per','Bezug',[['100 g','pro 100 g'],['100 ml','pro 100 ml']],'100 g')+inp('no-kcal','kcal *','','inputmode="decimal"')+'</div>'+
   '<div class="fields">'+inp('no-p','Protein g *','','inputmode="decimal"')+inp('no-k','Kohlenhydrate g *','','inputmode="decimal"')+inp('no-f','Fett g *','','inputmode="decimal"')+'</div>'+
-  '<div class="fields">'+inp('no-por','Standardportion (g/ml)','','inputmode="decimal"')+sel('no-main','Hauptsächlich',[['P','Protein'],['K','Kohlenhydrate'],['F','Fett'],['G','Gemüse/Obst']],'K')+'</div>',
+  '<div class="fields">'+inp('no-por','Standardportion (g/ml)','','inputmode="decimal"')+inp('no-pc','Gewicht pro Stück (g/ml, optional)','','inputmode="decimal" placeholder="z. B. 45 bei einem Riegel"')+sel('no-main','Hauptsächlich',[['P','Protein'],['K','Kohlenhydrate'],['F','Fett'],['G','Gemüse/Obst']],'K')+'</div>',
   '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="nutOwnOk">Speichern</button>');
 ACT.nutOwnOk = ()=>{ const n=val('no-name'), kc=num(val('no-kcal')), p=num(val('no-p')), k=num(val('no-k')), f=num(val('no-f'));
   if(!n || [kc,p,k,f].some(v=>v==null||v<0)){ toast('Bitte Name und alle Nährwerte als Zahl eingeben.'); return; }
@@ -2384,6 +2451,7 @@ ACT.nutOwnOk = ()=>{ const n=val('no-name'), kc=num(val('no-kcal')), p=num(val('
   const src=ui.offPicked && ui.offPicked.name===n ? ui.offPicked : null;
   S.nutrition.items.push({ id:uid('own'), custom:true, name:n, category:'eigene', per:val('no-per'), kcal:kc, protein_g:p, carbs_g:k, fat_g:f, fiber_g:null,
     default_portion_g:num(val('no-por')), portion_label:'', main_block:val('no-main'), grams_per_block:{}, tags:[], source:src?'Open Food Facts (Barcode '+src.code+')':'Packung (eigene Angabe)', off_code:src?src.code:undefined, active:true, createdAt:new Date().toISOString() });
+  const pc=num(val('no-pc')); if(pc && pc>0){ const it=S.nutrition.items[S.nutrition.items.length-1]; it.piece_g=pc; it.piece_label='Stück'; }
   ui.offPicked=null;
   save(); closeDlg(); render(); toast('Lebensmittel angelegt.'); };
 
