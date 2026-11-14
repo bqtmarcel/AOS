@@ -263,23 +263,51 @@ pre.out{background:#0a0a0b;border-color:var(--line)}
 
 /* Navigation */
 nav.tabs button{display:flex;align-items:center;gap:7px;border:0;border-radius:999px;color:var(--muted);font-weight:500}
-nav.tabs button svg{width:18px;height:18px;flex:none}
 nav.tabs button[aria-current="page"]{background:var(--surface2);color:var(--text);font-weight:600}
 @media (max-width:760px){
-  nav.tabs{left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));padding:6px;border-radius:30px;background:rgba(24,24,26,.82);backdrop-filter:saturate(150%) blur(20px);-webkit-backdrop-filter:saturate(150%) blur(20px);border:1px solid var(--line2);gap:0}
+  nav.tabs{left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));padding:6px;border-radius:30px;background:rgba(20,20,22,.96);backdrop-filter:saturate(150%) blur(20px);-webkit-backdrop-filter:saturate(150%) blur(20px);border:1px solid var(--line2);gap:0}
   nav.tabs button{flex-direction:column;gap:3px;font-size:.6rem;letter-spacing:.02em;padding:7px 0 6px;min-height:52px;border-radius:22px;background:none}
-  nav.tabs button svg{width:22px;height:22px}
   nav.tabs button[aria-current="page"]{background:rgba(255,255,255,.08);color:#fff}
   h1{font-size:1.9rem}
   main{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
   .hero .hero-title{font-size:1.55rem}
 }
 
-nav.tabs button svg{transition:transform .2s}
-nav.tabs button[aria-current="page"] svg .f{fill:currentColor}
-nav.tabs button[aria-current="page"] svg .d{stroke:#000;stroke-width:1.8}
-nav.tabs button[aria-current="page"] svg{transform:translateY(-1px)}
-nav.tabs button:not([aria-current="page"]) svg{opacity:.85}
+/* ===== Variante B (Signal) mit Code-Schrift ===== */
+:root{ --font:"SF Mono",ui-monospace,"JetBrains Mono","Roboto Mono",Menlo,Consolas,monospace; --sig:#c6ff3d; --sig-soft:rgba(198,255,61,.12) }
+body{letter-spacing:0;font-size:15px}
+h1{font-size:1.6rem;letter-spacing:-.02em;font-weight:600}
+h2,.eyebrow,label,th,.badge,.cap{letter-spacing:.08em}
+main{counter-reset:sec}
+main h2::before{counter-increment:sec;content:counter(sec,decimal-leading-zero) " / ";color:var(--faint)}
+dialog h2::before{content:none}
+.hero .hero-title{font-size:1.3rem;letter-spacing:-.01em;line-height:1.25}
+.hero .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--sig);margin-right:8px;box-shadow:0 0 10px var(--sig);vertical-align:1px}
+.ex-name{font-size:.95rem}
+button,.btn{font-size:.88rem}
+button.primary,button.primary:hover{background:var(--sig);border-color:var(--sig);color:#000}
+button.chip[aria-pressed="true"]{background:var(--sig);border-color:var(--sig);color:#000}
+input:focus,select:focus,textarea:focus{border-color:var(--sig)}
+:focus-visible{outline-color:var(--sig)}
+.weekstrip .day.today{background:transparent;box-shadow:inset 0 0 0 1px var(--sig)}
+.weekstrip .day.today .dn{color:var(--sig)}
+.weekstrip .day.today .wd{color:var(--text)}
+.badge.ok{color:var(--sig);border-color:rgba(198,255,61,.45)}
+.chart .ln{stroke:var(--sig)} .chart .pt{fill:var(--sig)}
+.brand{letter-spacing:.3em}
+.sysbar{display:flex;gap:10px;font-size:.66rem;letter-spacing:.04em;color:var(--muted);white-space:nowrap}
+.sysbar b{color:var(--text);font-weight:500}
+.sysbar .sd.ok{color:var(--sig)} .sysbar .sd.run{color:var(--text)} .sysbar .sd.err{color:var(--bad)} .sysbar .sd.off{color:var(--faint)}
+nav.tabs button{font-size:.72rem;letter-spacing:.02em}
+nav.tabs button[aria-current="page"]{color:#000;background:var(--sig)}
+@media (max-width:760px){
+  nav.tabs button{flex:1 1 0;min-width:0;min-height:44px;font-size:.6rem;letter-spacing:0;padding:0 1px;justify-content:center;border-radius:22px;overflow:hidden;text-overflow:ellipsis}
+  nav.tabs{padding:5px}
+  button.chip{padding:7px 12px}
+  nav.tabs button[aria-current="page"]{background:var(--sig);color:#000}
+  h1{font-size:1.5rem}
+  .hero .hero-title{font-size:1.25rem}
+}
 @media print{
   header.top,nav.tabs,.no-print,button{display:none!important}
   .print-only{display:block}
@@ -903,13 +931,6 @@ function exportCSV(kind){
 const ui = { view:'uebersicht', weekStart:null, sessionId:null, draft:null, testName:null, exName:null, blockId:null, filterEquip:false, importData:null };
 const ACT = {};      // Klick-Aktionen
 const CHG = {};      // Änderungs-Aktionen
-const NAV_ICON = (()=>{ const ic=d=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+d+'</svg>';
-  return { uebersicht:ic('<path class="f" d="M3.5 10.4 12 3.5l8.5 6.9V19a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path class="d" d="M9.5 21v-5a2.5 2.5 0 0 1 5 0v5"/>'),
-    training:ic('<rect class="f" x="2" y="9.5" width="3" height="5" rx="1.2"/><rect class="f" x="5" y="6.5" width="3.5" height="11" rx="1.5"/><rect class="f" x="15.5" y="6.5" width="3.5" height="11" rx="1.5"/><rect class="f" x="19" y="9.5" width="3" height="5" rx="1.2"/><path d="M8.5 12h7"/>'),
-    ernaehrung:ic('<path class="f" d="M12 7.6c-1.2-.9-2.6-1.6-4.3-1.6C5 6 3 8.2 3 11.2 3 15.8 6 21 8.6 21c1.4 0 2.1-.8 3.4-.8s2 .8 3.4.8C18 21 21 15.8 21 11.2 21 8.2 19 6 16.3 6c-1.7 0-3.1.7-4.3 1.6z"/><path d="M12 7.6c0-2 1-3.6 2.8-4.6"/>'),
-    tests:ic('<rect class="f" x="3.5" y="12" width="4" height="8.5" rx="1.5"/><rect class="f" x="10" y="7.5" width="4" height="13" rx="1.5"/><rect class="f" x="16.5" y="3.5" width="4" height="17" rx="1.5"/>'),
-    plan:ic('<rect class="f" x="3" y="4.5" width="18" height="16.5" rx="3.5"/><path class="d" d="M3 9.5h18"/><path d="M8 2.8v3.4M16 2.8v3.4"/><path class="d" d="M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/>'),
-    profil:ic('<circle class="f" cx="12" cy="8" r="4.2"/><path class="f" d="M4 20.5c.8-3.9 4-6.3 8-6.3s7.2 2.4 8 6.3a.8.8 0 0 1-.8.9H4.8a.8.8 0 0 1-.8-.9z"/>') }; })();
 const VIEWS = [['uebersicht','Übersicht'],['training','Training'],['ernaehrung','Ernährung'],['tests','Verlauf'],['plan','Plan'],['profil','Profil']];
 
 /* ---------- kleine Bausteine ---------- */
@@ -953,11 +974,12 @@ ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f
 /* ---------- Gerüst ---------- */
 function renderShell(){
   const b=activeBlock();
-  document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+' aria-label="'+t+'">'+(NAV_ICON[k]||'')+'<span>'+t+'</span></button>').join('');
+  document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+'>'+t+'</button>').join('');
   let info = b ? '<span class="small muted">'+esc(b.name)+'</span> ' : '';
   if(typeof REF!=='undefined' && REF.plan){ const td=todayISO(), pb=plCurrentBlock(td), ph=pb?(plPhase(td)||REF.plan.phases.find(x=>x.id===pb.phase)):null;
-    if(pb) info='<span class="small muted">'+esc((ph?ph.id+' · ':'')+(pb.start>td?'ab '+fmtDateShort(pb.start).slice(3):'Woche '+plWeek(pb,td)))+'</span> '; }
-  document.getElementById('topinfo').innerHTML = info;
+    if(pb){ const tot=pb.weeks*7, d=daysBetween(pb.start,td)+1;
+      info='<span>'+esc(ph?ph.id:pb.id)+'/<b>'+(pb.start>td?'ab '+fmtDateShort(pb.start).slice(3,8):'W'+plWeek(pb,td))+'</b></span>'+(pb.start>td?'':'<span>D'+d+'/<b>'+tot+'</b></span>'); } }
+  document.getElementById('topinfo').innerHTML = '<div class="sysbar">'+info+'<span id="hsync">'+ghDot()+'</span></div>';
 }
 function render(){
   if(window.__aosUpdate && typeof aosApplyUpdate==='function'){ aosApplyUpdate(); }
@@ -2365,9 +2387,9 @@ function ovToday(today){
   if(typeof REF==='undefined' || !REF.plan) return h+'<div class="hero-title">'+(ghReady()?'Plan wird geladen …':'Noch nicht verbunden')+'</div></div>';
   const due=plDue(today);
   if(due.doneToday) return h+'<div class="hero-title">'+esc(due.doneToday.name)+'</div><div class="hero-sub">✓ erledigt</div><button class="block" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button></div>';
-  if(due.plannedToday) return h+'<div class="hero-title">'+esc(due.plannedToday.name)+'</div><div class="hero-sub">gespeichert · bereit zum Erfassen</div><button class="primary block" data-act="startLog" data-id="'+due.plannedToday.id+'">Training erfassen</button></div>';
+  if(due.plannedToday) return h+'<div class="hero-title">'+esc(due.plannedToday.name)+'</div><div class="hero-sub">gespeichert · bereit zum Erfassen</div><button class="primary block" data-act="startLog" data-id="'+due.plannedToday.id+'">Training erfassen →</button></div>';
   if(due.block && due.tpl && !due.offday){ const t=plTemplate(due.block, due.tpl);
-    return h+'<div class="hero-title">'+esc(t.id+' – '+t.name)+'</div><div class="hero-sub">'+esc((due.phase?due.phase.id+' · ':'')+'Woche '+due.week)+' · ca. '+t.time_min+' min</div><button class="primary block" data-act="go" data-view="training">Einheit starten</button></div>'; }
+    return h.replace('<div class="eyebrow">','<div class="eyebrow"><span class="dot"></span>').replace(/<\/div>$/,' · bereit</div>')+'<div class="hero-title">'+esc(t.id+' – '+t.name)+'</div><div class="hero-sub">'+esc((due.phase?due.phase.id+' · ':'')+'Woche '+due.week)+' · ca. '+t.time_min+' min</div><button class="primary block" data-act="go" data-view="training">Einheit starten →</button></div>'; }
   const n=plNextTraining(addDays(today,1));
   return h+'<div class="hero-title">Kein Training</div><div class="hero-sub" style="margin-bottom:0">'+(n?'Nächste Einheit: '+esc(n.tpl+' – '+n.t.name)+' · '+WD[weekdayOf(n.date)]+' '+fmtDate(n.date).slice(0,6):'Erholung')+'</div></div>';
 }
@@ -2599,6 +2621,8 @@ function ghOnLocalChange(){ if(!gh.cfg) return; gh.dirty=true; ghStore(); if(ghR
 
 /* ---------- Anzeige ---------- */
 function ghTime(iso){ if(!iso) return ''; const d=new Date(iso); const t=pad(d.getHours())+':'+pad(d.getMinutes()); return isoOf(d)===todayISO()?t:fmtDateShort(isoOf(d))+' '+t; }
+function ghDot(){ const st=(typeof gh!=='undefined'&&gh.state)||'aus'; const c={ok:'ok',laeuft:'run',ausstehend:'run',offline:'off',fehler:'err',aus:'off'}[st]||'off';
+  return '<span class="sd '+c+'" title="'+esc({ok:'gespeichert',laeuft:'speichert',ausstehend:'ausstehend',offline:'offline',fehler:'Fehler beim Speichern',aus:'nicht verbunden'}[st]||st)+'">● SYNC</span>'; }
 function ghChip(){
   const st=gh.state;
   const m = { aus:['Nicht mit GitHub verbunden','warn'], laeuft:['Wird gespeichert …','info'], ok:['Gespeichert '+ghTime(gh.lastOk),'ok'],
@@ -2607,6 +2631,7 @@ function ghChip(){
 }
 function ghSetState(st){
   gh.state=st;
+  const hs=document.getElementById('hsync'); if(hs) hs.innerHTML=ghDot();
   const el=document.getElementById('syncchip'); if(el) el.innerHTML=ghChip();
   const box=document.getElementById('gh-status'); if(box) box.innerHTML=ghStatusText();
   const w=document.getElementById('syncwarn'); if(w) w.innerHTML=ghWarn();
