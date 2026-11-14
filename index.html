@@ -301,8 +301,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--sig)}
 nav.tabs button{font-size:.72rem;letter-spacing:.02em}
 nav.tabs button[aria-current="page"]{color:#000;background:var(--sig)}
 @media (max-width:760px){
-  nav.tabs button{flex:1 1 0;min-width:0;min-height:44px;font-size:.6rem;letter-spacing:0;padding:0 1px;justify-content:center;border-radius:22px;overflow:hidden;text-overflow:ellipsis}
-  nav.tabs{padding:5px}
+  nav.tabs{padding:5px 6px;justify-content:space-evenly;gap:0}
+  nav.tabs button{flex:0 0 auto;min-width:0;min-height:44px;font-size:clamp(8px,2.6vw,.6rem);letter-spacing:-.02em;padding:0 clamp(4px,1.8vw,8px);justify-content:center;border-radius:22px;white-space:nowrap}
   button.chip{padding:7px 12px}
   nav.tabs button[aria-current="page"]{background:var(--sig);color:#000}
   h1{font-size:1.5rem}
