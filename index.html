@@ -308,6 +308,33 @@ nav.tabs button[aria-current="page"]{color:#000;background:var(--sig)}
   h1{font-size:1.5rem}
   .hero .hero-title{font-size:1.25rem}
 }
+/* Heute-Karte */
+.today-card .hero-sub{margin-bottom:14px}
+.tc-row{border-top:1px solid var(--line);padding:12px 0}
+.tc-macros{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:6px}
+.tc-macros div{display:flex;flex-direction:column;gap:2px}
+.tc-macros b{font-size:1.15rem;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tc-macros div:first-child b{color:var(--sig)}
+.tc-macros b small{font-size:.7rem;font-weight:500;color:var(--muted);margin-left:2px}
+.tc-macros span,.tc-k{font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.tc-weight{display:flex;align-items:center;gap:12px}
+.tc-weight .tc-k{width:72px;flex:none}
+.tc-weight>span:nth-child(2){flex:1}
+.tc-weight.tc-edit{display:block}
+.tc-warn{font-size:.78rem;color:var(--warn);margin-bottom:2px}
+.tc-hints{border-top:1px solid var(--line);padding:10px 0 2px;font-size:.78rem;color:var(--muted);display:grid;gap:4px}
+.tc-btn{margin-top:12px}
+/* Navigation nur mit Icons */
+nav.tabs button svg{width:22px;height:22px;flex:none}
+nav.tabs button svg .f{fill:currentColor;stroke:none}
+nav.tabs button{justify-content:center;align-items:center}
+nav.tabs button[aria-current="page"]{color:#000;background:var(--sig)}
+@media (min-width:761px){ nav.tabs button{padding:8px 14px} }
+@media (max-width:760px){
+  nav.tabs{display:grid!important;grid-template-columns:repeat(6,1fr);padding:6px;gap:4px}
+  nav.tabs button{width:auto;min-height:48px;padding:0;border-radius:24px;font-size:0}
+  nav.tabs button svg{width:24px;height:24px}
+}
 @media print{
   header.top,nav.tabs,.no-print,button{display:none!important}
   .print-only{display:block}
@@ -931,6 +958,13 @@ function exportCSV(kind){
 const ui = { view:'uebersicht', weekStart:null, sessionId:null, draft:null, testName:null, exName:null, blockId:null, filterEquip:false, importData:null };
 const ACT = {};      // Klick-Aktionen
 const CHG = {};      // Änderungs-Aktionen
+const NAV_ICON = (()=>{ const ic=d=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">'+d+'</svg>';
+  return { uebersicht:ic('<rect x="3.75" y="3.75" width="7" height="7"/><rect x="13.25" y="3.75" width="7" height="7"/><rect x="3.75" y="13.25" width="7" height="7"/><rect x="13.25" y="13.25" width="7" height="7"/><rect class="f" x="15.75" y="15.75" width="2" height="2"/>'),
+    training:ic('<rect x="2.75" y="9.25" width="2.5" height="5.5"/><rect x="5.25" y="6.25" width="3" height="11.5"/><path d="M8.25 12h7.5"/><rect x="15.75" y="6.25" width="3" height="11.5"/><rect x="18.75" y="9.25" width="2.5" height="5.5"/>'),
+    ernaehrung:ic('<path d="M5 3.5v5.5h4.5V3.5M7.25 3.5v17"/><path d="M18 20.5v-17l-3.5 4.5v6.5H18"/>'),
+    tests:ic('<path d="M3.75 3.5v16.75H20.5"/><path d="M7.5 15.5l4-4.5 3 2.75 5-6"/><rect class="f" x="18.5" y="6.5" width="2.25" height="2.25"/>'),
+    plan:ic('<rect x="3.75" y="5.25" width="16.5" height="15"/><path d="M3.75 9.75h16.5M8 3.25v3.5M16 3.25v3.5"/><rect class="f" x="7" y="13" width="2" height="2"/><rect class="f" x="11" y="13" width="2" height="2"/><rect class="f" x="15" y="13" width="2" height="2"/><rect class="f" x="7" y="16.5" width="2" height="2"/>'),
+    profil:ic('<rect x="8.25" y="3.75" width="7.5" height="7.5" rx="3.75"/><path d="M4.75 20.25v-1.5a4.5 4.5 0 0 1 4.5-4.5h5.5a4.5 4.5 0 0 1 4.5 4.5v1.5"/>') }; })();
 const VIEWS = [['uebersicht','Übersicht'],['training','Training'],['ernaehrung','Ernährung'],['tests','Verlauf'],['plan','Plan'],['profil','Profil']];
 
 /* ---------- kleine Bausteine ---------- */
@@ -974,7 +1008,7 @@ ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f
 /* ---------- Gerüst ---------- */
 function renderShell(){
   const b=activeBlock();
-  document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+'>'+t+'</button>').join('');
+  document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+' aria-label="'+t+'" title="'+t+'">'+(NAV_ICON[k]||'')+'<span class="sr-only">'+t+'</span></button>').join('');
   let info = b ? '<span class="small muted">'+esc(b.name)+'</span> ' : '';
   if(typeof REF!=='undefined' && REF.plan){ const td=todayISO(), pb=plCurrentBlock(td), ph=pb?(plPhase(td)||REF.plan.phases.find(x=>x.id===pb.phase)):null;
     if(pb){ const tot=pb.weeks*7, d=daysBetween(pb.start,td)+1;
@@ -2379,20 +2413,42 @@ function viewOverview(){
   if(!ghReady()) h+='<div class="note warn"><strong>Noch nicht verbunden.</strong> Deine Daten liegen im privaten Datenrepo. <button class="link" data-act="ghOpen">Jetzt verbinden</button></div>';
   if(isIOS() && !isStandalone() && location.protocol==='https:' && !S.settings.hideInstallHint)
     h+='<div class="note warn"><strong>Als App installieren:</strong> In Safari auf <em>Teilen</em> → <em>Zum Home-Bildschirm</em>, danach AOS immer über das Symbol öffnen. <button class="link small" data-act="hideInstall">Ausblenden</button></div>';
-  h+=ovToday(today)+ovWeek(today)+ovWeight(today);
+  h+=ovToday(today)+ovWeek(today);
   return h;
 }
 function ovToday(today){
-  let h='<div class="section hero"><div class="eyebrow">Heute · '+WD[weekdayOf(today)]+' '+fmtDate(today).slice(0,6)+'</div>';
-  if(typeof REF==='undefined' || !REF.plan) return h+'<div class="hero-title">'+(ghReady()?'Plan wird geladen …':'Noch nicht verbunden')+'</div></div>';
-  const due=plDue(today);
-  if(due.doneToday) return h+'<div class="hero-title">'+esc(due.doneToday.name)+'</div><div class="hero-sub">✓ erledigt</div><button class="block" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button></div>';
-  if(due.plannedToday) return h+'<div class="hero-title">'+esc(due.plannedToday.name)+'</div><div class="hero-sub">gespeichert · bereit zum Erfassen</div><button class="primary block" data-act="startLog" data-id="'+due.plannedToday.id+'">Training erfassen →</button></div>';
-  if(due.block && due.tpl && !due.offday){ const t=plTemplate(due.block, due.tpl);
-    return h.replace('<div class="eyebrow">','<div class="eyebrow"><span class="dot"></span>').replace(/<\/div>$/,' · bereit</div>')+'<div class="hero-title">'+esc(t.id+' – '+t.name)+'</div><div class="hero-sub">'+esc((due.phase?due.phase.id+' · ':'')+'Woche '+due.week)+' · ca. '+t.time_min+' min</div><button class="primary block" data-act="go" data-view="training">Einheit starten →</button></div>'; }
-  const n=plNextTraining(addDays(today,1));
-  return h+'<div class="hero-title">Kein Training</div><div class="hero-sub" style="margin-bottom:0">'+(n?'Nächste Einheit: '+esc(n.tpl+' – '+n.t.name)+' · '+WD[weekdayOf(n.date)]+' '+fmtDate(n.date).slice(0,6):'Erholung')+'</div></div>';
+  const dayLbl='Heute · '+WD[weekdayOf(today)]+' '+fmtDate(today).slice(0,6);
+  if(typeof REF==='undefined' || !REF.plan) return '<div class="section hero"><div class="eyebrow">'+dayLbl+'</div><div class="hero-title">'+(ghReady()?'Plan wird geladen …':'Noch nicht verbunden')+'</div></div>';
+  const due=plDue(today); const T=REF.nut ? nutTargets(today) : null;
+  const typ=T ? T.label.replace(/\s*\(.*\)\s*$/,'') : '';
+  let state='rest', title='Ruhetag', sub='', btn='';
+  if(due.doneToday){ state='done'; title=due.doneToday.name; sub='✓ erledigt'+(due.doneToday.durationMin?' · '+due.doneToday.durationMin+' min':'');
+    btn='<button class="block" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button>'; }
+  else if(due.plannedToday){ state='open'; title=due.plannedToday.name; sub='gespeichert · bereit zum Erfassen';
+    btn='<button class="primary block" data-act="startLog" data-id="'+due.plannedToday.id+'">Erfassen →</button>'; }
+  else if(due.block && due.tpl && !due.offday){ const t=plTemplate(due.block, due.tpl); state='open'; title=t.id+' – '+t.name;
+    sub=(due.phase?due.phase.id+' · ':'')+'Woche '+due.week+' · ca. '+t.time_min+' min';
+    btn='<button class="primary block" data-act="go" data-view="training">Einheit starten →</button>'; }
+  else { const n=plNextTraining(addDays(today,1)); sub=n?'Nächste Einheit: '+n.tpl+' · '+WD[weekdayOf(n.date)]+' '+fmtDate(n.date).slice(0,6):'Erholung'; }
+  let h='<div class="section hero today-card"><div class="eyebrow">'+(state==='open'?'<span class="dot"></span>':'')+esc(dayLbl+(typ&&T.training?' · '+typ:''))+'</div>';
+  h+='<div class="hero-title">'+esc(title)+'</div><div class="hero-sub">'+esc(sub)+'</div>';
+  if(T) h+='<div class="tc-row tc-macros"><div><b>'+fmtK(T.kcal)+'</b><span>kcal</span></div><div><b>'+T.P+'<small>g</small></b><span>Protein</span></div><div><b>'+T.K+'<small>g</small></b><span>KH</span></div><div><b>'+T.F+'<small>g</small></b><span>Fett</span></div></div>';
+  h+=ovWeightRow(today);
+  const hints=[];
+  if(T && T.entry) hints.push('Einstiegsphase: KH −'+NUT().entry.carb_minus_g+' g bis '+fmtDate(NUT().entry.until).slice(0,6));
+  const mp=REF.nut && NUT().mealprep;
+  if(mp && mp.start===addDays(today,1)) hints.push('Morgen startet Meal-Prep – heute vorkochen');
+  if(mp && mp.start===today) hints.push('Meal-Prep startet heute');
+  if(hints.length) h+='<div class="tc-hints">'+hints.map(x=>'<div>› '+esc(x)+'</div>').join('')+'</div>';
+  return h+(btn?'<div class="tc-btn">'+btn+'</div>':'')+'</div>';
 }
+function ovWeightRow(today){
+  const t=S.bodyweight.find(b=>b.date===today);
+  const w=(typeof REF!=='undefined' && REF.nut) ? nutWeight(today) : null;
+  if(t && !ui.ovBwEdit) return '<div class="tc-row tc-weight"><span class="tc-k">Gewicht</span><span><b>'+fmtNum(t.kg)+' kg</b>'+(w&&/Schnitt/.test(w.basis)?' <span class="muted">· Ø '+fmtNum(Math.round(w.kg*10)/10)+'</span>':'')+'</span><button class="link small" data-act="ovBwEdit">ändern</button></div>';
+  return '<div class="tc-row tc-weight tc-edit">'+(t?'':'<div class="tc-warn">⚠ noch nicht gewogen</div>')+'<div class="row" style="align-items:flex-end;gap:8px;flex-wrap:nowrap"><div style="flex:1;min-width:0">'+inp('ov-kg','Heute morgens (kg)',t?fmtNum(t.kg):'','inputmode="decimal" placeholder="z. B. 92,4"')+'</div><button data-act="ovBw" style="margin-bottom:8px">OK</button></div></div>';
+}
+ACT.ovBwEdit = ()=>{ ui.ovBwEdit=true; render(); setTimeout(()=>{ const i=document.getElementById('ov-kg'); if(i) i.focus(); },50); };
 /* Woche als Streifen Mo–So aus dem Plan: ✓ erledigt · ○ gespeichert · ✗ nicht erfasst */
 function ovWeek(today){
   if(typeof REF==='undefined' || !REF.plan) return '';
@@ -2406,16 +2462,10 @@ function ovWeek(today){
   if(!any) return '';
   return '<h2>Diese Woche</h2><div class="weekstrip">'+cells.join('')+'</div><p class="small muted">Tipp auf einen Tag, um ihn zu ändern.</p>';
 }
-function ovWeight(today){
-  const t=S.bodyweight.find(b=>b.date===today);
-  const w=(typeof REF!=='undefined' && REF.nut) ? nutWeight(today) : null;
-  return '<h2>Gewicht</h2><div class="section"><div class="row" style="align-items:flex-end"><div style="flex:1;min-width:120px">'+inp('ov-kg','Heute morgens (kg)',t?fmtNum(t.kg):'','inputmode="decimal" placeholder="z. B. 92,4"')+'</div><button class="primary" data-act="ovBw" style="margin-bottom:8px">'+(t?'Ändern':'Speichern')+'</button></div>'+
-    (w&&!/Standardwert|ohne Datum/.test(w.basis)?'<p class="small muted">Schnitt: '+fmtNum(Math.round(w.kg*10)/10)+' kg ('+esc(w.basis)+')</p>':'<p class="small muted">Morgens nüchtern wiegen, 3–7× pro Woche. Daraus berechnet AOS deine Ernährungsziele.</p>')+'</div>';
-}
 ACT.ovBw = ()=>{ const kg=num(val('ov-kg')); if(kg==null||kg<30||kg>300){ toast('Bitte ein Gewicht in kg eingeben.'); return; }
   const today=todayISO(); let x=S.bodyweight.find(b=>b.date===today);
   if(!x){ x={ id:uid('bw'), date:today, approx:false, note:'', source:'eingabe', createdAt:new Date().toISOString() }; S.bodyweight.push(x); }
-  x.kg=kg; save(); toast('Gewicht gespeichert.'); render(); };
+  x.kg=kg; ui.ovBwEdit=false; save(); toast('Gewicht gespeichert.'); render(); };
 ACT.hideInstall = ()=>{ S.settings.hideInstallHint=true; save(); render(); };
 
 /* ---------- Training ---------- */
