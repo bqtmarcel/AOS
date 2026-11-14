@@ -1565,6 +1565,27 @@ ACT.dayEditSet = el=>{ const d=el.dataset.d, v=el.dataset.v; const key='sched|'+
   else S.suggestionDecisions[key]={ at:new Date().toISOString(), title:'Trainingstag '+fmtDate(d)+' geändert', status:'geändert', tpl: v==='none'?null:v };
   if(ui.pl && ui.pl.date===d){ ui.pl.tpl=null; ui.pl.accept={}; }
   save(); closeDlg(); render(); toast(v==='reset'?'Wie im Plan.':(v==='none'?fmtDateShort(d)+': kein Training.':fmtDateShort(d)+': '+v+'.')); };
+/* Wie viele Einheiten finden in dieser Woche wirklich statt, und wohin wandern die Kernübungen fehlender Einheiten? */
+function plWeekPlan(b, week){
+  const today=todayISO(); const mon=addDays(b.start,(week-1)*7);
+  const mine=plSessions().filter(s=>s.planner.blockId===b.id && s.planner.week===week);
+  const done=mine.filter(isDone).map(s=>s.planner.templateId); const doneDates=new Set(mine.filter(isDone).map(s=>sessionDate(s)));
+  const upcoming=[];
+  for(let i=0;i<7;i++){ const d=addDays(mon,i); if(d<today || doneDates.has(d)) continue; const t=plScheduledAt(b,d).tpl;
+    if(t && !done.includes(t) && !upcoming.some(u=>u.tpl===t)) upcoming.push({ date:d, tpl:t }); }
+  // Templates, deren Kernübungen schon in einer erledigten Einheit dieser Woche steckten, gelten als abgedeckt
+  const covered=mine.filter(isDone).flatMap(s=>(s.planner.merged||[]).map(id=>String(id).split('-')[0]));
+  const present=new Set(done.concat(upcoming.map(u=>u.tpl), covered));
+  const missing=(b.session_order||[]).filter(t=>!present.has(t));
+  const hosts={}; upcoming.forEach(u=>{ hosts[u.tpl]=[]; });
+  missing.forEach(m=>{ const mt=plTemplate(b,m); const c=Object.keys(hosts); if(!c.length || !mt) return;
+    const same=c.filter(h=>plTemplate(b,h).group===mt.group);
+    const pool=(same.length?same:c).slice().sort((a,z)=>hosts[a].length-hosts[z].length || b.session_order.indexOf(a)-b.session_order.indexOf(z));
+    hosts[pool[0]].push(m); });
+  return { count:done.length+upcoming.length, done, upcoming, missing, hosts };
+}
+function plMergeSlots(b, week, slots){ // Kernübungen (prio ≤ merge_priority) eines Templates, die in dieser Woche dosiert sind
+  const fr=(REF.plan.rules||{}).frequency||{}; return slots.filter(x=>(x.prio||9)<=(fr.merge_priority||1) && (x.dose||{})[week]); }
 function plFirstSession(b){ for(let i=0;i<b.weeks*7;i++){ const d=addDays(b.start,i); const w=plWeek(b,d); const t=plScheduledAt(b,d).tpl; if(t) return { date:d, tpl:t }; } return null; }
 /* Laufender Block – oder vor dessen Start der nächste (z. B. am Wochenende vor Blockbeginn) */
 function plCurrentBlock(date){ const bl=(REF.plan&&REF.plan.blocks)||[]; return plBlockAt(date) || bl.filter(b=>b.start>date).sort((a,c)=>a.start<c.start?-1:1)[0] || null; }
@@ -1706,7 +1727,20 @@ function plBuild(inp){
   const recentUse = slotId=>{ const s=plSessions().filter(x=>x.planner.blockId===b.id && isDone(x) && sessionDate(x)<inp.date).sort((a,c)=>sessionDate(a)<sessionDate(c)?1:-1);
     for(const x of s){ const pe=(x.plan||[]).find(p=>p.planner&&p.planner.slotId===slotId); if(pe) return pe.planner.dbId; } return null; };
 
-  t.slots.forEach(slot=>{
+  const fr=(REF.plan.rules||{}).frequency; let slots=t.slots.slice(); let merged=[];
+  if(fr){ const wp=plWeekPlan(b, week); const from=wp.hosts[t.id]||[];
+    from.forEach(m=>plMergeSlots(b, week, plTemplate(b,m).slots).forEach(sl=>{
+      const ex=REF.exMap[sl.candidates[0]];
+      const dup=slots.concat(merged).some(x=>x.candidates[0]===sl.candidates[0] || (x.role==='main' && sl.role==='main' && ex && REF.exMap[x.candidates[0]] && REF.exMap[x.candidates[0]].pattern===ex.pattern));
+      if(!dup) merged.push(Object.assign({}, sl, { from:m })); }));
+    if(merged.length){
+      const src=[...new Set(merged.map(x=>x.from))].join(', ');
+      slots=slots.filter(sl=>{ if((sl.prio||0)>=(fr.drop_host_priority||3) && (sl.dose||{})[week]){ dropped.push({ slot:sl, why:'Platz für Kernübungen aus '+src }); return false; } return true; });
+      const rank={ power:0, main:1, assistance:2, optional:3 };
+      slots=slots.concat(merged).sort((a,z)=>(rank[a.role]??9)-(rank[z.role]??9));
+      notes.push('Diese Woche '+wp.count+' Einheiten: Das Wichtigste aus '+src+' ist hier eingebaut ('+merged.map(x=>(REF.exMap[x.candidates[0]]||{}).name_de).join(', ')+').');
+    } }
+  slots.forEach(slot=>{
     const d=(slot.dose||{})[week]; if(!d){ return; }
     if(slot.role==='optional' && !(rd==null || rd>=4)){ dropped.push({ slot, why:'optional – nur bei Readiness 4–5' }); return; }
     // Kandidaten: Ausstattung, Beschwerden, Kontinuität (5.2)
@@ -1726,7 +1760,8 @@ function plBuild(inp){
     const reasons=[];
     if(ex.id!==slot.candidates[0]) reasons.push('Ersatz für '+(REF.exMap[slot.candidates[0]]?REF.exMap[slot.candidates[0]].name_de:slot.candidates[0])+(skipWhy.length?' ('+skipWhy.join('; ')+')':' (im Block bisher so gemacht)')+'.');
     let sets=d[0], reps=d[1];
-    const x={ slot, slotId:slot.id, dbId:ex.id, ex, role:slot.role, method:slot.method, sets, reps, rest:slot.rest||[60,90], rpe:slot.rpe||'', reasons, note:slot.note||'', alternatives: filt.filter(e=>e.id!==ex.id).map(e=>e.name_de) };
+    if(slot.from) reasons.unshift('Aus '+slot.from+' übernommen (diese Woche weniger Einheiten).');
+    const x={ slot, from:slot.from||null, slotId:slot.id, dbId:ex.id, ex, role:slot.role, method:slot.method, sets, reps, rest:slot.rest||[60,90], rpe:slot.rpe||'', reasons, note:slot.note||'', alternatives: filt.filter(e=>e.id!==ex.id).map(e=>e.name_de) };
     // Readiness (7)
     if(rd!=null && rd<=3 && x.role==='assistance' && x.sets>1){ x.sets--; reasons.push('Readiness '+rd+' → 1 Satz weniger.'); }
     if(rd!=null && rd<=2 && x.role==='power'){ const n=Math.max(1, Math.round(x.sets*0.75)); if(n<x.sets){ reasons.push('Readiness '+rd+' → Power-Volumen ca. −25 % ('+x.sets+' → '+n+' Sätze).'); x.sets=n; } }
@@ -1778,7 +1813,7 @@ function plToSession(P){
     status:'geplant', location:'', plan, dayVersion:null, log:null, skipReason:'', moves:[], createdAt:new Date().toISOString(),
     planner:{ planVersion:REF.plan.version, blockId:b.id, phase:P.due.phase?P.due.phase.id:null, week:P.week, wave:P.due.wave, templateId:t.id, cap:P.cap,
       checkin:{ readiness:P.inp.readiness, sleep:P.inp.sleep, pain:P.inp.pain, regions:P.inp.regions, avail:P.inp.avail, grip:!!P.inp.grip, noEquip:P.inp.noEquip },
-      notes:P.notes, dropped:P.dropped.map(d=>({ slot:d.slot.id, why:d.why })), contacts:P.contacts, estMin:P.estMin, generatedAt:new Date().toISOString() } };
+      notes:P.notes, merged:P.items.filter(x=>x.from).map(x=>x.slotId), dropped:P.dropped.map(d=>({ slot:d.slot.id, why:d.why })), contacts:P.contacts, estMin:P.estMin, generatedAt:new Date().toISOString() } };
 }
 
 /* ---------- Sessionplaner: Oberfläche ---------- */
@@ -1797,7 +1832,7 @@ function plPreview(P){
   P.notes.forEach(n=>{ h+='<div class="note small">'+esc(n)+'</div>'; });
   P.items.forEach((x,i)=>{
     const load = x.loadKg!=null ? fmtNum(x.loadKg)+' kg' : (x.load.calibrate?'kalibrieren':(x.load.text||''));
-    h+='<div class="ex"><div class="ex-head"><span class="ex-name">'+(i+1)+'. '+esc(x.ex.name_de)+'</span>'+badge(ROLE_LABEL[x.role]||x.role, x.role==='main'?'ok':(x.role==='power'?'info':''))+'</div>';
+    h+='<div class="ex"><div class="ex-head"><span class="ex-name">'+(i+1)+'. '+esc(x.ex.name_de)+'</span>'+(x.from?badge('aus '+x.from,'warn')+' ':'')+badge(ROLE_LABEL[x.role]||x.role, x.role==='main'?'ok':(x.role==='power'?'info':''))+'</div>';
     h+='<div><strong>'+x.sets+' × '+esc(x.reps)+'</strong>'+(load?' · '+esc(load):'')+(x.rpe?' · RPE '+esc(x.rpe):'')+' · Pause '+(x.rest[0]===x.rest[1]?x.rest[0]:x.rest[0]+'–'+x.rest[1])+' s</div>';
     if(x.load.suggest){ const k=x.suggestKey; const on=!!(ui.pl.accept||{})[k];
       h+='<div class="note '+(on?'':'warn')+' small">Steigerung auf <strong>'+fmtNum(x.load.suggest.kg)+' kg</strong> möglich (Grundlage: '+esc(x.load.suggest.basis)+'). '+
@@ -2137,6 +2172,8 @@ function viewPlan(){
     if(ov&&ov.note) h+='<tr><td></td><td colspan="7" class="muted">'+esc(ov.note)+'</td></tr>';
   }
   h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ gespeichert · ✗ nicht erfasst · * von dir geändert. Tipp auf einen kommenden Tag, um ihn zu ändern.</p>';
+  if(plBlockAt(today)===b){ const wk=plWeek(b,today); const wp=plWeekPlan(b,wk); const m=Object.entries(wp.hosts).filter(([,l])=>l.some(x=>plMergeSlots(b,wk,plTemplate(b,x).slots).length));
+    h+='<p class="small"><strong>Diese Woche: '+wp.count+' Einheit'+(wp.count===1?'':'en')+'.</strong> '+(m.length?m.map(([hst,l])=>'Kernübungen aus '+l.join(', ')+' → '+hst).join(' · '):'Alle Einheiten wie geplant.')+'</p>'; }
   Object.entries(b.week_notes||{}).forEach(([w,l])=>l.forEach(n=>{ h+='<p class="small"><strong>W'+w+':</strong> '+esc(n)+'</p>'; }));
   h+='</div>';
   // Templates
@@ -2146,13 +2183,13 @@ function viewPlan(){
     h+='<details class="section"><summary><strong>'+esc(t.id+' – '+t.name)+'</strong> <span class="small muted">'+(t.group==='lower'?'Unterkörper':'Oberkörper')+' · ca. '+t.time_min+' min</span></summary>';
     h+='<p class="small muted">'+esc(t.goal||'')+'</p><div class="table-wrap"><table class="small"><thead><tr><th>Übung (Ersatz)</th>'+weeks.map(w=>'<th>W'+w+'</th>').join('')+'<th>Last</th></tr></thead><tbody>';
     t.slots.forEach(s=>{ const ex=REF.exMap[s.candidates[0]]; const alt=s.candidates.slice(1).map(id=>(REF.exMap[id]||{}).name_de||id);
-      h+='<tr><td><strong>'+esc(ex?ex.name_de:s.candidates[0])+'</strong> '+badge(ROLE_LABEL[s.role]||s.role, s.role==='main'?'ok':(s.role==='power'?'info':''))+
+      h+='<tr><td><strong>'+esc(ex?ex.name_de:s.candidates[0])+'</strong> '+(s.prio===1?badge('Kern','ok')+' ':'')+badge(ROLE_LABEL[s.role]||s.role, s.role==='main'?'ok':(s.role==='power'?'info':''))+
         (alt.length?'<br><span class="muted">Ersatz: '+esc(alt.join(' / '))+'</span>':'')+'<br><span class="muted">'+esc(METHOD_LABEL[s.method]||s.method)+(s.range?' '+s.range[0]+'–'+s.range[1]:'')+' · Pause '+s.rest[0]+(s.rest[1]!==s.rest[0]?'–'+s.rest[1]:'')+' s'+(s.rpe?' · RPE '+esc(s.rpe):'')+'</span></td>'+
         weeks.map(w=>{ const d=(s.dose||{})[w]; return '<td>'+(d?d[0]+'×'+esc(d[1]):'–')+'</td>'; }).join('')+
         '<td>'+esc(plCurrentLoad(s, s.candidates[0], b))+'</td></tr>'; });
     h+='</tbody></table></div></details>';
   });
-  h+='<p class="small muted">Den Plan änderst du nicht hier, sondern gemeinsam mit Claude: Neue Planversionen (z. B. Phase 2) landen im Datenrepo und erscheinen hier automatisch. Laststeigerungen bestätigst du im Training.</p>';
+  h+='<p class="small muted">„Kern“ = wandert bei weniger Einheiten pro Woche in eine andere Einheit. Den Plan änderst du nicht hier, sondern gemeinsam mit Claude: Neue Planversionen (z. B. Phase 2) landen im Datenrepo und erscheinen hier automatisch. Laststeigerungen bestätigst du im Training.</p>';
   return h+planLegacyLink();
 }
 function planLegacyLink(){ return false ? '<p class="small muted" style="margin-top:16px">Früher von Hand angelegte Blöcke und Trainingstage: <button class="link" data-act="planLegacy">anzeigen</button></p>' : ''; }
