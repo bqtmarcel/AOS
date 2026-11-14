@@ -1544,7 +1544,28 @@ function plNextTraining(from){ if(typeof REF==='undefined' || !REF.plan) return 
 function plNextText(today, weekOnly){ const n=plNextTraining(today); if(!n) return '';
   if(weekOnly && mondayOf(n.date)!==mondayOf(today)) return 'Diese Woche ist laut Plan keine Einheit mehr vorgesehen. Nächste Einheit: <strong>'+esc(n.tpl+' – '+n.t.name)+'</strong> am '+WD_LONG[weekdayOf(n.date)]+', '+fmtDate(n.date)+'.';
   return 'Laut Plan: <strong>'+esc(n.tpl+' – '+n.t.name)+'</strong> am '+(n.date===today?'heute':WD_LONG[weekdayOf(n.date)]+', '+fmtDate(n.date))+'. Die Einheit stellt AOS am Trainingstag unter <button class="link" data-act="go" data-view="training">Training</button> zusammen.'; }
-function plFirstSession(b){ for(let i=0;i<b.weeks*7;i++){ const d=addDays(b.start,i); const w=plWeek(b,d); const ov=(b.week_overrides||{})[w]; const sch=(ov&&ov.schedule)||b.week_schedule||{}; const t=sch[WDKEY[weekdayOf(d)]]; if(t) return { date:d, tpl:t }; } return null; }
+/* Vom Athleten geänderte Tage (synchronisiert in suggestionDecisions, Schlüssel sched|Datum) */
+function plSchedOverride(date){ const d=(S.suggestionDecisions||{})['sched|'+date]; return d && d.status==='geändert' ? d : null; }
+function plScheduledAt(b, date){ const o=plSchedOverride(date); if(o) return { tpl:o.tpl||null, changed:true };
+  const w=plWeek(b,date); const ov=(b.week_overrides||{})[w]; const sch=(ov&&ov.schedule)||b.week_schedule||{}; return { tpl:sch[WDKEY[weekdayOf(date)]]||null, changed:false }; }
+ACT.dayEdit = el=>{ const d=el.dataset.d; const b=plBlockAt(d); if(!b) return;
+  const base=(()=>{ const w=plWeek(b,d); const ov=(b.week_overrides||{})[w]; return (((ov&&ov.schedule)||b.week_schedule||{})[WDKEY[weekdayOf(d)]])||null; })();
+  const cur=plScheduledAt(b,d); const saved=S.sessions.find(x=>x.status==='geplant' && x.plannedDate===d && (x.plan||[]).length);
+  const w=plWeek(b,d); const done=plSessions().filter(x=>x.planner.blockId===b.id && isDone(x) && x.planner.week===w).map(x=>x.planner.templateId);
+  const opt=(v,l,on)=>'<button class="chip" data-act="dayEditSet" data-d="'+d+'" data-v="'+v+'" aria-pressed="'+(on?'true':'false')+'">'+esc(l)+'</button>';
+  openDlg(WD_LONG[weekdayOf(d)]+', '+fmtDate(d)+' ändern',
+    '<p class="small">Laut Plan: <strong>'+(base?esc(base+' – '+plTemplate(b,base).name):'kein Training')+'</strong>'+(cur.changed?' · jetzt: <strong>'+(cur.tpl||'kein Training')+'</strong>':'')+'</p>'+
+    (saved?'<div class="note warn small">Für diesen Tag ist schon „'+esc(saved.name)+'“ gespeichert. Die verschiebst du unter Training → Verschieben / Auslassen.</div>':'')+
+    '<div>'+opt('none','Kein Training',cur.changed&&!cur.tpl)+b.templates.map(t=>opt(t.id, t.id+(done.includes(t.id)?' ✓':''), cur.changed&&cur.tpl===t.id)).join('')+'</div>'+
+    (cur.changed?'<p><button class="link" data-act="dayEditSet" data-d="'+d+'" data-v="reset">Wie im Plan</button></p>':'')+
+    '<p class="small muted">Verpasste Einheiten werden nicht nachgeholt. Willst du eine Einheit verlegen, setz den alten Tag auf „Kein Training“ und wähl sie am neuen Tag aus. Einheiten mit ✓ sind diese Woche schon erledigt.</p>',
+    '<button data-act="closeDlg">Schließen</button>'); };
+ACT.dayEditSet = el=>{ const d=el.dataset.d, v=el.dataset.v; const key='sched|'+d;
+  if(v==='reset') delete S.suggestionDecisions[key];
+  else S.suggestionDecisions[key]={ at:new Date().toISOString(), title:'Trainingstag '+fmtDate(d)+' geändert', status:'geändert', tpl: v==='none'?null:v };
+  if(ui.pl && ui.pl.date===d){ ui.pl.tpl=null; ui.pl.accept={}; }
+  save(); closeDlg(); render(); toast(v==='reset'?'Wie im Plan.':(v==='none'?fmtDateShort(d)+': kein Training.':fmtDateShort(d)+': '+v+'.')); };
+function plFirstSession(b){ for(let i=0;i<b.weeks*7;i++){ const d=addDays(b.start,i); const w=plWeek(b,d); const t=plScheduledAt(b,d).tpl; if(t) return { date:d, tpl:t }; } return null; }
 /* Laufender Block – oder vor dessen Start der nächste (z. B. am Wochenende vor Blockbeginn) */
 function plCurrentBlock(date){ const bl=(REF.plan&&REF.plan.blocks)||[]; return plBlockAt(date) || bl.filter(b=>b.start>date).sort((a,c)=>a.start<c.start?-1:1)[0] || null; }
 function plWeek(b, date){ return Math.floor(daysBetween(b.start, date)/7)+1; }
@@ -1567,10 +1588,10 @@ function plDue(date){
   r.plannedToday=mine.find(s=>s.status==='geplant' && s.plannedDate===date) || null;
   const done=mine.filter(s=>isDone(s) && s.planner.week===r.week).map(s=>s.planner.templateId);
   r.remaining=(b.session_order||[]).filter(t=>!skipped.includes(t) && !done.includes(t));
-  const scheduled=sched[WDKEY[weekdayOf(date)]]||null;
-  if(scheduled && r.remaining.includes(scheduled)){ r.tpl=scheduled; r.why='laut Wochenplan ('+WD_LONG[weekdayOf(date)]+(ov?', '+ov.note:'')+')'; }
+  const sc=plScheduledAt(b,date); const scheduled=sc.tpl; r.changed=sc.changed;
+  if(scheduled && (r.remaining.includes(scheduled) || (sc.changed && !done.includes(scheduled)))){ r.tpl=scheduled; r.why=sc.changed?'von dir für diesen Tag geändert':'laut Wochenplan ('+WD_LONG[weekdayOf(date)]+(ov?', '+ov.note:'')+')'; }
   else if(scheduled){ r.tpl=r.remaining[0]||null; r.why=scheduled+' ist diese Woche schon erledigt'+(r.tpl?' → nächste offene Einheit '+r.tpl:'')+'. Verpasstes wird nicht nachgeholt.'; }
-  else { r.offday=true; r.tpl=r.remaining[0]||null; r.why='Heute ist laut Wochenplan kein Trainingstag.'+(r.tpl?' Du kannst die nächste offene Einheit ('+r.tpl+') trotzdem starten.':''); }
+  else { r.offday=true; r.tpl=r.remaining[0]||null; r.why=(sc.changed?'Diesen Tag hast du trainingsfrei gesetzt.':'Heute ist laut Wochenplan kein Trainingstag.')+(r.tpl?' Du kannst die nächste offene Einheit ('+r.tpl+') trotzdem starten.':''); }
   if(skipped.length) r.warnings.push('Diese Woche entfällt '+skipped.join(', ')+' (kein Nachholen).');
   // Gleicher Schwerpunkt an aufeinanderfolgenden Tagen (5.1 Punkt 4)
   const t=plTemplate(b, r.tpl); const yest=mine.find(s=>isDone(s) && sessionDate(s)===addDays(date,-1));
@@ -2096,7 +2117,7 @@ function viewPlan(){
   const conf=(S.suggestionDecisions||{})['plan|'+b.id];
   h+='<h2>'+esc(b.name)+'</h2><div class="section"><p class="small">'+fmtDate(b.start)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+' · '+b.weeks+' Wochen · RPE-Cap '+fmtNum(b.rpe_cap[0])+'–'+fmtNum(b.rpe_cap[b.rpe_cap.length-1])+
     ' · max. '+((b.limits||{}).contacts_per_session||[])[1]+' Bodenkontakte/Einheit · '+((P.rules||{}).max_session_min||65)+' min</p>'+
-    '<p class="small">'+(b.status==='bestätigt'||conf?badge('bestätigt','ok')+(conf?' am '+fmtDate(conf.at.slice(0,10)):''):badge('Vorschlag','warn')+' <button class="link" data-act="plConfirmB" data-b="'+esc(b.id)+'">Vorlagen bestätigen</button>')+'</p>';
+    '<p class="small">'+(b.status==='bestätigt'||conf?badge('bestätigt','ok')+(conf?' am '+fmtDate(conf.at.slice(0,10))+' · <button class="link" data-act="plUnconfirm" data-b="'+esc(b.id)+'">Bestätigung zurücknehmen</button>':''):badge('Vorschlag','warn')+' <button class="link" data-act="plConfirmB" data-b="'+esc(b.id)+'">Vorlagen bestätigen</button>')+'</p>';
   // Wochenraster
   const days=['MON','TUE','WED','THU','FRI','SAT','SUN'], dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
   const mine=plSessions().filter(s=>s.planner.blockId===b.id);
@@ -2104,16 +2125,18 @@ function viewPlan(){
   for(let w=1; w<=b.weeks; w++){
     const ov=(b.week_overrides||{})[w]; const sched=(ov&&ov.schedule)||b.week_schedule; const mon=addDays(b.start,(w-1)*7);
     h+='<tr><td><strong>W'+w+'</strong><br><span class="muted">'+esc((b.week_wave||{})[w]||'')+'</span></td>';
-    days.forEach((k,i)=>{ const d=addDays(mon,i); const t=sched[k];
+    days.forEach((k,i)=>{ const d=addDays(mon,i); const sc=plScheduledAt(b,d); const t=sc.tpl;
       const s=mine.find(x=>sessionDate(x)===d && x.status!=='ausgelassen') || mine.find(x=>x.plannedDate===d);
       let cell='';
       if(s){ const st=isDone(s)?'✓':(s.status==='ausgelassen'?'–':'○'); cell='<button class="link" data-act="startLog" data-id="'+s.id+'">'+st+' '+esc(s.planner.templateId)+'</button>'; }
-      else if(t){ cell = d<today ? '<span class="muted" title="nicht erfasst">'+t+' ✗</span>' : (d===today?'<strong>'+t+'</strong>':t); }
-      h+='<td'+(d===today?' style="background:var(--accent-soft)"':'')+'>'+cell+'</td>'; });
+      else if(t){ cell = d<today ? '<span class="muted" title="nicht erfasst">'+t+' ✗</span>' : (d===today?'<strong>'+t+'</strong>':t)+(sc.changed?'*':''); }
+      else if(sc.changed && d>=today) cell='frei*';
+      const tap = !s && d>=today ? ' data-act="dayEdit" data-d="'+d+'" style="cursor:pointer'+(d===today?';background:var(--accent-soft)':'')+'"' : (d===today?' style="background:var(--accent-soft)"':'');
+      h+='<td'+tap+'>'+cell+'</td>'; });
     h+='</tr>';
     if(ov&&ov.note) h+='<tr><td></td><td colspan="7" class="muted">'+esc(ov.note)+'</td></tr>';
   }
-  h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ geplant · ✗ nicht erfasst (wird nicht nachgeholt) · fett = heute</p>';
+  h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ gespeichert · ✗ nicht erfasst · * von dir geändert. Tipp auf einen kommenden Tag, um ihn zu ändern.</p>';
   Object.entries(b.week_notes||{}).forEach(([w,l])=>l.forEach(n=>{ h+='<p class="small"><strong>W'+w+':</strong> '+esc(n)+'</p>'; }));
   h+='</div>';
   // Templates
@@ -2134,6 +2157,7 @@ function viewPlan(){
 }
 function planLegacyLink(){ return false ? '<p class="small muted" style="margin-top:16px">Früher von Hand angelegte Blöcke und Trainingstage: <button class="link" data-act="planLegacy">anzeigen</button></p>' : ''; }
 ACT.planLegacy = ()=>{ ui.planLegacy=!ui.planLegacy; render(); window.scrollTo(0,0); };
+ACT.plUnconfirm = el=>confirmDlg('Bestätigung zurücknehmen?','Die Vorlagen gelten dann wieder als Vorschlag. Deine Protokolle und bestätigten Lasten bleiben erhalten.','Zurücknehmen',()=>{ delete S.suggestionDecisions['plan|'+el.dataset.b]; save(); render(); });
 ACT.plConfirmB = ()=>{ ui.pl=ui.pl||plDefaults(); ACT.plConfirm(); };
 
 /* ===== AOS – schlanke Hauptansichten: Übersicht, Training, Profil ===== */
@@ -2166,10 +2190,11 @@ function ovWeek(today){
   const cells=dn.map((d,i)=>{ const date=addDays(mon,i); const b=plBlockAt(date); let txt='', act='';
     const s=plSessions().find(x=>(sessionDate(x)===date) && x.status!=='ausgelassen');
     if(s){ txt=(isDone(s)?'✓ ':'○ ')+s.planner.templateId; act=' data-act="startLog" data-id="'+s.id+'"'; any=true; }
-    else if(b){ const w=plWeek(b,date); const ov=(b.week_overrides||{})[w]; const t=((ov&&ov.schedule)||b.week_schedule||{})[WDKEY[weekdayOf(date)]]; if(t){ txt=t+(date<today?' ✗':''); any=true; } }
+    else if(b){ const sc=plScheduledAt(b,date); const t=sc.tpl; if(t){ txt=t+(date<today?' ✗':'')+(sc.changed?'*':''); any=true; } else if(sc.changed){ txt='frei*'; any=true; }
+      if(date>=today) act=' data-act="dayEdit" data-d="'+date+'"'; }
     return '<div class="day'+(date===today?' today':'')+'"'+act+'><div class="small muted">'+d+'</div><strong>'+esc(txt||'–')+'</strong></div>'; });
   if(!any) return '';
-  return '<h2>Diese Woche</h2><div class="weekstrip">'+cells.join('')+'</div>';
+  return '<h2>Diese Woche</h2><div class="weekstrip">'+cells.join('')+'</div><p class="small muted" style="margin-top:-8px">Tipp auf einen Tag, um ihn zu ändern (z. B. kein Training).</p>';
 }
 function ovWeight(today){
   const t=S.bodyweight.find(b=>b.date===today);
