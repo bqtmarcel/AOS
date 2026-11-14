@@ -813,7 +813,9 @@ function statusBadge(s){ const ov = s.status==='geplant' && s.plannedDate && s.p
   if(ov) return badge('nicht erfasst','warn');
   return badge(STATUS_LABEL[s.status], s.status==='absolviert'?'ok':s.status==='teilweise'?'info':s.status==='ausgelassen'?'':''); }
 function srcBadge(o){ return o && o.source==='ausgangsdaten' ? badge('Ausgangsdaten','info') : ''; }
-function capBadge(b){ const t=capText(b); return t?'<span class="cap" title="RPE-Obergrenze dieses Blocks">'+esc(t)+'</span>':''; }
+function planCapText(){ if(typeof REF==='undefined' || !REF.plan) return ''; const pb=plBlockAt(todayISO()); if(!pb) return ''; const c=pb.rpe_cap; return 'RPE ≤ '+fmtNum(c[0])+(c.length>1&&c[1]!==c[0]?'–'+fmtNum(c[1]):''); }
+function capBadge(b, raw){ const pt=(!raw && b && b.status==='aktiv') ? planCapText() : ''; const t=pt||capText(b);
+  return t?'<span class="cap" title="'+(pt?'RPE-Obergrenze laut Plan':'RPE-Obergrenze dieses Blocks')+'">'+esc(t)+'</span>':''; }
 function toast(msg){ document.querySelectorAll('.toast').forEach(x=>x.remove()); const t=document.createElement('div'); t.className='toast'; t.setAttribute('role','status'); t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3200); }
 const GLOSSAR = {
   RPE:'RPE (Rate of Perceived Exertion): Anstrengung eines Satzes auf einer Skala bis 10. RPE 7 ≈ noch etwa 3 Wiederholungen „im Tank“.',
@@ -831,7 +833,7 @@ function openDlg(title, body, foot){
   if(!d.open) d.showModal();
   const f=d.querySelector('.dlg-body input, .dlg-body select, .dlg-body textarea'); if(f) f.focus();
 }
-function closeDlg(){ const d=document.getElementById('dlg'); if(d.open) d.close(); }
+function closeDlg(){ const d=document.getElementById('dlg'); if(d.open) d.close(); if(window.__aosUpdate) setTimeout(aosApplyUpdate, 300); }
 ACT.closeDlg = closeDlg;
 function confirmDlg(title, text, okLabel, onOk, danger){
   ui._confirm = onOk;
@@ -849,6 +851,7 @@ function renderShell(){
   document.getElementById('topinfo').innerHTML = info+'<span id="syncchip">'+ghChip()+'</span>';
 }
 function render(){
+  if(window.__aosUpdate && typeof aosApplyUpdate==='function'){ aosApplyUpdate(); }
   renderShell();
   const m=document.getElementById('main');
   const fn = {uebersicht:viewOverview, plan:viewPlan, training:viewTraining, tests:viewTests, profil:viewProfile, ernaehrung:viewNutrition, druck:viewPrint}[ui.view] || viewOverview;
@@ -868,11 +871,16 @@ function viewOverview(){
   if(!b){
     h+='<div class="empty">Kein aktiver Trainingsblock. Lege unter <button class="link" data-act="go" data-view="plan">Plan</button> einen Block an oder setze einen bestehenden auf „aktiv“.</div>';
   } else {
-    const wk=blockWeek(b,today);
+    const wk=blockWeek(b,today); const pb=(typeof REF!=='undefined'&&REF.plan)?plBlockAt(today):null;
+    if(pb){ const ph=plPhase(today); const w=plWeek(pb,today);
+      h+='<div class="section"><div class="row between"><div><div class="muted small">Aktueller Block'+(ph?' · '+esc(ph.name):'')+'</div><strong style="font-size:1.1rem">'+esc(pb.name)+'</strong></div>'+capBadge(b)+'</div>';
+      h+='<p class="small">Woche '+w+' von '+pb.weeks+((pb.week_wave||{})[w]?' ('+esc(pb.week_wave[w])+')':'')+' · Block endet am '+fmtDate(addDays(pb.start,pb.weeks*7-1))+' · <button class="link" data-act="go" data-view="plan">Plan ansehen</button></p></div>';
+    } else {
     h+='<div class="section"><div class="row between"><div><div class="muted small">Aktueller Block</div><strong style="font-size:1.1rem">'+esc(b.name)+'</strong></div>'+capBadge(b)+'</div>';
     h+='<p class="small">'+(wk?'Woche '+wk+(b.end?' · Block endet am '+fmtDate(b.end):''):'<span class="badge warn">Startdatum fehlt – Blockwoche unbekannt</span>')+'</p>';
     if(b.rules) h+='<p class="small muted">Regeln: '+esc(b.rules)+'</p>';
     h+='</div>';
+    }
     // Woche
     const week=S.sessions.filter(s=>s.blockId===b.id && (s.plannedDate?mondayOf(s.plannedDate)===mon:s.week===mon)).sort(bySessionDate);
     h+='<h2>Diese Woche <span class="muted small">('+fmtDate(mon)+' – '+fmtDate(addDays(mon,6))+')</span></h2>';
@@ -961,7 +969,7 @@ function viewPlanLegacy(){
   h+='<div class="row no-print">'+(S.blocks.length>1?'<div style="flex:1;min-width:220px">'+sel('blk-pick','Trainingsblock',S.blocks.map(x=>[x.id,x.name+' ('+x.status+')']),b?b.id:'','data-chg="pickBlock"')+'</div>':'')+
     '<button data-act="newBlock">Neuer Block</button></div>';
   if(!b) return h+'<div class="empty">Noch kein Trainingsblock vorhanden. Lege einen Block mit Name, Ziel, Zeitraum und RPE-Obergrenze an.</div>';
-  h+='<div class="section"><div class="row between"><h2 style="margin:0">'+esc(b.name)+' '+srcBadge(b)+'</h2>'+capBadge(b)+'</div>'+
+  h+='<div class="section"><div class="row between"><h2 style="margin:0">'+esc(b.name)+' '+srcBadge(b)+'</h2>'+capBadge(b,true)+'</div>'+
     '<dl class="kv small" style="margin-top:10px">'+
     '<dt>Ziel</dt><dd>'+esc(b.goal||'—')+'</dd>'+
     '<dt>Zeitraum</dt><dd>'+(b.start?fmtDate(b.start):'<span class="badge warn">Start fehlt</span>')+' – '+(b.end?fmtDate(b.end):'<span class="badge warn">Ende fehlt</span>')+'</dd>'+
@@ -2532,6 +2540,14 @@ document.addEventListener('visibilitychange', ()=>{
 window.addEventListener('online', ()=>{ if(ghReady()) ghSync('online'); });
 window.addEventListener('offline', ()=>{ if(ghReady()) ghSetState('offline'); });
 
+/* Neue App-Version laden, sobald nichts Ungespeichertes offen ist */
+function aosApplyUpdate(){
+  if(!window.__aosUpdate) return;
+  const dlg=document.getElementById('dlg');
+  if(ui.draft || (dlg && dlg.open)){ if(!window.__aosUpdateToast){ window.__aosUpdateToast=true; toast('Neue AOS-Version verfügbar – sie wird geladen, sobald du gespeichert hast.'); } return; }
+  const go=()=>location.reload();
+  if(ghReady() && gh.dirty) ghSync('update').finally(go); else go();
+}
 (function init(){
   ghLoad(); refInit();
   load();
@@ -2541,8 +2557,11 @@ window.addEventListener('offline', ()=>{ if(ghReady()) ghSetState('offline'); })
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') && document.querySelector('link[rel=manifest]')){
     const hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.register('sw.js').catch(e=>console.warn('Offline-Modus nicht verfügbar', e));
-    navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(hadController) toast('AOS wurde aktualisiert. Die neue Version ist beim nächsten Öffnen aktiv.'); });
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      // Beim Zurückkehren in die App nach einer neuen Version suchen
+      document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') reg.update().catch(()=>{}); });
+    }).catch(e=>console.warn('Offline-Modus nicht verfügbar', e));
+    navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(!hadController) return; window.__aosUpdate=true; aosApplyUpdate(); });
   }
 })();
 </script>
