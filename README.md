@@ -24,3 +24,5 @@ Die App startet mit einem leeren, neutralen Stand und lädt alles Persönliche a
 ## Entwicklung
 
 Einzelne Datei `index.html` ohne Build-Schritt. Bei Änderungen an `index.html` die Cache-Version in `sw.js` erhöhen, sonst sehen installierte Apps die neue Version nicht.
+
+Geplante Verbesserungen und Ideen: siehe [BACKLOG.md](BACKLOG.md).
