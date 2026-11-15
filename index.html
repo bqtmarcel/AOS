@@ -1218,7 +1218,8 @@ function testCard(name){
     list.slice().reverse().map(t=>{ const g=testGaps(t);
       return '<tr><td>'+(t.date?fmtDate(t.date):'—')+'</td><td>'+esc(testValueText(t))+'</td><td>'+esc(t.conditions||'—')+'</td><td>'+srcBadge(t)+' '+g.map(x=>badge(x,'warn')).join(' ')+(t.note?'<div class="small muted">'+esc(t.note)+'</div>':'')+'</td><td><button class="small" data-act="editTest" data-id="'+t.id+'">Bearbeiten</button></td></tr>'; }).join('')+
     '</tbody></table></div><div class="add-row"><button class="small" data-act="editTest" data-name="'+esc(name)+'">+ Neue Messung</button></div>';
-  return pdet('vt-'+name,name,[last?testValueText(last):'',goal?'Ziel '+fmtNum(goal.target)+' '+goal.unit:''].filter(Boolean).join(' · '),'<p class="small muted" style="margin-top:0">'+(list.length===1?'1 Eintrag':list.length+' Einträge')+'</p>'+h);
+  const info=[last?'Aktuell <strong>'+esc(testValueText(last))+'</strong>':'', goal?'Ziel '+esc(fmtNum(goal.target)+' '+goal.unit):'', list.length===1?'1 Eintrag':list.length+' Einträge'].filter(Boolean).join(' · ');
+  return pdet('vt-'+name,name,'','<p class="small muted" style="margin-top:0">'+info+'</p>'+h);
 }
 ACT.editTest = el=>{
   const t=el.dataset.id?S.tests.find(x=>x.id===el.dataset.id):null;
