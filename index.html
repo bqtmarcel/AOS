@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=3">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -144,7 +144,7 @@ details summary{cursor:pointer;color:var(--accent);margin:6px 0}
   --text:#f4f4f5; --muted:#8b8b90; --faint:#55555a;
   --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.16);
   --accent:#f4f4f5; --accent-ink:#000; --accent-soft:rgba(255,255,255,.08);
-  --warn:#e3b45c; --warn-soft:rgba(227,180,92,.10); --bad:#ff6b6b; --bad-soft:rgba(255,107,107,.10);
+  --warn:#e3b45c; --warn-soft:rgba(227,180,92,.10); --bad:#FF8A1F; --bad-soft:rgba(255,138,31,.12);
   --info:#c9c9ce; --info-soft:rgba(255,255,255,.05);
   --radius:20px;
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Inter","Helvetica Neue",Arial,sans-serif;
@@ -189,7 +189,7 @@ button:active{transform:scale(.98)}
 button.primary{background:#f4f4f5;color:#000;border-color:#f4f4f5;font-weight:600}
 button.primary:hover{background:#fff}
 button.block{display:block;width:100%}
-button.danger{color:var(--bad);border-color:rgba(255,107,107,.4)}
+button.danger{color:var(--bad);border-color:rgba(255,138,31,.45)}
 button.link{color:var(--text);text-decoration:none;border-bottom:1px solid var(--line2);border-radius:0;padding:2px 0;margin:0 2px;min-height:auto}
 button.small{padding:6px 14px;min-height:36px;font-size:.84rem}
 button.chip{border-radius:999px;background:transparent;border:1px solid var(--line2);color:var(--text);min-height:40px;padding:7px 15px;font-size:.88rem}
@@ -213,7 +213,7 @@ details[open]>summary::before{content:'–'}
 .badge.ok{color:var(--text);border-color:rgba(255,255,255,.35);background:transparent}
 .badge.info{color:var(--muted);background:transparent;border-color:var(--line2)}
 .badge.warn{color:var(--warn);border-color:rgba(227,180,92,.4);background:transparent}
-.badge.bad{color:var(--bad);border-color:rgba(255,107,107,.4);background:transparent}
+.badge.bad{color:var(--bad);border-color:rgba(255,138,31,.45);background:transparent}
 .cap{background:transparent;border:1px solid var(--line2);color:var(--text);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600;padding:4px 10px}
 
 /* Wochenstreifen */
@@ -274,7 +274,7 @@ nav.tabs button[aria-current="page"]{background:var(--surface2);color:var(--text
 }
 
 /* ===== Variante B (Signal) mit Code-Schrift ===== */
-:root{ --font:"SF Mono",ui-monospace,"JetBrains Mono","Roboto Mono",Menlo,Consolas,monospace; --sig:#c6ff3d; --sig-soft:rgba(198,255,61,.12) }
+:root{ --font:"SF Mono",ui-monospace,"JetBrains Mono","Roboto Mono",Menlo,Consolas,monospace; --sig:#F60100; --sig-deep:#BB271B; --sig-ink:#fff; --sig-soft:rgba(246,1,0,.12) }
 body{letter-spacing:0;font-size:15px}
 h1{font-size:1.6rem;letter-spacing:-.02em;font-weight:600}
 h2,.eyebrow,label,th,.badge,.cap{letter-spacing:.08em}
@@ -285,26 +285,26 @@ dialog h2::before{content:none}
 .hero .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--sig);margin-right:8px;box-shadow:0 0 10px var(--sig);vertical-align:1px}
 .ex-name{font-size:.95rem}
 button,.btn{font-size:.88rem}
-button.primary,button.primary:hover{background:var(--sig);border-color:var(--sig);color:#000}
-button.chip[aria-pressed="true"]{background:var(--sig);border-color:var(--sig);color:#000}
+button.primary,button.primary:hover{background:var(--sig);border-color:var(--sig);color:var(--sig-ink)}
+button.chip[aria-pressed="true"]{background:var(--sig);border-color:var(--sig);color:var(--sig-ink)}
 input:focus,select:focus,textarea:focus{border-color:var(--sig)}
 :focus-visible{outline-color:var(--sig)}
 .weekstrip .day.today{background:transparent;box-shadow:inset 0 0 0 1px var(--sig)}
 .weekstrip .day.today .dn{color:var(--sig)}
 .weekstrip .day.today .wd{color:var(--text)}
-.badge.ok{color:var(--sig);border-color:rgba(198,255,61,.45)}
+.badge.ok{color:var(--text);border-color:rgba(246,1,0,.55)}
 .chart .ln{stroke:var(--sig)} .chart .pt{fill:var(--sig)}
 .brand{letter-spacing:.3em}
 .sysbar{display:flex;gap:10px;font-size:.66rem;letter-spacing:.04em;color:var(--muted);white-space:nowrap}
 .sysbar b{color:var(--text);font-weight:500}
-.sysbar .sd.ok{color:var(--sig)} .sysbar .sd.run{color:var(--text)} .sysbar .sd.err{color:var(--bad)} .sysbar .sd.off{color:var(--faint)}
+.sysbar .sd.ok{color:var(--text)} .sysbar .sd.run{color:var(--text)} .sysbar .sd.err{color:var(--bad)} .sysbar .sd.off{color:var(--faint)}
 nav.tabs button{font-size:.72rem;letter-spacing:.02em}
-nav.tabs button[aria-current="page"]{color:#000;background:var(--sig)}
+nav.tabs button[aria-current="page"]{color:var(--sig-ink);background:var(--sig)}
 @media (max-width:760px){
   nav.tabs{padding:5px 6px;justify-content:space-evenly;gap:0}
   nav.tabs button{flex:0 0 auto;min-width:0;min-height:44px;font-size:clamp(8px,2.6vw,.6rem);letter-spacing:-.02em;padding:0 clamp(4px,1.8vw,8px);justify-content:center;border-radius:22px;white-space:nowrap}
   button.chip{padding:7px 12px}
-  nav.tabs button[aria-current="page"]{background:var(--sig);color:#000}
+  nav.tabs button[aria-current="page"]{background:var(--sig);color:var(--sig-ink)}
   h1{font-size:1.5rem}
   .hero .hero-title{font-size:1.25rem}
 }
@@ -328,7 +328,7 @@ nav.tabs button[aria-current="page"]{color:#000;background:var(--sig)}
 nav.tabs button svg{width:22px;height:22px;flex:none}
 nav.tabs button svg .f{fill:currentColor;stroke:none}
 nav.tabs button{justify-content:center;align-items:center}
-nav.tabs button[aria-current="page"]{color:#000;background:var(--sig)}
+nav.tabs button[aria-current="page"]{color:var(--sig-ink);background:var(--sig)}
 @media (min-width:761px){ nav.tabs button{padding:8px 14px} }
 @media (max-width:760px){
   nav.tabs{display:grid!important;grid-template-columns:repeat(6,1fr);padding:6px;gap:4px}
@@ -384,9 +384,9 @@ main table:not(.stack) td button{white-space:nowrap}
 .mb-n{grid-area:n;font-size:.75rem;color:var(--muted);white-space:nowrap}
 .mb-bar{grid-area:b;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden}
 .mb-bar i{display:block;height:100%;background:var(--muted);border-radius:3px}
-.mb-row.ok .mb-bar i{background:var(--sig)} .mb-row.ok .mb-n{color:var(--sig)}
+.mb-bar i{background:var(--sig-deep)!important} .mb-row.ok .mb-bar i{background:var(--sig)!important} .mb-row.ok .mb-n{color:var(--text)}
 .mb-row.over .mb-bar i{background:var(--warn)} .mb-row.over .mb-n{color:var(--warn)}
-.off-at{display:inline-block;font-size:.6rem;font-weight:700;letter-spacing:.08em;color:#000;background:var(--sig);border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:2px}
+.off-at{display:inline-block;font-size:.6rem;font-weight:700;letter-spacing:.08em;color:var(--sig-ink);background:var(--sig);border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:2px}
 /* Trainingsorte */
 .loc-card textarea{width:100%;min-height:76px}
 .loc-card .chip[data-act="locDay"]{min-width:0;padding:6px 0;width:calc((100% - 36px)/7);margin:0 6px 0 0;font-size:.8rem}
@@ -395,6 +395,8 @@ main table:not(.stack) td button{white-space:nowrap}
 .chips10{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .chips10 .chip{margin:0;min-height:44px;font-weight:600;font-variant-numeric:tabular-nums}
 .field-card{border-color:var(--line2)}
+button.primary:active,nav.tabs button[aria-current="page"]:active{background:var(--sig-deep)!important;border-color:var(--sig-deep)!important}
+.sysbar .sd.err::before{content:'⚠ '}
 @media print{
   header.top,nav.tabs,.no-print,button{display:none!important}
   .print-only{display:block}
