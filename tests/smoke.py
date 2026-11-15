@@ -21,24 +21,25 @@ DEMO = """(()=>{
   const ex=(id,name,pattern,role,eq,prog,cpr)=>({id,name_de:name,pattern,role,capabilities:[],equipment:eq,equipment_type:eq.length?'free_weight':'bodyweight',
     progression:prog,unilateral:false,contacts_per_rep:cpr,phases:['P1'],fatigue:'M',regions:[],substitutes:[],min_increment_kg:2.5,machine:false,selection_penalty:0,position_relevance:{},equipment_check:[]});
   const X={ name:'Demo-Übungen', exercises:[
-    ex('demo_squat','Kniebeuge','squat','main',['barbell','rack'],['rpe_linear'],0),
-    ex('demo_bench','Bankdrücken','horizontal_push','main',['barbell','bench'],['rpe_linear'],0),
-    ex('demo_pullup','Klimmzug','vertical_pull','main',[],['bodyweight_reps'],0),
-    ex('demo_jump','Standweitsprung','jump','power',[],['quality'],1) ]};
+    ex('high_bar_squat','Kniebeuge','squat','main',['barbell','rack'],['rpe_linear'],0),
+    ex('bench_press','Bankdrücken','horizontal_push','main',['barbell','bench'],['rpe_linear'],0),
+    ex('pull_up','Klimmzug','vertical_pull','main',[],['bodyweight_reps'],0),
+    ex('broad_jump','Standweitsprung','jump','power',[],['quality'],1) ]};
   const dose={'1':[3,'5'],'2':[3,'5'],'3':[3,'5']};
-  const P={ name:'Demo-Plan', version:'DEMO-1', season:{first_game:[addDays(mon,90)]}, rules:{pain_threshold:3,max_session_min:65,warmup_min:7,leg_regions:['knee'],increments_kg:{demo_squat:2.5,demo_bench:2.5}},
-    phases:[{id:'P1',name:'P1 Demo',start:mon,end,rpe_cap:[7,8],status:'bestätigt'}],
+  const P={ name:'Demo-Plan', version:'DEMO-1', season:{first_game:[addDays(mon,90)]}, rules:{pain_threshold:3,max_session_min:65,warmup_min:7,leg_regions:['knee'],increments_kg:{high_bar_squat:2.5,bench_press:2.5}},
+    phases:[{id:'P1',name:'P1 Demo',start:mon,end,rpe_cap:[7,8]},{id:'P2',name:'P2 Demo (automatisch)',start:addDays(end,1),end:addDays(end,28),rpe_cap:[8,8]}],
     blocks:[{ id:'DEMO-B1', name:'Demo-Block', phase:'P1', start:mon, weeks:3, rpe_cap:[7,8], status:'bestätigt',
       week_wave:{'1':'Einstieg','2':'Aufbau','3':'Test'}, week_schedule:{MON:'A',WED:'B',FRI:'A'}, week_overrides:{}, session_order:['A','B'],
-      limits:{contacts_per_session:[10,30],sprint_m_per_session:[0,0]}, week_notes:{}, start_loads:{demo_squat:60,demo_bench:40},
+      limits:{contacts_per_session:[10,30],sprint_m_per_session:[0,0]}, week_notes:{}, start_loads:{high_bar_squat:60,bench_press:40},
       templates:[
         {id:'A',name:'Unterkörper',group:'lower',time_min:45,goal:'Demo',slots:[
-          {id:'A-1',role:'power',prio:1,method:'quality',candidates:['demo_jump'],dose:{'1':[3,'3'],'2':[3,'3'],'3':[3,'3']},rest:[60,90]},
-          {id:'A-2',role:'main',prio:1,method:'rpe_linear',candidates:['demo_squat'],dose,rest:[120,150],rpe:'≤ 8'}]},
+          {id:'A-1',role:'power',prio:1,method:'quality',candidates:['broad_jump'],dose:{'1':[3,'3'],'2':[3,'3'],'3':[3,'3']},rest:[60,90]},
+          {id:'A-2',role:'main',prio:1,method:'rpe_linear',candidates:['high_bar_squat'],dose,rest:[120,150],rpe:'≤ 8'}]},
         {id:'B',name:'Oberkörper',group:'upper',time_min:45,goal:'Demo',slots:[
-          {id:'B-1',role:'main',prio:1,method:'wave',candidates:['demo_bench'],dose,rpe_wave:{'1':7,'2':7.5,'3':8},rest:[120,150]},
-          {id:'B-2',role:'main',prio:1,method:'bodyweight_reps',candidates:['demo_pullup'],dose,rest:[90,90]}]} ]}] };
+          {id:'B-1',role:'main',prio:1,method:'wave',candidates:['bench_press'],dose,rpe_wave:{'1':7,'2':7.5,'3':8},rest:[120,150]},
+          {id:'B-2',role:'main',prio:1,method:'bodyweight_reps',candidates:['pull_up'],dose,rest:[90,90]}]} ]}] };
   refSet(P, X, new Date().toISOString(), {nut:null,food:null,recipes:null});
+  if(!REF.plan.blocks.some(b=>b.auto && b.templates.some(t=>t.slots.length))) throw new Error('Automatische Blockplanung hat keinen Block erzeugt');
 })()"""
 
 
