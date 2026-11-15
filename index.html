@@ -381,6 +381,16 @@ body::before{content:'';position:fixed;z-index:-1;pointer-events:none;right:-22v
 .pdet .loc-card{margin:10px 0}
 @media (min-width:761px){nav.tabs{border-radius:999px!important;padding:4px!important}}
 .add-row{margin-top:16px}
+#rest-bar{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:40;display:flex;align-items:center;gap:10px;padding:8px 8px 8px 16px;border-radius:999px;background:rgba(20,20,22,.94);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#rest-bar .rb-l{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+#rest-bar .rb-t{font-size:1.35rem;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text)}
+#rest-bar .rb-z{flex:1;font-size:.75rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rest-bar button{min-height:36px;padding:0 12px}
+#rest-bar i{position:absolute;left:0;bottom:0;height:3px;background:var(--muted);transition:width .5s linear}
+#rest-bar.ok i{background:var(--sig)}#rest-bar.ok .rb-t{color:var(--sig)}
+#rest-bar.go{border-color:var(--sig)}#rest-bar.go .rb-z{color:var(--sig)}
+body:has(#rest-bar) main{padding-bottom:calc(190px + env(safe-area-inset-bottom))!important}
+@media (min-width:761px){#rest-bar{left:50%;right:auto;transform:translateX(-50%);bottom:24px;width:min(560px,90vw)}}
 .last-perf{font-size:.8rem;color:var(--muted);margin:2px 0 8px}.last-perf strong{color:var(--text);font-weight:600}
 .pdet-b>.table-wrap:last-child,.pdet-b>details:last-child{margin-bottom:2px}
 .meal{padding-top:12px;padding-bottom:12px}
@@ -1068,6 +1078,38 @@ function startLog(id){
   render(); window.scrollTo(0,0);
 }
 
+/* ---------- Pausentimer: startet, sobald ein Satz eingetragen ist (nur während die Einheit läuft) ---------- */
+const REST={ start:0, min:0, max:0, key:'', iv:null, beeped:0, ac:null };
+function restRange(pe){ const m=String((pe&&pe.rest)||'').match(/(\d+)(?:\s*[–-]\s*(\d+))?/); if(!m) return [90,90]; const a=+m[1], b=m[2]?+m[2]:a; return [a,b]; }
+function restMaybeStart(ei, sj, f, n){
+  const s=sessionById(ui.sessionId); if(!s || s.log || typeof n!=='number' || Number.isNaN(n)) return;
+  const e=ui.draft.exercises[ei]; const key=(e.metric||'kraft')==='kraft' ? 'reps' : (METRIC_FIELDS[e.metric]||METRIC_FIELDS.kraft)[0][0];
+  if(f!==key) return; const k=ei+'-'+sj; if(REST.key===k) return;
+  const pe=(s.plan||[]).find(p=>p.id===e.planExId); const [a,b]=restRange(pe);
+  restStart(a,b,k);
+}
+function restStart(a,b,k){ Object.assign(REST,{ start:Date.now(), min:a, max:b, key:k||'', beeped:0 });
+  try{ if(!REST.ac){ const C=window.AudioContext||window.webkitAudioContext; if(C) REST.ac=new C(); } if(REST.ac && REST.ac.state==='suspended') REST.ac.resume(); }catch(e){}
+  clearInterval(REST.iv); REST.iv=setInterval(restTick, 500); restTick(); }
+function restBeep(n){ try{ navigator.vibrate && navigator.vibrate(n>1?[200,100,200]:200); const ac=REST.ac; if(!ac) return;
+  for(let i=0;i<n;i++){ const o=ac.createOscillator(), g=ac.createGain(); o.frequency.value=880; o.connect(g); g.connect(ac.destination);
+    const t=ac.currentTime+i*0.25; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.3,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.18); o.start(t); o.stop(t+0.2); } }catch(e){} }
+function restStop(){ clearInterval(REST.iv); REST.iv=null; REST.key=''; const el=document.getElementById('rest-bar'); if(el) el.remove(); }
+function restTick(){
+  if(!(ui.view==='training' && ui.sessionId)){ restStop(); return; }
+  const sec=Math.floor((Date.now()-REST.start)/1000); const fmt=x=>Math.floor(x/60)+':'+String(x%60).padStart(2,'0');
+  if(sec>=REST.min && REST.beeped<1){ REST.beeped=1; restBeep(1); }
+  if(REST.max>REST.min && sec>=REST.max && REST.beeped<2){ REST.beeped=2; restBeep(2); }
+  let el=document.getElementById('rest-bar');
+  if(!el){ el=document.createElement('div'); el.id='rest-bar'; el.setAttribute('role','timer'); document.body.appendChild(el); }
+  const st= sec>=REST.max ? 'go' : sec>=REST.min ? 'ok' : '';
+  el.className=st; const pct=Math.min(100, sec/REST.max*100);
+  el.innerHTML='<span class="rb-l">Pause</span><span class="rb-t">'+fmt(sec)+'</span><span class="rb-z">'+(st==='go'?'weiter geht’s':'Ziel '+(REST.min===REST.max?fmt(REST.min):fmt(REST.min)+'–'+fmt(REST.max)))+'</span>'+
+    '<button class="small" data-act="restPlus" aria-label="30 Sekunden länger">+30</button><button class="small" data-act="restStop" aria-label="Pause beenden">✕</button><i style="width:'+pct+'%"></i>';
+}
+ACT.restStop = ()=>restStop();
+ACT.restPlus = ()=>{ REST.min+=30; REST.max+=30; if(REST.beeped>0 && (Date.now()-REST.start)/1000<REST.min) REST.beeped=0; restTick(); };
+
 /* Letzte Leistung einer Übung (gleicher Name und Variante), ohne die aktuelle Einheit */
 function lastPerf(e, excludeId){
   const key=e.name+'|'+(e.variant||'');
@@ -1127,6 +1169,7 @@ function updateDraftFromInput(t){
   const dr=ui.draft; if(!dr) return; const k=t.dataset.log;
   if(k==='set'){ const f=t.dataset.f; const v=t.value.trim(); const n = f==='reps' ? (v===''?null:(/^\d+$/.test(v)?parseInt(v,10):NaN)) : (v===''?null:(num(v)==null?NaN:num(v)));
     dr.exercises[+t.dataset.e].sets[+t.dataset.s][f]=n;
+    restMaybeStart(+t.dataset.e, +t.dataset.s, f, n);
     if(f==='rpe'){ const s=sessionById(ui.sessionId); const cap=(s.planner&&s.planner.cap!=null)?s.planner.cap:capMax(blockById(s.blockId)); const over=cap!=null&&typeof n==='number'&&n>cap; t.style.borderColor=over?'var(--warn)':''; t.style.borderWidth=over?'2px':''; t.title=over?'über der RPE-Obergrenze':''; } }
   else if(k==='exnote') dr.exercises[+t.dataset.e].note=t.value;
   else if(k==='fast') dr.exercises[+t.dataset.e].fast = t.value==='' ? null : t.value==='ja';
