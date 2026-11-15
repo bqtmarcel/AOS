@@ -397,6 +397,35 @@ main table:not(.stack) td button{white-space:nowrap}
 .field-card{border-color:var(--line2)}
 button.primary:active,nav.tabs button[aria-current="page"]:active{background:var(--sig-deep)!important;border-color:var(--sig-deep)!important}
 .sysbar .sd.err::before{content:'⚠ '}
+/* ===== Chrome Glass ===== */
+body{background-color:#040405;background-image:radial-gradient(110% 55% at 90% -5%,rgba(246,1,0,.26),transparent 60%),radial-gradient(70% 40% at -10% 60%,rgba(187,39,27,.12),transparent 60%),linear-gradient(180deg,#101216,#040405 50%);background-attachment:fixed}
+header.top{background:linear-gradient(180deg,rgba(26,28,32,.97),rgba(8,8,10,.97));border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 1px 0 rgba(0,0,0,.6)}
+.chrome,h1{background:linear-gradient(180deg,#fff 0%,#d3d8df 46%,#8a919b 54%,#f0f3f6 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.section,.ex,dialog{background:linear-gradient(160deg,rgba(255,255,255,.10),rgba(255,255,255,.02) 55%,rgba(255,255,255,.05));border:1px solid transparent;position:relative;backdrop-filter:blur(22px) saturate(170%);-webkit-backdrop-filter:blur(22px) saturate(170%);border-radius:24px;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 14px 34px rgba(0,0,0,.45)}
+dialog{background:linear-gradient(160deg,#1f2126,#111215 60%,#17191d)}
+.section::before,.ex::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(135deg,rgba(255,255,255,.5),rgba(255,255,255,.06) 30%,rgba(255,255,255,.03) 70%,rgba(255,255,255,.3));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.hero{background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.03) 55%,rgba(246,1,0,.08))}
+.ex{border-radius:20px}
+button.primary,button.primary:hover{background:linear-gradient(180deg,#ff3b30 0%,#e00000 50%,#c00000 51%,#e00000 100%);border:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(0,0,0,.25),0 8px 22px rgba(246,1,0,.3)}
+button:not(.primary):not(.link):not(.chip),.btn{background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.18);box-shadow:inset 0 1px 0 rgba(255,255,255,.16)}
+button.chip{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.02));border-color:rgba(255,255,255,.16)}
+button.chip[aria-pressed="true"]{background:linear-gradient(180deg,#ff3b30 0%,#e00000 50%,#c00000 51%,#e00000 100%);border-color:#c00000;box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
+input,select,textarea{background:rgba(0,0,0,.35);border-color:rgba(255,255,255,.14);box-shadow:inset 0 2px 6px rgba(0,0,0,.5)}
+nav.tabs{background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.03))!important;backdrop-filter:blur(28px) saturate(180%)!important;-webkit-backdrop-filter:blur(28px) saturate(180%)!important;border:1px solid rgba(255,255,255,.22)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 14px 40px rgba(0,0,0,.6)}
+nav.tabs button,nav.tabs button:not(.primary):not(.link):not(.chip){background:transparent;border:0;box-shadow:none}
+nav.tabs button[aria-current="page"],nav.tabs button[aria-current="page"]:not(.primary):not(.link):not(.chip){background:linear-gradient(180deg,#ff3b30 0%,#e00000 50%,#c00000 51%,#e00000 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 14px rgba(246,1,0,.35)}
+.weekstrip .day.today{background:rgba(246,1,0,.12)}
+.mb-bar,.kpis>div{background:rgba(0,0,0,.35)}
+.tc-macros b{background:linear-gradient(180deg,#fff,#b9bfc8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tc-macros div:first-child b{background:none;color:var(--sig)}
+.toast{background:linear-gradient(180deg,#f4f5f7,#cfd3d9);color:#000}
+/* Marke im Kopf: Chrom-AOS mit rotem Cursor wie das App-Symbol */
+.brand{display:flex;align-items:center;gap:0;letter-spacing:0;line-height:1}
+.brand .b-word{font-weight:800;font-size:1.25rem;letter-spacing:.14em;background:linear-gradient(180deg,#fff 0%,#e3e7ec 40%,#7f8692 52%,#c9ced6 70%,#f5f7f9 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 1px 0 rgba(0,0,0,.6))}
+.brand .b-cur{display:inline-block;width:.55rem;height:1.05rem;margin-left:2px;background:linear-gradient(180deg,#ff3b30,#c00000);box-shadow:0 0 10px rgba(246,1,0,.6);border-radius:1px;animation:bcur 1.2s steps(1) infinite}
+.brand small{display:block!important;margin-left:10px;padding-left:10px;border-left:1px solid rgba(255,255,255,.18);font-size:.56rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:500;line-height:1.3;max-width:4.5em}
+@keyframes bcur{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.brand .b-cur{animation:none}}
 @media print{
   header.top,nav.tabs,.no-print,button{display:none!important}
   .print-only{display:block}
@@ -412,7 +441,7 @@ button.primary:active,nav.tabs button[aria-current="page"]:active{background:var
 <a href="#main" class="sr-only">Zum Inhalt springen</a>
 <header class="top">
   <div class="top-inner">
-    <div class="brand">AOS<small>Athlete Operating System</small></div>
+    <div class="brand" aria-label="AOS – Athlete Operating System"><span class="b-word">AOS</span><span class="b-cur" aria-hidden="true"></span><small>Athlete OS</small></div>
     <div id="topinfo"></div>
     <nav class="tabs" id="nav" aria-label="Hauptbereiche"></nav>
   </div>
