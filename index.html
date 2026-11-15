@@ -396,8 +396,12 @@ main table:not(.stack) td button{white-space:nowrap}
 .chips10 .chip{margin:0;min-height:44px;font-weight:600;font-variant-numeric:tabular-nums}
 .field-card{border-color:var(--line2)}
 button.primary:active,nav.tabs button[aria-current="page"]:active{background:var(--sig-deep)!important;border-color:var(--sig-deep)!important}
-.sysbar .sd.err::before{content:'⚠ '}
+.sysbar .sd{font-size:.9rem;line-height:1}
+.sysbar .sd.run{animation:sdp 1s ease-in-out infinite}@keyframes sdp{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.sysbar .sd.run{animation:none}}
 /* ===== Chrome Glass ===== */
+.tc-phase{font-size:.72rem;color:var(--muted);margin:2px 0 8px;letter-spacing:.02em}
+.tc-phase b{color:var(--text);font-weight:600}
 body{background-color:#040405;background-image:radial-gradient(110% 55% at 90% -5%,rgba(246,1,0,.26),transparent 60%),radial-gradient(70% 40% at -10% 60%,rgba(187,39,27,.12),transparent 60%),linear-gradient(180deg,#101216,#040405 50%);background-attachment:fixed}
 header.top{background:linear-gradient(180deg,rgba(26,28,32,.97),rgba(8,8,10,.97));border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 1px 0 rgba(0,0,0,.6)}
 .chrome,h1{background:linear-gradient(180deg,#fff 0%,#d3d8df 46%,#8a919b 54%,#f0f3f6 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -1158,11 +1162,7 @@ ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f
 function renderShell(){
   const b=activeBlock();
   document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+' aria-label="'+t+'" title="'+t+'">'+(NAV_ICON[k]||'')+'<span class="sr-only">'+t+'</span></button>').join('');
-  let info = b ? '<span class="small muted">'+esc(b.name)+'</span> ' : '';
-  if(typeof REF!=='undefined' && REF.plan){ const td=todayISO(), pb=plCurrentBlock(td), ph=pb?(plPhase(td)||REF.plan.phases.find(x=>x.id===pb.phase)):null;
-    if(pb){ const tot=pb.weeks*7, d=daysBetween(pb.start,td)+1;
-      info='<span>'+esc(ph?ph.id:pb.id)+'/<b>'+(pb.start>td?'ab '+fmtDateShort(pb.start).slice(3,8):'W'+plWeek(pb,td))+'</b></span>'+(pb.start>td?'':'<span>D'+d+'/<b>'+tot+'</b></span>'); } }
-  document.getElementById('topinfo').innerHTML = '<div class="sysbar">'+info+'<span id="hsync">'+ghDot()+'</span></div>';
+  document.getElementById('topinfo').innerHTML = '<div class="sysbar"><span id="hsync">'+ghDot()+'</span></div>';
 }
 /* Tabellen mit 3+ Spalten werden am Handy als Liste untereinander dargestellt (kein Seitwärts-Scrollen) */
 function stackTables(root){
@@ -2714,6 +2714,13 @@ function viewOverview(){
   h+=ovToday(today)+ovWeek(today);
   return h;
 }
+function ovPhaseLine(td){
+  const pb=plCurrentBlock(td); if(!pb) return '';
+  const ph=plPhase(td)||REF.plan.phases.find(x=>x.id===pb.phase); const nm=ph?(ph.name||ph.id):pb.id;
+  const rest = pb.start>td ? 'Start '+WD[weekdayOf(pb.start)]+' '+fmtDate(pb.start).slice(0,6)
+    : 'Woche '+plWeek(pb,td)+'/'+pb.weeks+' · Tag '+(daysBetween(pb.start,td)+1)+'/'+(pb.weeks*7);
+  return '<div class="tc-phase"><b>'+esc(nm)+'</b> · '+esc(rest)+'</div>';
+}
 function ovToday(today){
   const dayLbl='Heute · '+WD[weekdayOf(today)]+' '+fmtDate(today).slice(0,6);
   if(typeof REF==='undefined' || !REF.plan) return '<div class="section hero"><div class="eyebrow">'+dayLbl+'</div><div class="hero-title">'+(ghReady()?'Plan wird geladen …':'Noch nicht verbunden')+'</div></div>';
@@ -2725,11 +2732,12 @@ function ovToday(today){
   else if(due.plannedToday){ state='open'; title=due.plannedToday.name; sub='gespeichert · bereit zum Erfassen';
     btn='<button class="primary block" data-act="startLog" data-id="'+due.plannedToday.id+'">Erfassen →</button>'; }
   else if(due.block && due.tpl && !due.offday){ const t=plTemplate(due.block, due.tpl); state='open'; title=t.id+' – '+t.name;
-    sub=(due.phase?due.phase.id+' · ':'')+'Woche '+due.week+' · ca. '+t.time_min+' min';
+    sub='ca. '+t.time_min+' min';
     btn='<button class="primary block" data-act="go" data-view="training">Einheit starten →</button>'; }
   else if(isFieldDay(today)){ title='Kein Gym – '+((fieldCfg()||{}).name||'Feldtraining'); sub=((fieldCfg()||{}).time||'')+' · siehe unten'; }
   else { const n=plNextTraining(addDays(today,1)); sub=n?'Nächste Einheit: '+n.tpl+' · '+WD[weekdayOf(n.date)]+' '+fmtDate(n.date).slice(0,6):'Erholung'; }
   let h='<div class="section hero today-card"><div class="eyebrow">'+(state==='open'?'<span class="dot"></span>':'')+esc(dayLbl+(typ&&T.training?' · '+typ:''))+'</div>';
+  h+=ovPhaseLine(today);
   h+='<div class="hero-title">'+esc(title)+'</div><div class="hero-sub">'+esc(sub)+'</div>';
   if(T){ const di=nutDayItems(today,T);
     h+= di.length ? '<div class="tc-row"><div class="tc-k" style="margin-bottom:6px">Ernährung · abgedeckt</div>'+macroBars(sumMac(di),T,true)+'</div>'
@@ -3029,7 +3037,7 @@ function ghOnLocalChange(){ if(!gh.cfg) return; gh.dirty=true; ghStore(); if(ghR
 /* ---------- Anzeige ---------- */
 function ghTime(iso){ if(!iso) return ''; const d=new Date(iso); const t=pad(d.getHours())+':'+pad(d.getMinutes()); return isoOf(d)===todayISO()?t:fmtDateShort(isoOf(d))+' '+t; }
 function ghDot(){ const st=(typeof gh!=='undefined'&&gh.state)||'aus'; const c={ok:'ok',laeuft:'run',ausstehend:'run',offline:'off',fehler:'err',aus:'off'}[st]||'off';
-  return '<span class="sd '+c+'" title="'+esc({ok:'gespeichert',laeuft:'speichert',ausstehend:'ausstehend',offline:'offline',fehler:'Fehler beim Speichern',aus:'nicht verbunden'}[st]||st)+'">● SYNC</span>'; }
+  return '<span class="sd '+c+'" title="'+esc({ok:'gespeichert',laeuft:'speichert',ausstehend:'ausstehend',offline:'offline',fehler:'Fehler beim Speichern',aus:'nicht verbunden'}[st]||st)+'" role="img" aria-label="Speicherstatus: '+esc({ok:'gespeichert',laeuft:'speichert',ausstehend:'ausstehend',offline:'offline',fehler:'Fehler',aus:'nicht verbunden'}[st]||st)+'">●</span>'; }
 function ghChip(){
   const st=gh.state;
   const m = { aus:['Nicht mit GitHub verbunden','warn'], laeuft:['Wird gespeichert …','info'], ok:['Gespeichert '+ghTime(gh.lastOk),'ok'],

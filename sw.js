@@ -1,6 +1,6 @@
 /* AOS Service Worker – speichert nur die App-Dateien für den Offline-Start.
    Trainingsdaten laufen nicht über den Service Worker (Anfragen an api.github.com werden nicht zwischengespeichert). */
-const CACHE = 'aos-3ba69b69cfd4';
+const CACHE = 'aos-e4359b31ca7e';
 const FILES = ['./', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
