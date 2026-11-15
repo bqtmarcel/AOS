@@ -2213,6 +2213,31 @@ function nutCalc(items, T){
 }
 
 /* ---------- Tagestyp, Gewicht, Ziele (4, 5, 6.4) ---------- */
+/* ---------- Automatische Kalorienanpassung (Spezifikation 4.4) – AOS entscheidet selbst, wöchentlich montags ----------
+   Gewicht ist die Leitplanke (7-Tage-Schnitt), Leistung entscheidet mit. Nach jeder Änderung 14 Tage Pause.
+   Anpassung immer über Kohlenhydrate: +30 g ≈ +120 kcal, −25 g ≈ −100 kcal. */
+function bwAvg(date){ const w=S.bodyweight.filter(b=>b.date && b.kg!=null && b.date<=date && daysBetween(b.date,date)<7); return w.length>=2 ? w.reduce((a,b)=>a+b.kg,0)/w.length : null; }
+function nutCorridor(){ const N=NUT(); if(Array.isArray(N.weight_corridor)) return N.weight_corridor; const t=S.profile&&S.profile.targetWeightKg; return t ? [t-1.5, t+1.5] : null; }
+function nutAdjust(date){
+  const out={ train:0, rest:0, hist:[] }; const dated=S.bodyweight.filter(b=>b.date&&b.kg!=null).map(b=>b.date).sort(); if(!dated.length || !REF.nut) return out;
+  const cor=nutCorridor(); const maxGain=(NUT().max_gain_pct_week||0.25)/100; let last=null;
+  for(let d=mondayOf(addDays(dated[0],14)); d<=date; d=addDays(d,7)){
+    if(last && daysBetween(last,d)<14) continue;
+    const a0=bwAvg(addDays(d,-1)), a1=bwAvg(addDays(d,-8)), a2=bwAvg(addDays(d,-15)); if(a0==null||a1==null) continue;
+    const rd=loggedSessions().filter(s=>sessionDate(s)<d && s.planner).slice(-3).map(s=>s.log.form!=null?s.log.form:(s.planner.checkin||{}).readiness).filter(v=>v!=null);
+    const lowRd=rd.length===3 && rd.reduce((x,y)=>x+y,0)/3<=2.5;
+    let dT=0, dR=0, why='';
+    if(cor && a0<cor[0]){ dT=30; dR=30; why='7-Tage-Schnitt '+fmtNum(Math.round(a0*10)/10)+' kg unter dem Korridor ('+fmtNum(cor[0])+'–'+fmtNum(cor[1])+' kg)'; }
+    else if(a2!=null && a0<a1 && a1<a2){ dT=30; dR=30; why='Gewicht 2 Wochen in Folge gesunken ('+fmtNum(Math.round(a2*10)/10)+' → '+fmtNum(Math.round(a0*10)/10)+' kg)'; }
+    else if(lowRd && a0<=a1){ dT=40; why='Tagesform niedrig bei stabilem oder fallendem Gewicht – mehr Kohlenhydrate an Trainingstagen'; }
+    else if(cor && a0>cor[1]){ dR=-25; why='7-Tage-Schnitt '+fmtNum(Math.round(a0*10)/10)+' kg über dem Korridor'; }
+    else if((a0-a1)/a1>maxGain){ dR=-25; why='Zunahme '+fmtNum(Math.round((a0-a1)*10)/10)+' kg/Woche – schneller als '+fmtNum(maxGain*100)+' %'; }
+    if(!dT && !dR) continue;
+    const nT=Math.max(-50,Math.min(100,out.train+dT)), nR=Math.max(-50,Math.min(100,out.rest+dR)); if(nT===out.train && nR===out.rest) continue;
+    out.hist.push({ date:d, dT:nT-out.train, dR:nR-out.rest, why }); out.train=nT; out.rest=nR; last=d;
+  }
+  return out;
+}
 function nutWeight(date){
   const dated=S.bodyweight.filter(b=>b.date && b.date<=date && b.kg!=null).sort((a,b)=>a.date<b.date?1:-1);
   const win=dated.filter(b=>daysBetween(b.date,date)<7);
@@ -2238,11 +2263,12 @@ function nutTargets(date){
   const type=cfg.type||auto.type; const dt=N.day_types[type]||N.day_types.rest;
   const w=nutWeight(date);
   const P=r5(N.protein_g_per_kg*w.kg); let K=r5(dt.carb_g_per_kg*w.kg); const F=Math.round(dt.fat_g_per_kg*w.kg);
+  const adj=nutAdjust(date); const adjK=type!=='rest' ? adj.train : adj.rest; if(adjK) K=Math.max(0, K+adjK);
   const en=N.entry; const entry=!!(en && date<=en.until && en.day_types.includes(type));
   if(entry) K=Math.max(0, K-en.carb_minus_g);
   const training=type!=='rest';
   const time = training ? (cfg.time||'morning') : 'rest';
-  return { type, label:dt.label, auto, manual:!!cfg.type, w, P, K, F, kcal:r10(4*P+4*K+9*F), entry, time, training };
+  return { type, label:dt.label, auto, manual:!!cfg.type, w, P, K, F, kcal:r10(4*P+4*K+9*F), entry, time, training, adjK, adj };
 }
 function nutMealPlan(T){ const mp=NUT().meal_plans[T.time] || NUT().meal_plans.rest;
   return mp.map(s=>({ slot:s, P:Math.round(T.P*s.P), K:Math.round(T.K*s.K), F:Math.round(T.F*s.F) })); }
@@ -2265,6 +2291,7 @@ function viewNutrition(){
   if(T.training) h+='<div>'+Object.entries(NUT().training_times).map(([k,l])=>chipBtn('nutTimeChip','time',k,l.replace(/^Training /,''),T.time===k)).join('')+'</div>';
   { const di=nutDayItems(date,T); h+='<div class="eyebrow" style="margin:12px 0 2px">Abgedeckt '+(di.length?'· '+di.length+' Einträge':'· noch nichts eingetragen')+'</div>'+macroBars(sumMac(di),T); }
   h+='<p class="small muted">Basis '+fmtNum(Math.round(T.w.kg*10)/10)+' kg · '+esc(T.w.basis)+(T.entry?' · Einstiegsziel bis '+fmtDate(NUT().entry.until).slice(0,6):'')+'</p>';
+  if(T.adjK){ const lh=T.adj.hist[T.adj.hist.length-1]; h+='<p class="small"><strong>Von AOS angepasst:</strong> '+(T.adjK>0?'+':'')+T.adjK+' g Kohlenhydrate '+(T.adj.train===T.adj.rest?'an allen Tagen':(T.training?'an Trainingstagen':'an Ruhetagen'))+' (seit '+fmtDate(lh.date).slice(0,6)+': '+esc(lh.why)+').</p>'; }
   h+='<details><summary class="small muted">Tagestyp ändern</summary>'+sel('nut-type','Tagestyp',[['','automatisch']].concat(Object.entries(NUT().day_types).map(([k,v])=>[k,v.label])),cfg.type||'','data-chg="nutType"')+'</details></div>';
 
   // Mahlzeiten

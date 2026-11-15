@@ -48,7 +48,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 
 | # | Idee | Nutzen | Prio | Aufwand |
 |---|---|---|---|---|
-| E1 | **Kalorienziel automatisch anpassen** nach Gewichtstrend (Spezifikation 4.4), mit Begründung | Weniger Nachrechnen | ⏸ braucht deine Bestätigung von Spezifikation 4.4 und den Gewichtskorridor in nutrition.json | M |
+| E1 | **Kalorienziel automatisch anpassen** nach Gewichtstrend (Spezifikation 4.4), mit Begründung | Weniger Nachrechnen | ✅ erledigt | M |
 | E3 | **Mahlzeit vom Vortag kopieren** mit einem Tipp | Weniger Tipparbeit | ✅ erledigt | S |
 | E4 | **Supplements**: Wochenübersicht abgehakt / vergessen | Regelmäßigkeit | ✅ erledigt | S |
 | E5 | **Meal-Prep-Plan** (Spezifikation 12) als eigene Ansicht: Mengen für die Woche, direkt in die Einkaufsliste | Planung am Wochenende | ⏸ braucht deine Antwort zu offenem Punkt 7 (Mittagessen pro Woche, Gefrierschrank) | M |
