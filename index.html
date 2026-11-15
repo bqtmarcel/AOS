@@ -382,6 +382,9 @@ table.supw td,table.supw th{text-align:center;padding:6px 2px}table.supw td:firs
 .date-pick{position:relative;display:flex;align-items:center;justify-content:center;min-height:48px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.35);color:var(--text);font-weight:600;cursor:pointer;margin:0}
 .date-pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0;margin:0}
 .date-pick input::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+@media (min-width:1000px){
+  .nut-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);grid-template-areas:"b a" "b c";column-gap:28px;align-items:start}
+  .ng-a{grid-area:a}.ng-b{grid-area:b}.ng-c{grid-area:c} .ng-b>h2:first-child{margin-top:0} }
 .last-perf{font-size:.8rem;color:var(--muted);margin:2px 0 8px}.last-perf strong{color:var(--text);font-weight:600}
 .pdet-b>.table-wrap:last-child,.pdet-b>details:last-child{margin-bottom:2px}
 .meal{padding-top:12px;padding-bottom:12px}
@@ -2033,6 +2036,7 @@ function viewNutrition(){
     return h+'<div class="note">'+(REF.loading?'Ernährungsdaten werden geladen …':(REF.nutError||'Ernährungsdaten noch nicht geladen.'))+' <button class="link" data-act="plReload">Neu laden</button></div>';
   }
   const date=ui.nutDate||todayISO(); const T=nutTargets(date); const cfg=nutDayCfg(date);
+  h+='<div class="nut-grid"><div class="ng-a">';
   h+='<div class="row between no-print"><button data-act="nutDay" data-d="-1">←</button><label class="date-pick" style="flex:1;max-width:220px"><span>'+(date===todayISO()?'Heute · ':'')+WD[weekdayOf(date)]+' '+fmtDate(date).slice(0,6)+'</span><input id="nut-date" type="date" value="'+date+'" data-chg="nutDate" aria-label="Datum wählen"></label><button data-act="nutDay" data-d="1">→</button></div>';
   // Tagestyp & Ziel
   h+='<div class="section"><div class="row between"><strong>'+WD_LONG[weekdayOf(date)]+', '+fmtDate(date)+'</strong>'+badge(T.label, T.training?'ok':'')+'</div>';
@@ -2045,7 +2049,7 @@ function viewNutrition(){
   // Mahlzeiten
   const plan=nutMealPlan(T);
   const all=[]; let doneN=0;
-  h+='<h2>Mahlzeiten</h2>';
+  h+='</div><div class="ng-b"><h2>Mahlzeiten</h2>';
   plan.forEach(({slot,P,K,F})=>{
     const m=nutMeal(date, slot.id); const items=m?m.items:[]; items.forEach(i=>all.push(i)); if(m&&m.done) doneN++;
     const ist=sumMac(items); const open=!!(ui.mealOpen||{})[slot.id]; const zk=Math.round(4*P+4*K+9*F);
@@ -2069,6 +2073,7 @@ function viewNutrition(){
   const day=sumMac(all); const pct=(a,b)=>b?Math.round((a/b-1)*100):0; const tol=(NUT().tolerance||{}).day_pct||5;
   const line=(l,a,b,u)=>'<div><span class="small muted">'+l+'</span><strong>'+Math.round(a)+(u||' g')+'</strong><span class="small muted"> / '+b+(u||' g')+(all.length?' ('+(pct(a,b)>0?'+':'')+pct(a,b)+' %'+(Math.abs(pct(a,b))<=tol?' ✓':'')+')':'')+'</span></div>';
 
+  h+='</div><div class="ng-c">';
   // Supplements
   const sup=(NUT().supplements||[]).filter(s=>s.active);
   if(sup.length) h+='<h2>Supplements</h2><div class="section sup-list">'+sup.map(s=>{ const on=!!(cfg.supp&&cfg.supp[s.id]); const nm=s.name.replace(/\s*\(.*\)\s*$/,'');
@@ -2081,6 +2086,7 @@ function viewNutrition(){
   h+='<div class="no-print" style="margin-top:16px"><button class="primary block" data-act="shopOpen">Einkaufsliste</button></div>';
   h+=nutTplSection();
   h+='<p class="small muted" style="margin-top:16px">Richtwerte aus Nährwerttabellen, Packungsangaben haben Vorrang.</p>';
+  h+='</div></div>';
   return h;
 }
 /* ---------- Aktionen ---------- */
