@@ -2380,7 +2380,7 @@ document.addEventListener('toggle', e=>{ const d=e.target; if(d && d.dataset && 
 function viewProfile(){
   const p=S.profile;
   let h='<h1>Profil</h1>';
-  h+=pdet('person','Persönliche Daten',[p.name,p.heightCm?p.heightCm+' cm':''].filter(Boolean).join(' · '),'<div class="fields">'+inp('p-name','Name',p.name)+inp('p-by','Geburtsjahr',p.birthYear,'inputmode="numeric" placeholder="z. B. 1993"')+'</div>'+
+  h+=pdet('person','Persönliche Daten',[p.name,p.heightCm?p.heightCm+' cm':''].filter(Boolean).join(' · '),'<div class="fields">'+inp('p-name','Name',p.name)+inp('p-by','Geburtsjahr',p.birthYear,'inputmode="numeric" placeholder="z. B. 1990"')+'</div>'+
     '<div class="fields">'+inp('p-h','Größe (cm)',p.heightCm,'inputmode="numeric"')+inp('p-tw','Zielgewicht (kg, optional)',fmtNum(p.targetWeightKg),'inputmode="decimal"')+'</div>'+
     '<button class="primary" data-act="saveProfileSlim">Speichern</button>');
   h+=calSection();
