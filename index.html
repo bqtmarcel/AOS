@@ -392,6 +392,9 @@ main table:not(.stack) td button{white-space:nowrap}
 .loc-card .chip[data-act="locDay"]{min-width:0;padding:6px 0;width:calc((100% - 36px)/7);margin:0 6px 0 0;font-size:.8rem}
 .loc-card .chip[data-act="locDay"]:last-child{margin-right:0}
 .loc-sum{margin:6px 0 4px;color:var(--muted);border-left:2px solid var(--sig);padding-left:10px}
+.chips10{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.chips10 .chip{margin:0;min-height:44px;font-weight:600;font-variant-numeric:tabular-nums}
+.field-card{border-color:var(--line2)}
 @media print{
   header.top,nav.tabs,.no-print,button{display:none!important}
   .print-only{display:block}
@@ -493,6 +496,7 @@ function save(silent){
 function migrate(d){
   // Platz für künftige Schema-Änderungen; fehlende Bereiche ergänzen statt Daten zu verwerfen
   d.unavailable = d.unavailable || [];
+  d.fieldLogs = Array.isArray(d.fieldLogs) ? d.fieldLogs : [];   // Feldtraining (Football, Team): ein Eintrag pro Tag
   d.suggestionDecisions = d.suggestionDecisions || {};
   if(!d.nutrition || !Array.isArray(d.nutrition.items)) d.nutrition = defaultNutrition();
   const n=d.nutrition; n.combos=n.combos||[]; n.meals=n.meals||[]; n.dayOverrides=n.dayOverrides||{}; n.constraints=n.constraints||''; n.guides=n.guides||defaultNutrition().guides;
@@ -677,7 +681,8 @@ const SYNC_ARRAYS = [
   ['sessions','Trainingseinheiten', d=>d.sessions, (d,v)=>d.sessions=v],
   ['food','Ernährungsbausteine', d=>d.nutrition.items, (d,v)=>d.nutrition.items=v],
   ['combo','Ernährungskombinationen', d=>d.nutrition.combos, (d,v)=>d.nutrition.combos=v],
-  ['meal','Mahlzeiten', d=>d.nutrition.meals, (d,v)=>d.nutrition.meals=v]
+  ['meal','Mahlzeiten', d=>d.nutrition.meals, (d,v)=>d.nutrition.meals=v],
+  ['field','Feldtraining', d=>d.fieldLogs, (d,v)=>d.fieldLogs=v]
 ];
 const SYNC_LABELS = Object.assign(Object.fromEntries(SYNC_ARRAYS.map(a=>[a[0],a[1]])),
   { profile:'Profil', nutset:'Ernährungseinstellungen', unavail:'nicht verfügbare Tage', decision:'Entscheidungen zu Vorschlägen', dayov:'Tagesarten (Ernährung)' });
@@ -1626,6 +1631,10 @@ function viewTests(){
   // Körpergewicht
   const bws=S.bodyweight.slice().sort((a,b)=>(a.date||'')<(b.date||'')?-1:1);
   const goalW=S.profile.targetWeightKg;
+  const fls=(S.fieldLogs||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
+  if(fls.length) h+='<h2>Feldtraining</h2><div class="section"><div class="table-wrap"><table><thead><tr><th>Datum</th><th>Anstrengung</th><th>Kontakt</th><th>Belastung</th></tr></thead><tbody>'+
+    fls.slice(0,12).map(l=>'<tr><td><button class="link" data-act="fieldLog" data-d="'+l.date+'">'+fmtDateShort(l.date)+'</button></td><td>'+(l.status==='ausgefallen'?'fand nicht statt':l.rpe+'/10')+'</td><td>'+esc(l.contact||'—')+'</td><td>'+(l.rpe&&l.durationMin?(l.rpe*l.durationMin)+' AU':'—')+'</td></tr>').join('')+
+    '</tbody></table></div><p class="small muted">Belastung = Anstrengung × Minuten (Session-RPE). Hilft, harte Wochen zu erkennen.</p></div>';
   h+='<h2>Körpergewicht</h2><div class="section">';
   const pts=bws.filter(x=>x.date&&x.kg!=null).map(x=>({x:x.date,y:x.kg}));
   h+= pts.length>=2 ? lineChart(pts,{unit:'kg',goal:goalW,label:'Körpergewicht'}) : '<p class="small muted">Für ein Diagramm werden mindestens zwei Messungen mit Datum benötigt.</p>';
@@ -2046,6 +2055,10 @@ function plBuild(inp){
   const painOn = pain>=thr;
   const legPain = painOn && regions.some(r=>(rules.leg_regions||[]).includes(r));
   const notes=[], dropped=[], items=[];
+  const fieldToday=fieldActive(inp.date); const fc=fieldCfg();
+  const ydLog=fieldLog(addDays(inp.date,-1)); const fieldYest=fieldHard(ydLog);
+  if(fieldToday) notes.push('Heute '+(fc.time||'')+' '+(fc.name||'Feldtraining')+' (ca. '+(fc.duration_min||90)+' min): Power/Sprünge und Zusatzübungen je −1 Satz, optionale Übungen entfallen, Hauptübungen ab 4 Sätzen −1 Satz.');
+  if(fieldYest) notes.push('Gestern hartes Feldtraining ('+fieldSummary(ydLog).replace('✓ ','')+'): intensive Sprünge entfallen heute.');
   const locObj=inp.loc?locById(inp.loc):null; const locR=locObj?locParse(locObj.text):null;
   if(locObj && locR && !locR.empty) notes.push('Ort '+locObj.name+': '+locSummary(locObj)+'. Übungen, die dort nicht gehen, werden ersetzt oder weggelassen.');
   const noIncrease = painOn ? 'Beschwerden '+pain+'/10' : (rd!=null && rd<=2 ? 'Readiness '+rd : '');
@@ -2070,6 +2083,7 @@ function plBuild(inp){
     } }
   slots.forEach(slot=>{
     const d=(slot.dose||{})[week]; if(!d){ return; }
+    if(slot.role==='optional' && fieldToday){ dropped.push({ slot, why:'optional – heute abends Feldtraining' }); return; }
     if(slot.role==='optional' && !(rd==null || rd>=4)){ dropped.push({ slot, why:'optional – nur bei Readiness 4–5' }); return; }
     // Kandidaten: Ausstattung, Beschwerden, Kontinuität (5.2)
     let cands=slot.candidates.map(id=>REF.exMap[id]).filter(Boolean);
@@ -2082,6 +2096,7 @@ function plBuild(inp){
       if(miss.length){ skipWhy.push(e.name_de+': '+miss.map(q=>EQUIP_LABEL[q]||q).join(', ')+' nicht verfügbar'); return; }
       const hit=painOn ? (e.regions||[]).filter(r=>regions.includes(r)) : [];
       if(hit.length){ skipWhy.push(e.name_de+' belastet '+hit.map(r=>REGION_LABEL[r]||r).join(', ')); return; }
+      if(fieldYest && (e.pattern==='jump'||e.pattern==='jump_loaded')){ skipWhy.push(e.name_de+': gestern hartes Feldtraining'); return; }
       if(legPain && (e.pattern==='jump'||e.pattern==='jump_loaded')){ skipWhy.push(e.name_de+': intensive Sprünge entfallen bei Beschwerden in Bein/Hüfte/Leiste'); return; }
       filt.push(e);
     });
@@ -2094,6 +2109,8 @@ function plBuild(inp){
     if(slot.from) reasons.unshift('Aus '+slot.from+' übernommen (diese Woche weniger Einheiten).');
     const x={ slot, from:slot.from||null, slotId:slot.id, dbId:ex.id, ex, role:slot.role, method:slot.method, sets, reps, rest:slot.rest||[60,90], rpe:slot.rpe||'', reasons, note:slot.note||'', alternatives: filt.filter(e=>e.id!==ex.id).map(e=>e.name_de) };
     // Readiness (7)
+    if(fieldToday){ const lim = x.role==='main' ? 4 : 2;
+      if(['power','assistance','main'].includes(x.role) && x.sets>=lim){ x.sets--; reasons.push('Abends Feldtraining → 1 Satz weniger.'); } }
     if(rd!=null && rd<=3 && x.role==='assistance' && x.sets>1){ x.sets--; reasons.push('Readiness '+rd+' → 1 Satz weniger.'); }
     if(rd!=null && rd<=2 && x.role==='power'){ const n=Math.max(1, Math.round(x.sets*0.75)); if(n<x.sets){ reasons.push('Readiness '+rd+' → Power-Volumen ca. −25 % ('+x.sets+' → '+n+' Sätze).'); x.sets=n; } }
     if(slot.grip && inp.grip && x.sets>1){ x.sets--; reasons.push('Griff ermüdet → 1 Satz weniger.'); }
@@ -2315,7 +2332,11 @@ function nutWeight(date){
   if(any) return { kg:any.kg, basis:'Ausgangswert ohne Datum', provisional:true };
   return { kg:NUT().weight_default_kg, basis:NUT().weight_default_note||'Standardwert', provisional:true };
 }
-function nutAutoType(date){
+function nutAutoType(date){ const r=nutAutoTypeGym(date);
+  if(!fieldActive(date)) return r; const c=fieldCfg();
+  if(r.type==='rest') return { type:'field', why:(c.name||'Feldtraining')+' '+(c.time||'') };
+  return { type:'gym_field', why:r.why+' + '+(c.name||'Feldtraining')+' '+(c.time||'') }; }
+function nutAutoTypeGym(date){
   const map=NUT().template_day_type||{};
   const s=S.sessions.find(x=>x.planner && x.status!=='ausgelassen' && (sessionDate(x)===date));
   if(s) return { type:map[s.planner.templateId]||'gym_upper', why:(isDone(s)?'Einheit ':'geplante Einheit ')+s.planner.templateId+' – '+s.name.replace(/^D\d – /,'') };
@@ -2674,12 +2695,15 @@ function ovToday(today){
   else if(due.block && due.tpl && !due.offday){ const t=plTemplate(due.block, due.tpl); state='open'; title=t.id+' – '+t.name;
     sub=(due.phase?due.phase.id+' · ':'')+'Woche '+due.week+' · ca. '+t.time_min+' min';
     btn='<button class="primary block" data-act="go" data-view="training">Einheit starten →</button>'; }
+  else if(isFieldDay(today)){ title='Kein Gym – '+((fieldCfg()||{}).name||'Feldtraining'); sub=((fieldCfg()||{}).time||'')+' · siehe unten'; }
   else { const n=plNextTraining(addDays(today,1)); sub=n?'Nächste Einheit: '+n.tpl+' · '+WD[weekdayOf(n.date)]+' '+fmtDate(n.date).slice(0,6):'Erholung'; }
   let h='<div class="section hero today-card"><div class="eyebrow">'+(state==='open'?'<span class="dot"></span>':'')+esc(dayLbl+(typ&&T.training?' · '+typ:''))+'</div>';
   h+='<div class="hero-title">'+esc(title)+'</div><div class="hero-sub">'+esc(sub)+'</div>';
   if(T){ const di=nutDayItems(today,T);
     h+= di.length ? '<div class="tc-row"><div class="tc-k" style="margin-bottom:6px">Ernährung · abgedeckt</div>'+macroBars(sumMac(di),T,true)+'</div>'
       : '<div class="tc-row tc-macros"><div><b>'+fmtK(T.kcal)+'</b><span>kcal</span></div><div><b>'+T.P+'<small>g</small></b><span>Protein</span></div><div><b>'+T.K+'<small>g</small></b><span>KH</span></div><div><b>'+T.F+'<small>g</small></b><span>Fett</span></div></div>'; }
+  if(isFieldDay(today)){ const fc=fieldCfg(), fl=fieldLog(today);
+    h+='<div class="tc-row tc-weight"><span class="tc-k">'+esc(fc.time||'Feld')+'</span><span>'+esc(fc.name||'Football-Training')+'<br><span class="small muted">'+(fl?esc(fieldSummary(fl)):'ca. '+(fc.duration_min||90)+' min')+'</span></span><button class="small'+(fl?' link':'')+'" data-act="fieldLog" data-d="'+today+'">'+(fl?'ändern':'Erfassen')+'</button></div>'; }
   h+=ovWeightRow(today);
   const hints=[];
   if(T && T.entry) hints.push('Einstiegsphase: KH −'+NUT().entry.carb_minus_g+' g bis '+fmtDate(NUT().entry.until).slice(0,6));
@@ -2705,6 +2729,7 @@ function ovWeek(today){
     let done=false; if(s){ done=isDone(s); txt=(done?'✓ ':'')+s.planner.templateId; act=' data-act="startLog" data-id="'+s.id+'"'; any=true; }
     else if(b){ const sc=plScheduledAt(b,date); const t=sc.tpl; if(t){ txt=t+(date<today?' ✗':'')+(sc.changed?'*':''); any=true; } else if(sc.changed){ txt='frei*'; any=true; }
       if(date>=today) act=' data-act="dayEdit" data-d="'+date+'"'; }
+    if(isFieldDay(date)){ const fl=fieldLog(date); txt=(txt?txt+'+':'')+(fl&&fl.status==='ausgefallen'?'F✗':'F'); any=true; }
     return '<div class="day'+(date===today?' today':'')+'"'+act+(act&&!s?'':'')+'><span class="wd">'+d+'</span><span class="dn">'+parseISO(date).getDate()+'</span><span class="tp'+(done?' done':'')+'">'+esc(txt||'')+'</span></div>'; });
   if(!any) return '';
   return '<h2>Diese Woche</h2><div class="weekstrip">'+cells.join('')+'</div><p class="small muted">Tipp auf einen Tag, um ihn zu ändern.</p>';
@@ -2715,11 +2740,44 @@ ACT.ovBw = ()=>{ const kg=num(val('ov-kg')); if(kg==null||kg<30||kg>300){ toast(
   x.kg=kg; ui.ovBwEdit=false; save(); toast('Gewicht gespeichert.'); render(); };
 ACT.hideInstall = ()=>{ S.settings.hideInstallHint=true; save(); render(); };
 
+/* ---------- Feldtraining (Team, Football-spezifisch, Inhalte vorgegeben) ----------
+   Konfiguration in planner/plan.json → field { start, days, time, duration_min, name }. */
+function fieldCfg(){ return (typeof REF!=='undefined' && REF.plan && REF.plan.field) || null; }
+function fieldLog(date){ return (S.fieldLogs||[]).find(l=>l.date===date) || null; }
+function isFieldDay(date){ const c=fieldCfg(); if(!c || !date || date<c.start || (c.end && date>c.end)) return false; return (c.days||[]).includes(WDKEY[weekdayOf(date)]); }
+function fieldActive(date){ if(!isFieldDay(date)) return false; const l=fieldLog(date); return !(l && l.status==='ausgefallen'); }
+const FIELD_CONTACT = [['keiner','kein Kontakt'],['leicht','leicht'],['mittel','mittel'],['hoch','hoch']];
+function fieldHard(l){ return !!(l && l.status==='absolviert' && ((l.rpe||0)>=8 || l.contact==='hoch')); }
+function fieldSummary(l){ if(!l) return ''; if(l.status==='ausgefallen') return 'fand nicht statt';
+  return '✓ Anstrengung '+l.rpe+'/10 · Kontakt '+((FIELD_CONTACT.find(x=>x[0]===l.contact)||[,l.contact])[1])+(l.durationMin?' · '+l.durationMin+' min':''); }
+function fieldDlgBody(){ const d=ui.fieldDraft; const c=fieldCfg()||{};
+  return '<p class="small muted">'+esc((c.name||'Football-Training')+' · Inhalte vom Team vorgegeben. Kurz nach dem Training eintragen.')+'</p>'+
+    '<label>Wie anstrengend war es? (1 = sehr leicht, 10 = maximal)</label><div class="chips10">'+[1,2,3,4,5,6,7,8,9,10].map(n=>'<button class="chip" data-act="fieldSet" data-k="rpe" data-v="'+n+'" aria-pressed="'+(d.rpe===n)+'">'+n+'</button>').join('')+'</div>'+
+    '<label>Kontaktintensität</label><div>'+FIELD_CONTACT.map(([k,l])=>'<button class="chip" data-act="fieldSet" data-k="contact" data-v="'+k+'" aria-pressed="'+(d.contact===k)+'">'+esc(l)+'</button>').join('')+'</div>'+
+    '<div class="fields">'+inp('fl-min','Dauer (min)',d.durationMin==null?'':d.durationMin,'inputmode="numeric"')+inp('fl-note','Notiz (optional)',d.note||'','placeholder="z. B. viel Pass-Pro, Scrimmage"')+'</div>'; }
+function fieldDlgOpen(){ const d=ui.fieldDraft; const c=fieldCfg()||{};
+  openDlg((c.name||'Football-Training')+' · '+WD[weekdayOf(d.date)]+' '+fmtDate(d.date).slice(0,6), fieldDlgBody(),
+    '<button data-act="fieldCancel">Fand nicht statt</button>'+(fieldLog(d.date)?'<button data-act="fieldDel">Eintrag löschen</button>':'')+'<button class="primary" data-act="fieldSave">Speichern</button>'); }
+ACT.fieldLog = el=>{ const date=el.dataset.d||todayISO(); const l=fieldLog(date); const c=fieldCfg()||{};
+  ui.fieldDraft={ date, rpe:l&&l.rpe||null, contact:l&&l.contact||null, durationMin:l&&l.durationMin||c.duration_min||90, note:l&&l.note||'' }; fieldDlgOpen(); };
+ACT.fieldSet = el=>{ const d=ui.fieldDraft; d.durationMin=num(val('fl-min'))||d.durationMin; d.note=val('fl-note');
+  if(el.dataset.k==='rpe') d.rpe=Number(el.dataset.v); else d.contact=el.dataset.v; fieldDlgOpen(); };
+function fieldPut(rec){ S.fieldLogs=S.fieldLogs||[]; const i=S.fieldLogs.findIndex(l=>l.date===rec.date);
+  if(i>=0){ rec.id=S.fieldLogs[i].id; rec.createdAt=S.fieldLogs[i].createdAt; S.fieldLogs[i]=rec; } else S.fieldLogs.push(rec); save(); closeDlg(); render(); }
+ACT.fieldSave = ()=>{ const d=ui.fieldDraft; const m=num(val('fl-min'));
+  if(!d.rpe){ toast('Bitte die Anstrengung (1–10) antippen.'); return; } if(!d.contact){ toast('Bitte die Kontaktintensität antippen.'); return; }
+  fieldPut({ id:uid('fld'), date:d.date, status:'absolviert', rpe:d.rpe, contact:d.contact, durationMin:m&&m>0?Math.round(m):null, note:val('fl-note')||'', createdAt:new Date().toISOString() });
+  toast('Feldtraining gespeichert.'); };
+ACT.fieldCancel = ()=>{ const d=ui.fieldDraft; fieldPut({ id:uid('fld'), date:d.date, status:'ausgefallen', rpe:null, contact:null, durationMin:null, note:val('fl-note')||'', createdAt:new Date().toISOString() }); toast('Als „fand nicht statt“ gespeichert.'); };
+ACT.fieldDel = ()=>{ const d=ui.fieldDraft; S.fieldLogs=(S.fieldLogs||[]).filter(l=>l.date!==d.date); save(); closeDlg(); render(); toast('Eintrag gelöscht.'); };
+function fieldCard(date){ if(!isFieldDay(date)) return ''; const c=fieldCfg(); const l=fieldLog(date); const today=todayISO();
+  return '<div class="section field-card"><div class="eyebrow">'+(c.time?esc(c.time)+' · ':'')+'Feldtraining</div><div class="row between" style="align-items:center;margin-top:6px"><div><strong>'+esc(c.name||'Football-Training')+'</strong><div class="small muted">'+(l?esc(fieldSummary(l)):'ca. '+(c.duration_min||90)+' min · Inhalte vom Team')+'</div></div>'+
+    (date<=today ? '<button class="small'+(l?'':' primary')+'" data-act="fieldLog" data-d="'+date+'">'+(l?'ändern':'Erfassen')+'</button>' : '')+'</div></div>'; }
 /* ---------- Training ---------- */
 function viewTraining(){
   if(ui.sessionId && sessionById(ui.sessionId)) return logForm();
   const today=todayISO();
-  let h='<h1>Training</h1>'+plSection();
+  let h='<h1>Training</h1>'+plSection()+fieldCard((ui.pl&&ui.pl.date)||today);
   const saved=S.sessions.filter(s=>s.status==='geplant' && (s.plan||[]).length && !(ui.pl && s.plannedDate===ui.pl.date)).sort(bySessionDate);
   if(saved.length){ h+='<h2>Gespeicherte Einheiten</h2>';
     saved.forEach(s=>{ const ov=s.plannedDate&&s.plannedDate<today;
