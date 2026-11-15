@@ -400,6 +400,8 @@ button.primary:active,nav.tabs button[aria-current="page"]:active{background:var
 .sysbar .sd.run{animation:sdp 1s ease-in-out infinite}@keyframes sdp{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.sysbar .sd.run{animation:none}}
 /* Countdown & Kalender */
+.pdet:not([open]){padding-top:14px;padding-bottom:14px}.pdet[open]>summary{margin-bottom:10px}.pdet>summary{margin:0}
+.pdet .loc-card{margin:10px 0}
 .meal{padding-top:12px;padding-bottom:12px}
 .meal-head{display:flex;align-items:center;gap:10px}
 .meal-done{min-height:30px!important;width:30px;padding:0!important;margin:0!important;flex-shrink:0;justify-content:center}
@@ -2989,7 +2991,7 @@ setInterval(()=>{ const els=document.querySelectorAll('.cd-live[data-t]'); if(!e
 const CAL_KIND={ game:'Spiel', event:'Termin' };
 function calSection(){ const L=calSorted(); const td=todayISO(); const c=cdNext(); const up=L.filter(e=>e.date>=td);
   const sum=up.length ? (c&&L.some(e=>e.kind==='game')?'Spiel '+fmtDateShort(c.g.date).slice(3):up.length+' Termine') : 'leer';
-  let h='<details class="section cal-det" id="cal-det"'+(ui.calOpen?' open':'')+'><summary><strong>Kalender</strong> <span class="small muted">· '+esc(sum)+'</span></summary>';
+  let h='<details class="section cal-det pdet" id="cal-det"'+(ui.calOpen?' open':'')+'><summary><strong>Kalender</strong> <span class="small muted">· '+esc(sum)+'</span></summary>';
   if(L.length) h+='<div class="cal-list">'+L.map(e=>'<div class="cal-row'+(e.date<td?' past':'')+'"><div><span class="cal-d">'+fmtDateShort(e.date)+(e.time?' · '+esc(e.time):'')+'</span><strong>'+esc(e.title||CAL_KIND[e.kind])+'</strong>'+(e.place?'<span class="small muted"> · '+esc(e.place)+'</span>':'')+'</div>'+
     '<span class="cal-k '+e.kind+'">'+CAL_KIND[e.kind]+'</span><button class="link" data-act="calEdit" data-id="'+e.id+'">ändern</button></div>').join('')+'</div>';
   else h+='<p class="small muted">Spieltage mit Kickoff steuern den Countdown. Ohne Eintrag zählt er bis zum ersten Spiel laut Plan.</p>';
@@ -3030,24 +3032,27 @@ ACT.logFree = ()=>{ const b=activeBlock(); const s={ id:uid('ses'), blockId:b?b.
   S.sessions.push(s); save(); startLog(s.id); };
 
 /* ---------- Profil ---------- */
+function pdet(k, title, sub, body){ const open=!!(ui.profOpen||{})[k];
+  return '<details class="section pdet" id="pd-'+k+'" data-pk="'+k+'"'+(open?' open':'')+'><summary><strong>'+esc(title)+'</strong>'+(sub?' <span class="small muted">· '+esc(sub)+'</span>':'')+'</summary><div class="pdet-b">'+body+'</div></details>'; }
+document.addEventListener('toggle', e=>{ const d=e.target; if(d && d.dataset && d.dataset.pk){ ui.profOpen=ui.profOpen||{}; ui.profOpen[d.dataset.pk]=d.open; } }, true);
 function viewProfile(){
   const p=S.profile;
   let h='<h1>Profil</h1>';
-  h+='<div class="section"><div class="fields">'+inp('p-name','Name',p.name)+inp('p-by','Geburtsjahr',p.birthYear,'inputmode="numeric" placeholder="z. B. 1993"')+'</div>'+
+  h+=pdet('person','Persönliche Daten',[p.name,p.heightCm?p.heightCm+' cm':''].filter(Boolean).join(' · '),'<div class="fields">'+inp('p-name','Name',p.name)+inp('p-by','Geburtsjahr',p.birthYear,'inputmode="numeric" placeholder="z. B. 1993"')+'</div>'+
     '<div class="fields">'+inp('p-h','Größe (cm)',p.heightCm,'inputmode="numeric"')+inp('p-tw','Zielgewicht (kg, optional)',fmtNum(p.targetWeightKg),'inputmode="decimal"')+'</div>'+
-    '<button class="primary" data-act="saveProfileSlim">Speichern</button></div>';
+    '<button class="primary" data-act="saveProfileSlim">Speichern</button>');
   h+=calSection();
-  h+='<h2>Trainingsorte</h2>'+locSection();
+  h+=pdet('loc','Trainingsorte',(S.profile.locations||[]).length+' Orte',locSection());
   h+=ghSection();
   const le=S.settings.lastExport;
-  h+='<h2>Sicherung</h2><div class="section"><p class="small muted">Deine Daten sind im Datenrepo gesichert, jeder Abgleich ist eine Version. Zusätzlich kannst du eine Datei herunterladen'+(le?' (zuletzt '+fmtDate(le.slice(0,10))+')':'')+'.</p>'+
+  h+=pdet('backup','Sicherung',le?'zuletzt '+fmtDate(le.slice(0,10)):'','<p class="small muted">Deine Daten sind im Datenrepo gesichert, jeder Abgleich ist eine Version. Zusätzlich kannst du eine Datei herunterladen'+(le?' (zuletzt '+fmtDate(le.slice(0,10))+')':'')+'.</p>'+
     '<button data-act="exportJSON">Sicherung herunterladen</button>'+
     '<details style="margin-top:12px"><summary class="small">Erweitert</summary>'+
       '<p class="small muted">Sicherung einspielen ersetzt die Daten auf diesem Gerät; danach wird mit dem Datenrepo abgeglichen.</p>'+
       '<div class="row"><label class="btn" for="imp-file" style="display:inline-flex;align-items:center;color:var(--text);margin:0">Sicherung einspielen …</label><input id="imp-file" type="file" accept=".json,application/json" class="sr-only" data-chg="importFile"></div>'+
       '<p class="small" style="margin-top:12px">Tabellen (CSV): <button class="link" data-act="csv" data-k="saetze">Trainingssätze</button> · <button class="link" data-act="csv" data-k="tests">Tests</button> · <button class="link" data-act="csv" data-k="bw">Körpergewicht</button></p>'+
       '<p class="small" style="margin-top:12px"><button class="link" data-act="resetAll" style="color:var(--bad)">Daten auf diesem Gerät zurücksetzen …</button></p>'+
-    '</details></div>';
+    '</details>');
   h+='<p class="small muted" style="margin-top:24px">AOS ist kein Ersatz für medizinische oder sportwissenschaftliche Betreuung.</p>';
   return h;
 }
@@ -3263,7 +3268,7 @@ function ghStatusText(){
 }
 function ghSection(){
   const c=gh.cfg;
-  return '<h2 id="gh-sec">Datenspeicherung (GitHub)</h2><div class="section">'+
+  return pdet('gh','Datenspeicherung', ghReady()?(gh.cfg.repo):'nicht verbunden', '<span id="gh-sec"></span>'+
     '<p class="small">AOS speichert deine Trainings-, Ernährungs- und Körperdaten in deinem <strong>privaten</strong> Repo <code>'+esc(c.owner+'/'+c.repo)+'</code>. Jede Änderung wird nach wenigen Sekunden abgeglichen; ohne Netz wird gepuffert und später nachgeholt. iPhone und Laptop arbeiten so mit demselben Stand.</p>'+
     '<p id="gh-status" class="small" aria-live="polite">'+ghStatusText()+'</p>'+
     '<div class="fields">'+inp('gh-owner','GitHub-Konto',c.owner)+inp('gh-repo','Datenrepo',c.repo)+'</div>'+
@@ -3276,9 +3281,9 @@ function ghSection(){
       '<li>Permissions → Repository permissions → <strong>Contents: Read and write</strong> (sonst nichts).</li>'+
       '<li>Ablaufdatum wählen, Token kopieren und hier einfügen.</li></ol>'+
       '<p class="small muted">Der Token bleibt nur auf diesem Gerät, steht in keiner Sicherung und wird nur an api.github.com gesendet. Er kann ausschließlich das Datenrepo lesen und schreiben.</p></details>'+
-    '</div>';
+    '');
 }
-ACT.ghOpen = ()=>{ ui.view='profil'; location.hash='profil'; render(); const el=document.getElementById('gh-sec'); if(el) el.scrollIntoView(); };
+ACT.ghOpen = ()=>{ ui.view='profil'; location.hash='profil'; ui.profOpen=ui.profOpen||{}; ui.profOpen.gh=true; render(); const el=document.getElementById('gh-sec'); if(el) el.scrollIntoView(); };
 ACT.ghSave = async ()=>{
   const owner=val('gh-owner'), repo=val('gh-repo'), branch=val('gh-branch')||'main', path=val('gh-path')||'aos-data.json', token=val('gh-token');
   if(!owner||!repo){ toast('Bitte Konto und Repo eintragen.'); return; }
