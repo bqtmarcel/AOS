@@ -399,6 +399,30 @@ button.primary:active,nav.tabs button[aria-current="page"]:active{background:var
 .sysbar .sd{font-size:.9rem;line-height:1}
 .sysbar .sd.run{animation:sdp 1s ease-in-out infinite}@keyframes sdp{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.sysbar .sd.run{animation:none}}
+/* Countdown & Kalender */
+.cd{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.cd-k{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cd-k span{font-size:.62rem;letter-spacing:.24em;text-transform:uppercase;color:var(--sig);font-weight:700}
+.cd-k small{font-size:.74rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd-v{display:flex;gap:8px;flex-shrink:0}
+.cd-seg{display:flex;flex-direction:column;align-items:center;line-height:1}
+.cd-seg b{font-size:1.7rem;font-weight:800;font-variant-numeric:tabular-nums;background:linear-gradient(180deg,#fff 0%,#e3e7ec 40%,#7f8692 52%,#c9ced6 70%,#f5f7f9 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.cd-seg small{font-size:.54rem;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin-top:4px}
+.cd.is-live{flex-direction:column;align-items:stretch}
+.cd.is-live .cd-v{justify-content:space-between;gap:4px}
+.cd.is-live .cd-seg{flex:1;padding:8px 0;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+.cd.is-live .cd-seg b{font-size:1.55rem}
+.tc-cd{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.cd-plan .cd-seg b{font-size:2.1rem}
+.cal-list{display:flex;flex-direction:column;margin-bottom:12px}
+.cal-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.cal-row>div{flex:1;min-width:0}.cal-row.past{opacity:.5}
+.cal-d{display:block;font-size:.72rem;color:var(--muted);letter-spacing:.04em}
+.cal-k{font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;padding:3px 8px;border-radius:99px;border:1px solid var(--line2);color:var(--muted)}
+.cal-k.game{color:var(--sig);border-color:rgba(246,1,0,.5)}
+table.wgrid td,table.wgrid th{white-space:nowrap;padding-left:4px;padding-right:4px}
+table.wgrid td[colspan]{white-space:normal}
+table.wgrid td:first-child{white-space:normal;max-width:6.5em;font-size:.72rem}
 /* ===== Red Tigers ===== */
 input[type=date]{min-width:0;max-width:100%;width:100%;-webkit-appearance:none;appearance:none;text-align:left;box-sizing:border-box}
 .fields>*{min-width:0}
@@ -519,7 +543,7 @@ function seedData(){
     meta: { createdAt: now, updatedAt: now, app:'AOS – Athlete Operating System' },
     profile: { name:'', sex:'', age:null, birthYear:null, heightCm:null, targetWeightKg:null, positions:[], positionHistory:[], locations:[] },
     goals: [], tests: [], bodyweight: [], blocks: [], sessions: [],
-    unavailable: [], suggestionDecisions: {},
+    unavailable: [], suggestionDecisions: {}, calendar: [],
     nutrition: defaultNutrition(),
     settings: { seededAt: now }
   };
@@ -557,7 +581,8 @@ function save(silent){
 function migrate(d){
   // Platz für künftige Schema-Änderungen; fehlende Bereiche ergänzen statt Daten zu verwerfen
   d.unavailable = d.unavailable || [];
-  d.fieldLogs = Array.isArray(d.fieldLogs) ? d.fieldLogs : [];   // Feldtraining (Football, Team): ein Eintrag pro Tag
+  d.fieldLogs = Array.isArray(d.fieldLogs) ? d.fieldLogs : [];
+  d.calendar = Array.isArray(d.calendar) ? d.calendar : [];   // Kalender: Spieltage (Kickoff) und wichtige Termine   // Feldtraining (Football, Team): ein Eintrag pro Tag
   d.suggestionDecisions = d.suggestionDecisions || {};
   if(!d.nutrition || !Array.isArray(d.nutrition.items)) d.nutrition = defaultNutrition();
   const n=d.nutrition; n.combos=n.combos||[]; n.meals=n.meals||[]; n.dayOverrides=n.dayOverrides||{}; n.constraints=n.constraints||''; n.guides=n.guides||defaultNutrition().guides;
@@ -743,7 +768,8 @@ const SYNC_ARRAYS = [
   ['food','Ernährungsbausteine', d=>d.nutrition.items, (d,v)=>d.nutrition.items=v],
   ['combo','Ernährungskombinationen', d=>d.nutrition.combos, (d,v)=>d.nutrition.combos=v],
   ['meal','Mahlzeiten', d=>d.nutrition.meals, (d,v)=>d.nutrition.meals=v],
-  ['field','Feldtraining', d=>d.fieldLogs, (d,v)=>d.fieldLogs=v]
+  ['field','Feldtraining', d=>d.fieldLogs, (d,v)=>d.fieldLogs=v],
+  ['cal','Kalender', d=>d.calendar, (d,v)=>d.calendar=v]
 ];
 const SYNC_LABELS = Object.assign(Object.fromEntries(SYNC_ARRAYS.map(a=>[a[0],a[1]])),
   { profile:'Profil', nutset:'Ernährungseinstellungen', unavail:'nicht verfügbare Tage', decision:'Entscheidungen zu Vorschlägen', dayov:'Tagesarten (Ernährung)' });
@@ -2038,6 +2064,18 @@ function lastDecision(dbId){
 }
 function plInc(id){ const r=(REF.plan.rules||{}).increments_kg||{}; const e=REF.exMap[id]; return r[id] || (e&&e.min_increment_kg) || 2.5; }
 const roundDown=(x,inc)=>Math.floor(x/inc+1e-9)*inc;
+/* Startgewicht schätzen wie ein Strength Coach: konservativ aus den bestätigten Startlasten der Grundübungen.
+   Kurzhantel-Übungen: Gewicht je Hand. Nach der ersten Einheit steuert das Protokoll (RPE, Wdh) die Last. */
+const START_EST={ ssb_squat:['high_bar_squat',0.85], hang_power_clean:['high_bar_squat',0.45], trap_bar_shrug:['trap_bar_deadlift',1.0],
+  landmine_push_press:['bench_press',0.35], bulgarian_split_squat:['high_bar_squat',0.16], high_step_up:['high_bar_squat',0.14], db_row:['bench_press',0.40],
+  db_overhead_press:['bench_press',0.28], farmer_carry:['trap_bar_deadlift',0.35], prone_ytw:['bench_press',0.03], db_lateral_raise:['bench_press',0.12],
+  dead_bug:['bench_press',0.12], trap_bar_speed_pull:['trap_bar_deadlift',0.65], bench_press:['high_bar_squat',0.65], high_bar_squat:['trap_bar_deadlift',0.85], trap_bar_deadlift:['high_bar_squat',1.15] };
+const perHand=id=>{ const e=REF.exMap[id]; return !!(e && (e.equipment||[]).includes('dumbbell') && !(e.equipment||[]).includes('barbell')); };
+function plStartEst(exId, block, date){ const r=START_EST[exId]; if(!r) return null; const [ref,f]=r;
+  let base=(block.start_loads||{})[ref];
+  const h=plHistory(ref, date)[0]; if(h && topKg(h.le)!=null) base=topKg(h.le);
+  if(base==null) return null; const inc=plInc(exId); const kg=Math.max(inc, roundDown(base*f, inc));
+  return { kg, ref:(REF.exMap[ref]||{}).name_de||ref }; }
 
 /* Last für einen Slot (Spezifikation 3.4, 6.3) */
 function plLoad(slot, exId, ctx){
@@ -2054,6 +2092,8 @@ function plLoad(slot, exId, ctx){
   if(decAfterLast){ base=dec.kg; out.reasons.push('Steigerung auf '+fmtNum(dec.kg)+' kg bestätigt am '+fmtDate(dec.at.slice(0,10))+'.'); }
   const start=(ctx.block.start_loads||{})[exId];
   if(base==null && start!=null){ base=start; out.reasons.push('Bestätigte Startlast.'); }
+  if(base==null){ const est=plStartEst(exId, ctx.block, ctx.date);
+    if(est){ base=est.kg; out.kg=base; out.reasons.push('Startgewicht von AOS festgelegt (abgeleitet aus '+est.ref+'). Nach dieser Einheit passt AOS die Last selbst an.'); return out; } }
   if(base==null){ out.calibrate=true; out.text='kalibrieren';
     out.reasons.push(slot.rpe&&/6/.test(slot.rpe) ? 'Noch kein Wert: leicht einsteigen und bis RPE ≤ 6 steigern, jede Wdh schnell. Arbeitsgewicht notieren.' : 'Noch kein Wert: aufwärmen bis Ziel-RPE ~7, Arbeitsgewicht notieren.');
     return out; }
@@ -2070,7 +2110,7 @@ function plLoad(slot, exId, ctx){
       else if(r>cap || met===false){ { const r=Math.round(base*0.975/inc)*inc; out.kg = r<base ? r : base-inc; } out.decrease=true;
         out.reasons.push((r>cap?'RPE '+fmtNum(r)+' über der Obergrenze '+fmtNum(cap):'Vorgabe nicht ganz geschafft')+' → automatisch auf '+fmtNum(out.kg)+' kg reduziert.'); }
       else if(met && r<=cap-0.5){ if(noUp) out.reasons.push('Steigerung wäre möglich, heute aber nicht ('+noUp+').');
-        else out.suggest={ kg:base+inc, basis:fmtDate(last.date)+': '+setsTxt(last.le) }; }
+        else { const n = r<=cap-2 ? 2 : 1; out.suggest={ kg:base+n*inc, basis:fmtDate(last.date)+': '+setsTxt(last.le)+(n>1?' – deutlich leichter als geplant':'') }; } }
       else out.reasons.push('RPE '+fmtNum(r)+' nahe der Obergrenze → halten.');
     } else if(m==='velocity'){
       if(last.le.fast===true && met!==false){ if(noUp) out.reasons.push('Steigerung wäre möglich, heute aber nicht ('+noUp+').'); else out.suggest={ kg:base+inc, basis:fmtDate(last.date)+': alle Wdh schnell' }; }
@@ -2176,7 +2216,9 @@ function plBuild(inp){
     // Last
     const L=plLoad(slot, ex.id, { date:inp.date, cap, block:b, readiness:rd, noIncrease });
     x.load=L; x.loadKg=L.kg; L.reasons.forEach(r=>reasons.push(r));
-    if(L.suggest){ x.suggestKey='last|'+ex.id+'|'+inp.date; if((inp.accept||{})[x.suggestKey]){ x.loadKg=L.suggest.kg; x.accepted=true; if(L.suggest.resetReps) x.reps=String(x.reps).replace(/^\d+(–\d+)?/, String(L.suggest.resetReps)); } }
+    if(L.suggest){ x.loadKg=L.suggest.kg; x.increased=true; if(L.suggest.resetReps) x.reps=String(x.reps).replace(/^\d+(–\d+)?/, String(L.suggest.resetReps));
+      reasons.push('Steigerung auf '+fmtNum(L.suggest.kg)+' kg (+'+fmtNum(L.suggest.kg-L.kg)+')'+(/deutlich leichter/.test(L.suggest.basis)?' – letzte Einheit deutlich leichter als geplant, doppelter Schritt':' – Vorgabe letztes Mal sauber geschafft')+'.'); }
+    x.perHand=perHand(ex.id);
     items.push(x);
   });
 
@@ -2209,7 +2251,7 @@ function plToSession(P){
   const b=P.block, t=P.tpl, date=P.inp.date;
   const plan=P.items.map(x=>({
     id:uid('ex'), name:x.ex.name_de, variant:'', sets:x.sets, reps:x.reps, loadKg:x.loadKg,
-    loadNote: x.load.calibrate ? 'kalibrieren' : (x.loadKg==null ? (x.load.text||'') : ''),
+    loadNote: x.load.calibrate ? 'kalibrieren' : (x.loadKg==null ? (x.load.text||'') : (x.perHand?'je Hand':'')),
     rpeTarget:x.rpe, rest:x.rest[0]===x.rest[1] ? x.rest[0]+' s' : x.rest[0]+'–'+x.rest[1]+' s',
     metric:metricOf(x.ex, Object.assign({doseTxt:x.reps}, x.slot)), positionTag:'allgemein', equipment:[], alternatives:x.alternatives.map(n=>({name:n, note:''})),
     notes:[x.note].concat(x.reasons).filter(Boolean).join(' '),
@@ -2238,14 +2280,11 @@ function plPreview(P){
   let h='<div class="section"><div class="row between"><span class="small muted">ca. '+P.estMin+' min inkl. Aufwärmen'+(P.contacts?' · '+P.contacts+' Bodenkontakte':'')+'</span><span class="cap">RPE ≤ '+fmtNum(P.cap)+'</span></div>';
   P.notes.forEach(n=>{ h+='<div class="note small">'+esc(n)+'</div>'; });
   P.items.forEach((x,i)=>{
-    const load = x.loadKg!=null ? fmtNum(x.loadKg)+' kg' : (x.load.calibrate?'kalibrieren':(x.load.text||''));
+    const load = x.loadKg!=null ? fmtNum(x.loadKg)+' kg'+(x.perHand?' je Hand':'')+(x.increased?' ↑':'') : (x.load.calibrate?'kalibrieren':(x.load.text||''));
     h+='<div class="ex"><div class="ex-head"><span class="ex-name">'+(i+1)+'. '+esc(x.ex.name_de)+'</span>'+(x.from?badge('aus '+x.from,'warn')+' ':'')+badge(ROLE_LABEL[x.role]||x.role, x.role==='main'?'ok':(x.role==='power'?'info':''))+'</div>';
     h+='<div><strong>'+x.sets+' × '+esc(x.reps)+'</strong>'+(load?' · '+esc(load):'')+(x.rpe?' · RPE '+esc(x.rpe):'')+' · Pause '+(x.rest[0]===x.rest[1]?x.rest[0]:x.rest[0]+'–'+x.rest[1])+' s</div>';
-    if(x.load.suggest){ const k=x.suggestKey; const on=!!(ui.pl.accept||{})[k];
-      h+='<div class="note '+(on?'':'warn')+' small">Steigerung auf <strong>'+fmtNum(x.load.suggest.kg)+' kg</strong> möglich (Grundlage: '+esc(x.load.suggest.basis)+'). '+
-        (on?'Übernommen. <button class="link" data-act="plAccept" data-k="'+esc(k)+'">Rückgängig</button>':'Ohne Bestätigung bleibt die Last gleich. <button class="link" data-act="plAccept" data-k="'+esc(k)+'">Steigerung übernehmen</button>')+'</div>'; }
     // Wichtiges direkt zeigen (Anleitung, Ersatz, Reduktion), Herkunft der Last nur auf Nachfrage
-    const info=r=>/^(Letzte Einheit|Bestätigte Startlast|Steigerung auf .* bestätigt)/.test(r);
+    const info=r=>/^(Letzte Einheit|Bestätigte Startlast|Startgewicht von AOS|Steigerung auf .* bestätigt)/.test(r);
     const main=[x.note].concat(x.reasons.filter(r=>!info(r))).filter(Boolean), more=x.reasons.filter(info);
     if(main.length) h+='<div class="small muted">'+main.map(esc).join(' ')+'</div>';
     if(more.length || x.alternatives.length) h+='<details><summary class="small muted">Details</summary><div class="small muted">'+more.map(esc).join(' ')+(x.alternatives.length?' Ersatz möglich: '+esc(x.alternatives.join(' / '))+'.':'')+'</div></details>';
@@ -2274,7 +2313,7 @@ ACT.plAccept = el=>{ const k=el.dataset.k; ui.pl.accept=ui.pl.accept||{}; if(ui.
 ACT.plReload = async ()=>{ const ok=await refLoad(true); toast(ok?'Planerdaten aktualisiert.':(REF.error||'Keine Verbindung – es wird der zuletzt geladene Stand verwendet.')); render(); };
 ACT.plConfirm = ()=>{ const b=plDue(ui.pl.date).block; if(!b) return;
   const ov=Object.entries(b.week_overrides||{}).filter(([,o])=>o.note).map(([w,o])=>'Woche '+w+': '+o.note);
-  confirmDlg('Vorlagen bestätigen?', 'Damit übernimmst du die Einheiten '+esc(b.templates.map(t=>t.id).join(', '))+' der Planversion '+esc(b.id)+(ov.length?' (inkl. '+esc(ov.join('; '))+')':'')+' als aktuellen Plan. Laststeigerungen brauchen weiterhin jeweils deine Bestätigung.', 'Bestätigen', ()=>{
+  confirmDlg('Vorlagen bestätigen?', 'Damit übernimmst du die Einheiten '+esc(b.templates.map(t=>t.id).join(', '))+' der Planversion '+esc(b.id)+(ov.length?' (inkl. '+esc(ov.join('; '))+')':'')+' als aktuellen Plan. Gewichte und Steigerungen legt AOS selbst fest.', 'Bestätigen', ()=>{
     S.suggestionDecisions['plan|'+b.id]={ at:new Date().toISOString(), title:'Planversion '+b.id+' ('+b.name+')', status:'bestätigt' }; save(); render(); }); };
 ACT.plCleanup = ()=>{ const l=plPlaceholders(); confirmDlg('Leere Einheiten entfernen?', l.length+' geplante Einheit(en) ohne Übungen und ohne Protokoll werden entfernt. Der Sessionplaner ersetzt sie.', 'Entfernen', ()=>{
   const ids=new Set(l.map(s=>s.id)); S.sessions=S.sessions.filter(s=>!ids.has(s.id)); save(); render(); }, true); };
@@ -2282,7 +2321,6 @@ ACT.plCleanup = ()=>{ const l=plPlaceholders(); confirmDlg('Leere Einheiten entf
 function plCommit(){
   const P=plBuild(plInput()); if(P.error || !P.items.length){ toast(P.error||'Keine Übungen in dieser Einheit.'); return null; }
   if(P.due.doneToday && P.due.doneToday.planner && P.due.doneToday.planner.templateId!==P.tpl.id && P.inp.date===P.due.doneToday.plannedDate){ toast('Für diesen Tag ist schon eine Einheit erledigt – höchstens eine Einheit pro Tag.'); return null; }
-  P.items.filter(x=>x.accepted).forEach(x=>{ S.suggestionDecisions[x.suggestKey]={ at:new Date().toISOString(), title:'Steigerung '+x.ex.name_de+' auf '+fmtNum(x.loadKg)+' kg', status:'bestätigt', kg:x.loadKg, dbId:x.dbId, note:x.load.suggest.basis }; });
   const s=plToSession(P);
   // Bestehende, noch nicht protokollierte Einheit desselben Tages ersetzen (Planer-Einheit oder leerer Platzhalter)
   const old=S.sessions.find(o=>o.status==='geplant' && !o.log && o.plannedDate===P.inp.date && (o.planner || !(o.plan||[]).length));
@@ -2658,7 +2696,8 @@ function plCurrentLoad(slot, exId, b){
   const last=H[0]; const lastAt=last?((last.s.log&&last.s.log.loggedAt)||last.date):'';
   if(dec && (!last || dec.at>lastAt)) return fmtNum(dec.kg)+' kg (bestätigt)';
   if(last && topKg(last.le)!=null) return fmtNum(topKg(last.le))+' kg ('+fmtDateShort(last.date)+')';
-  const st=(b.start_loads||{})[exId]; return st!=null ? fmtNum(st)+' kg (Start)' : 'kalibrieren';
+  const st=(b.start_loads||{})[exId]; if(st!=null) return fmtNum(st)+' kg (Start)';
+  const es=plStartEst(exId, b, todayISO()); return es ? fmtNum(es.kg)+' kg'+(perHand(exId)?' je Hand':'')+' (Start)' : 'kalibrieren';
 }
 function viewPlan(){
   if(ui.planLegacy) return '<div class="row no-print"><button data-act="planLegacy">← Zurück zum aktuellen Plan</button></div>'+viewPlanLegacy();
@@ -2668,9 +2707,7 @@ function viewPlan(){
     return h+'<div class="note">'+(REF.loading?'Plan wird geladen …':(REF.error||'Plan noch nicht geladen.'))+' <button class="link" data-act="plReload">Neu laden</button></div>'+planLegacyLink();
   }
   const P=REF.plan, today=todayISO();
-  const fg=(P.season&&P.season.first_game)||[]; const weeksLeft=fg[0]?Math.ceil(daysBetween(today, fg[0])/7):null;
-  h+='<div class="section"><strong>Saison 2027</strong>'+(fg[0]?' · erstes Spiel '+fg.map(d=>fmtDateShort(d)).join('/')+(weeksLeft>0?' · noch '+weeksLeft+' Wochen':''):'')+
-    '<p class="small muted">Planversion '+esc(P.version)+' · Stand '+fmtDate(P.stand)+' · geladen '+(REF.at?ghTime(REF.at):'—')+' <button class="link" data-act="plReload">neu laden</button></p></div>';
+  h+='<div class="section">'+(cdBlock('cd-plan')||'<strong>Saison</strong>')+'<p class="small muted" style="margin-top:10px">Plan geladen '+(REF.at?ghTime(REF.at):'—')+' · <button class="link" data-act="plReload">neu laden</button> · Spieltage im <button class="link" data-act="go" data-view="profil">Profil → Kalender</button></p></div>';
   // Phasen
   h+='<h2>Phasen bis zum ersten Spiel</h2><div class="section table-wrap"><table><tbody>'+P.phases.map(ph=>{
     const cur=today>=ph.start && today<=ph.end; const w=Math.round((daysBetween(ph.start,ph.end)+1)/7);
@@ -2680,14 +2717,13 @@ function viewPlan(){
   // Aktueller (oder nächster) Block
   const b=plBlockAt(today) || P.blocks.find(x=>x.start>today) || P.blocks[P.blocks.length-1];
   if(!b) return h+planLegacyLink();
-  const conf=(S.suggestionDecisions||{})['plan|'+b.id];
   h+='<h2>'+esc(b.name)+'</h2><div class="section"><p class="small">'+fmtDate(b.start)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+' · '+b.weeks+' Wochen · RPE-Cap '+fmtNum(b.rpe_cap[0])+'–'+fmtNum(b.rpe_cap[b.rpe_cap.length-1])+
     ' · max. '+((b.limits||{}).contacts_per_session||[])[1]+' Bodenkontakte/Einheit · '+((P.rules||{}).max_session_min||65)+' min</p>'+
-    '<p class="small">'+(b.status==='bestätigt'||conf?badge('bestätigt','ok')+(conf?' am '+fmtDate(conf.at.slice(0,10))+' · <button class="link" data-act="plUnconfirm" data-b="'+esc(b.id)+'">Bestätigung zurücknehmen</button>':''):badge('Vorschlag','warn')+' <button class="link" data-act="plConfirmB" data-b="'+esc(b.id)+'">Vorlagen bestätigen</button>')+'</p>';
+    '';
   // Wochenraster
   const days=['MON','TUE','WED','THU','FRI','SAT','SUN'], dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
   const mine=plSessions().filter(s=>s.planner.blockId===b.id);
-  h+='<div class="table-wrap"><table class="small"><thead><tr><th>Woche</th>'+dn.map(d=>'<th>'+d+'</th>').join('')+'</tr></thead><tbody>';
+  h+='<div class="table-wrap"><table class="small wgrid"><thead><tr><th>Woche</th>'+dn.map(d=>'<th>'+d+'</th>').join('')+'</tr></thead><tbody>';
   for(let w=1; w<=b.weeks; w++){
     const ov=(b.week_overrides||{})[w]; const sched=(ov&&ov.schedule)||b.week_schedule; const mon=addDays(b.start,(w-1)*7);
     h+='<tr><td><strong>W'+w+'</strong><br><span class="muted">'+esc((b.week_wave||{})[w]||'')+'</span></td>';
@@ -2720,7 +2756,7 @@ function viewPlan(){
         '<td>'+esc(plCurrentLoad(s, s.candidates[0], b))+'</td></tr>'; });
     h+='</tbody></table></div></details>';
   });
-  h+='<p class="small muted">„Kern“ = wandert bei weniger Einheiten pro Woche in eine andere Einheit. Den Plan änderst du nicht hier, sondern gemeinsam mit Claude: Neue Planversionen (z. B. Phase 2) landen im Datenrepo und erscheinen hier automatisch. Laststeigerungen bestätigst du im Training.</p>';
+  h+='<p class="small muted">„Kern“ = wandert bei weniger Einheiten pro Woche in eine andere Einheit. Den Plan änderst du nicht hier, sondern gemeinsam mit Claude: Neue Planversionen (z. B. Phase 2) landen im Datenrepo und erscheinen hier automatisch. Gewichte und Steigerungen legt AOS selbst fest – du führst aus und trägst ein, was du geschafft hast.</p>';
   return h+planLegacyLink();
 }
 function planLegacyLink(){ return false ? '<p class="small muted" style="margin-top:16px">Früher von Hand angelegte Blöcke und Trainingstage: <button class="link" data-act="planLegacy">anzeigen</button></p>' : ''; }
@@ -2787,7 +2823,7 @@ function ovToday(today){
   if(mp && mp.start===addDays(today,1)) hints.push('Morgen startet Meal-Prep – heute vorkochen');
   if(mp && mp.start===today) hints.push('Meal-Prep startet heute');
   if(hints.length) h+='<div class="tc-hints">'+hints.map(x=>'<div>› '+esc(x)+'</div>').join('')+'</div>';
-  return h+(btn?'<div class="tc-btn">'+btn+'</div>':'')+MOTTO+'</div>';
+  return h+(btn?'<div class="tc-btn">'+btn+'</div>':'')+cdBlock('tc-cd')+MOTTO+'</div>';
 }
 function ovWeightRow(today){
   const t=S.bodyweight.find(b=>b.date===today);
@@ -2849,6 +2885,55 @@ ACT.fieldDel = ()=>{ const d=ui.fieldDraft; S.fieldLogs=(S.fieldLogs||[]).filter
 function fieldCard(date){ if(!isFieldDay(date)) return ''; const c=fieldCfg(); const l=fieldLog(date); const today=todayISO();
   return '<div class="section field-card"><div class="eyebrow">'+(c.time?esc(c.time)+' · ':'')+'Feldtraining</div><div class="row between" style="align-items:center;margin-top:6px"><div><strong>'+esc(c.name||'Football-Training')+'</strong><div class="small muted">'+(l?esc(fieldSummary(l)):'ca. '+(c.duration_min||90)+' min · Inhalte vom Team')+'</div></div>'+
     (date<=today ? '<button class="small'+(l?'':' primary')+'" data-act="fieldLog" data-d="'+date+'">'+(l?'ändern':'Erfassen')+'</button>' : '')+'</div></div>'; }
+/* ---------- Kalender & Countdown ---------- */
+function calSorted(){ return (S.calendar||[]).slice().sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||''))); }
+function calGames(){ const g=calSorted().filter(e=>e.kind==='game' && e.date);
+  if(g.length) return g.map(e=>({ date:e.date, time:e.time||'', title:e.title||'', place:e.place||'', alt:[] }));
+  const fg=(typeof REF!=='undefined' && REF.plan && REF.plan.season && REF.plan.season.first_game)||[];
+  return fg.length ? [{ date:fg[0], time:'', title:'', place:'', alt:fg.slice(1) }] : []; }
+function kickoffAt(g){ return new Date(g.date+'T'+(g.time||'00:00')+':00'); }
+function cdNext(now){ now=now||new Date(); const G=calGames(); const td=todayISO();
+  const i=G.findIndex(g=> g.time ? kickoffAt(g)>now : g.date>=td); if(i<0) return null;
+  const g=G[i]; const ms=g.time ? kickoffAt(g)-now : null;
+  return { g, first:i===0, live: ms!=null && ms<=7*864e5, ms, days:daysBetween(td, g.date) }; }
+const p2=n=>String(n).padStart(2,'0');
+function cdSegs(ms){ const t=Math.max(0,Math.floor(ms/1000)); const d=Math.floor(t/86400), h=Math.floor(t%86400/3600), m=Math.floor(t%3600/60), x=t%60;
+  return [[d,'Tage'],[p2(h),'Std'],[p2(m),'Min'],[p2(x),'Sek']].map(([v,l])=>'<span class="cd-seg"><b>'+v+'</b><small>'+l+'</small></span>').join(''); }
+function cdBlock(cls){ const c=cdNext(); if(!c) return '';
+  const g=c.g; const when=fmtDateShort(g.date)+(g.alt.length?'/'+g.alt.map(fmtDateShort).join('/'):'')+(g.time?' · '+g.time:'');
+  const lbl=(c.first?'Saisonstart':'Nächstes Spiel')+(g.title?' · '+g.title:'');
+  const val = c.live ? '<div class="cd-v cd-live" data-t="'+kickoffAt(g).getTime()+'">'+cdSegs(c.ms)+'</div>'
+    : '<div class="cd-v">'+(c.days<=0?'<span class="cd-seg"><b>Heute</b><small>Gameday</small></span>':'<span class="cd-seg"><b>'+c.days+'</b><small>'+(c.days===1?'Tag':'Tage')+'</small></span>')+'</div>';
+  return '<div class="cd '+(cls||'')+(c.live?' is-live':'')+'"><div class="cd-k"><span>'+esc(lbl)+'</span><small>'+esc(when+(g.place?' · '+g.place:''))+'</small></div>'+val+'</div>'; }
+setInterval(()=>{ const els=document.querySelectorAll('.cd-live[data-t]'); if(!els.length) return; let done=false;
+  els.forEach(el=>{ const ms=Number(el.dataset.t)-Date.now(); if(ms<=0) done=true; else el.innerHTML=cdSegs(ms); });
+  if(done) render(); }, 1000);
+
+const CAL_KIND={ game:'Spiel', event:'Termin' };
+function calSection(){ const L=calSorted(); const td=todayISO();
+  let h='<div class="section"><p class="small muted">Spieltage mit Kickoff steuern den Countdown in der Übersicht und im Plan. Eine Woche vor jedem Spiel läuft er auf die Sekunde.</p>';
+  if(L.length) h+='<div class="cal-list">'+L.map(e=>'<div class="cal-row'+(e.date<td?' past':'')+'"><div><span class="cal-d">'+fmtDateShort(e.date)+(e.time?' · '+esc(e.time):'')+'</span><strong>'+esc(e.title||CAL_KIND[e.kind])+'</strong>'+(e.place?'<span class="small muted"> · '+esc(e.place)+'</span>':'')+'</div>'+
+    '<span class="cal-k '+e.kind+'">'+CAL_KIND[e.kind]+'</span><button class="link" data-act="calEdit" data-id="'+e.id+'">ändern</button></div>').join('')+'</div>';
+  else h+='<p class="small">Noch keine Einträge. Bis dahin zählt der Countdown bis zum ersten Spiel laut Plan.</p>';
+  return h+'<button data-act="calNew">+ Termin oder Spiel</button></div>'; }
+function calDlgOpen(){ const d=ui.calDraft;
+  openDlg(d.id?'Eintrag ändern':'Neuer Eintrag',
+    '<label>Art</label><div>'+Object.entries(CAL_KIND).map(([k,l])=>'<button class="chip" data-act="calKind" data-v="'+k+'" aria-pressed="'+(d.kind===k)+'">'+l+'</button>').join('')+'</div>'+
+    '<div class="fields">'+inp('cal-date','Datum',d.date,'type="date"')+inp('cal-time',d.kind==='game'?'Kickoff':'Uhrzeit (optional)',d.time,'type="time"')+'</div>'+
+    inp('cal-title',d.kind==='game'?'Gegner (z. B. vs Vikings)':'Titel',d.title,'')+inp('cal-place','Ort (optional)',d.place,''),
+    (d.id?'<button class="danger" data-act="calDel">Löschen</button>':'')+'<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="calSave">Speichern</button>'); }
+function calRead(){ const d=ui.calDraft; d.date=val('cal-date'); d.time=val('cal-time'); d.title=val('cal-title'); d.place=val('cal-place'); }
+ACT.calNew = ()=>{ ui.calDraft={ id:null, kind:'game', date:'', time:'', title:'', place:'' }; calDlgOpen(); };
+ACT.calEdit = el=>{ const e=(S.calendar||[]).find(x=>x.id===el.dataset.id); if(!e) return; ui.calDraft=Object.assign({},e); calDlgOpen(); };
+ACT.calKind = el=>{ calRead(); ui.calDraft.kind=el.dataset.v; calDlgOpen(); };
+ACT.calSave = ()=>{ calRead(); const d=ui.calDraft;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d.date||'')){ toast('Bitte ein Datum wählen.'); return; }
+  if(d.kind==='game' && !d.time){ toast('Bitte die Kickoff-Zeit eintragen.'); return; }
+  const rec={ id:d.id||uid('cal'), kind:d.kind, date:d.date, time:d.time||'', title:(d.title||'').trim(), place:(d.place||'').trim(), createdAt:d.createdAt||new Date().toISOString() };
+  S.calendar=S.calendar||[]; const i=S.calendar.findIndex(x=>x.id===rec.id); if(i>=0) S.calendar[i]=rec; else S.calendar.push(rec);
+  save(); closeDlg(); render(); toast('Gespeichert.'); };
+ACT.calDel = ()=>{ const id=ui.calDraft.id; S.calendar=(S.calendar||[]).filter(x=>x.id!==id); save(); closeDlg(); render(); toast('Eintrag gelöscht.'); };
+
 /* ---------- Training ---------- */
 function viewTraining(){
   if(ui.sessionId && sessionById(ui.sessionId)) return logForm();
@@ -2874,6 +2959,7 @@ function viewProfile(){
   h+='<div class="section"><div class="fields">'+inp('p-name','Name',p.name)+inp('p-by','Geburtsjahr',p.birthYear,'inputmode="numeric" placeholder="z. B. 1993"')+'</div>'+
     '<div class="fields">'+inp('p-h','Größe (cm)',p.heightCm,'inputmode="numeric"')+inp('p-tw','Zielgewicht (kg, optional)',fmtNum(p.targetWeightKg),'inputmode="decimal"')+'</div>'+
     '<button class="primary" data-act="saveProfileSlim">Speichern</button></div>';
+  h+='<h2>Kalender</h2>'+calSection();
   h+='<h2>Trainingsorte</h2>'+locSection();
   h+=ghSection();
   const le=S.settings.lastExport;
