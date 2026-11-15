@@ -2763,7 +2763,7 @@ function ovToday(today){
   let state='rest', title='Ruhetag', sub='', btn='';
   if(due.doneToday){ state='done'; title=due.doneToday.name; sub='✓ erledigt'+(due.doneToday.durationMin?' · '+due.doneToday.durationMin+' min':'');
     btn='<button class="block" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button>'; }
-  else if(due.plannedToday && !due.plannedToday.planner){ state='open'; title=due.plannedToday.name; sub='gespeichert · bereit zum Erfassen';
+  else if(due.plannedToday && !due.plannedToday.planner){ state='open'; title=due.plannedToday.name; sub='offen · bereit zum Erfassen';
     btn=phBtn('Einheit erfassen','data-act="startLog" data-id="'+due.plannedToday.id+'"'); }
   else if(due.block && due.tpl && !due.offday){ const t=plTemplate(due.block, due.tpl); state='open'; title=t.id+' – '+t.name;
     sub='ca. '+t.time_min+' min';
