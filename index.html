@@ -2185,7 +2185,7 @@ ACT.plChip = el=>{ const p=ui.pl, k=el.dataset.k, v=el.dataset.v;
   else { const a=p[k]; const i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); }
   render(); };
 ACT.plDate = el=>{ ui.pl=ui.pl||plDefaults(); ui.pl.date=el.dataset.d; ui.pl.tpl=null; ui.pl.accept={}; render(); window.scrollTo(0,0); };
-ACT.plShowBlock = el=>{ ui.planBlock=el.dataset.id; render(); const x=document.getElementById('plan-block'); if(x) x.scrollIntoView(); };
+ACT.plShowBlock = el=>{ const id=el.dataset.id; ui.planBlock = ui.planBlock===id ? null : id; render(); const x=ui.planBlock&&document.getElementById('plan-block'); if(x) x.scrollIntoView(); };
 ACT.plReload = async ()=>{ const ok=await refLoad(true); toast(ok?'Planerdaten aktualisiert.':(REF.error||'Keine Verbindung – es wird der zuletzt geladene Stand verwendet.')); render(); };
 
 function plCommit(){
@@ -2658,16 +2658,16 @@ function viewPlan(){
   h+='<h2>Phasen</h2><div class="section ph-list">'+P.phases.map(ph=>{
     const cur=today>=ph.start && today<=ph.end; const w=Math.round((daysBetween(ph.start,ph.end)+1)/7);
     const pb=P.blocks.find(b=>b.phase===ph.id); const cap=pb?plCap(pb):(ph.rpe_cap||[]).slice(-1)[0];
-    const sel=ui.planBlock ? ui.planBlock===(pb&&pb.id) : cur;
+    const sel=!!ui.planBlock && ui.planBlock===(pb&&pb.id);
     const nm=pb?'<button class="link" data-act="plShowBlock" data-id="'+esc(pb.id)+'"><strong>'+esc(ph.name)+'</strong></button>':'<strong>'+esc(ph.name)+'</strong>';
     const tags=(cur?badge('aktuell','ok')+' ':'')+(pb?(pb.auto?'':badge('fester Plan','ok')):badge('offen','warn'));   // alle Phasen plant AOS – „automatisch“ nicht extra kennzeichnen
     return '<div class="ph-row'+(sel?' sel':'')+'"><div class="ph-top">'+nm+'<span class="ph-tags">'+tags+'</span></div>'+
-      '<div class="small muted ph-meta"><span>'+fmtDate(ph.start).slice(0,6)+' – '+fmtDate(ph.end).slice(0,6)+'</span><span>'+w+' Wochen</span>'+(cap!=null?'<span>RPE ≤ '+fmtNum(cap)+'</span>':'')+'</div></div>'; }).join('')+'</div><p class="small muted">Tipp auf eine Phase für ihre Einheiten.</p>';
+      '<div class="small muted ph-meta"><span>'+fmtDate(ph.start).slice(0,6)+' – '+fmtDate(ph.end).slice(0,6)+'</span><span>'+w+' Wochen</span>'+(cap!=null?'<span>RPE ≤ '+fmtNum(cap)+'</span>':'')+'</div></div>'; }).join('')+'</div><p class="small muted">Tipp auf eine Phase zum Öffnen oder Schließen.</p>';
   // Aktueller (oder nächster) Block
-  const b=(ui.planBlock && P.blocks.find(x=>x.id===ui.planBlock)) || plBlockAt(today) || P.blocks.find(x=>x.start>today) || P.blocks[P.blocks.length-1];
+  const b=ui.planBlock && P.blocks.find(x=>x.id===ui.planBlock);
   if(!b) return h;
   h+='<h2 id="plan-block">'+esc(b.name)+'</h2><div class="section"><div class="small ph-meta" style="margin-bottom:10px"><span>'+fmtDate(b.start).slice(0,6)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+'</span><span>'+b.weeks+' Wochen</span><span>RPE ≤ '+fmtNum(plCap(b))+'</span>'+
-    '<span>max. '+((b.limits||{}).contacts_per_session||[])[1]+' Bodenkontakte</span><span>'+((P.rules||{}).max_session_min||65)+' min/Einheit</span></div>'+
+    '<span>'+((P.rules||{}).max_session_min||65)+' min/Einheit</span></div>'+
     '';
   // Wochenraster
   const days=['MON','TUE','WED','THU','FRI','SAT','SUN'], dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
@@ -2704,7 +2704,7 @@ function viewPlan(){
         '<td>'+esc(plCurrentLoad(s, s.candidates[0], b))+'</td></tr>'; });
     h+=pdet('tpl-'+t.id, t.id+' – '+t.name, (t.group==='lower'?'Unterkörper':'Oberkörper')+' · ca. '+t.time_min+' min', tb+'</tbody></table></div>');
   });
-  h+='<p class="small muted">„Kern“ = wandert in eine andere Einheit, wenn eine ausfällt.</p>';
+  h+='<p class="small muted">Kern: wird bei Ausfall verschoben</p>';
   return h;
 }
 
