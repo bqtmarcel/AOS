@@ -2682,7 +2682,7 @@ function viewPlan(){
   // Aktueller (oder nächster) Block
   const b=ui.planBlock && P.blocks.find(x=>x.id===ui.planBlock);
   if(!b) return h;
-  h+='<h2 id="plan-block">'+esc(b.name)+'</h2><div class="section"><div class="small ph-meta" style="margin-bottom:10px"><span>'+fmtDate(b.start).slice(0,6)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+'</span><span>'+b.weeks+' Wochen</span><span>RPE ≤ '+fmtNum(plCap(b))+'</span>'+
+  h+='<h2 id="plan-block">'+esc(b.name)+'</h2><div class="section"><div class="small ph-meta" style="margin-bottom:10px"><span style="flex-basis:100%">'+fmtDate(b.start).slice(0,6)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+'</span><span>'+b.weeks+' Wochen</span><span>RPE ≤ '+fmtNum(plCap(b))+'</span>'+
     '<span>'+((P.rules||{}).max_session_min||65)+' min/Einheit</span></div>'+
     '';
   // Wochenraster
