@@ -381,6 +381,7 @@ body::before{content:'';position:fixed;z-index:-1;pointer-events:none;right:-22v
 .pdet .loc-card{margin:10px 0}
 @media (min-width:761px){nav.tabs{border-radius:999px!important;padding:4px!important}}
 .add-row{margin-top:16px}
+.last-perf{font-size:.8rem;color:var(--muted);margin:2px 0 8px}.last-perf strong{color:var(--text);font-weight:600}
 .pdet-b>.table-wrap:last-child,.pdet-b>details:last-child{margin-bottom:2px}
 .meal{padding-top:12px;padding-bottom:12px}
 .meal-head{display:flex;align-items:center;gap:10px}
@@ -1067,6 +1068,21 @@ function startLog(id){
   render(); window.scrollTo(0,0);
 }
 
+/* Letzte Leistung einer Übung (gleicher Name und Variante), ohne die aktuelle Einheit */
+function lastPerf(e, excludeId){
+  const key=e.name+'|'+(e.variant||'');
+  const ss=loggedSessions().filter(s=>s.id!==excludeId).reverse();
+  for(const s of ss){ const le=s.log.exercises.find(x=>x.name+'|'+(x.variant||'')===key); if(!le) continue;
+    const sets=le.sets.filter(x=>Object.values(x).some(v=>v!=null)); if(!sets.length) continue;
+    const withKg=sets.filter(x=>x.kg!=null);
+    const top=withKg.length?withKg.reduce((a,b)=>(b.kg>a.kg||(b.kg===a.kg&&(b.reps||0)>(a.reps||0)))?b:a):sets[0];
+    const same=sets.every(x=>x.kg===sets[0].kg && x.reps===sets[0].reps);
+    const rp=sets.map(x=>x.rpe).filter(v=>v!=null); const rpMax=rp.length?Math.max(...rp):null;
+    const txt=(same&&sets.length>1&&sets[0].reps!=null ? sets.length+' × '+istOf(Object.assign({},top,{rpe:rpMax})) : istOf(top)+(sets.length>1?' · '+sets.length+' Sätze':''));
+    return { date:sessionDate(s), text:txt };
+  }
+  return null;
+}
 function logForm(){
   const s=sessionById(ui.sessionId); const b=blockById(s.blockId); const dr=ui.draft; const cap=(s.planner&&s.planner.cap!=null)?s.planner.cap:capMax(b);
   const day=b?dayById(b,s.dayId):null;
@@ -1081,6 +1097,7 @@ function logForm(){
     const pe=(s.plan||[]).find(p=>p.id===e.planExId);
     const F=METRIC_FIELDS[e.metric]||METRIC_FIELDS.kraft;
     h+='<div class="ex"><div class="ex-head"><span class="ex-name">'+esc(e.name+(e.variant?' ('+e.variant+')':''))+'</span>'+(pe?'<span class="plan-hint">Soll: '+esc(exPlanText(pe)||'ohne Vorgabe')+'</span>':'<span class="plan-hint">ohne Vorgabe</span>')+'</div>';
+    const lp=lastPerf(e, s.id); h+='<div class="last-perf">'+(lp?'Letztes Mal ('+esc(WD[weekdayOf(lp.date)]+' '+fmtDate(lp.date).slice(0,6))+'): <strong>'+esc(lp.text)+'</strong>':'Erstes Mal – noch kein Vergleich')+'</div>';
     if(pe && pe.alternatives && pe.alternatives.length) h+='<div class="small muted">Alternativen: '+esc(pe.alternatives.map(a=>a.name).join(' / '))+'</div>';
     if(pe && pe.notes) h+='<div class="small muted">'+esc(pe.notes)+'</div>';
     e.sets.forEach((x,j)=>{
