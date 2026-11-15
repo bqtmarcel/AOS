@@ -1544,15 +1544,15 @@ const AP_WAVE_LABEL={ E:'Einstieg', A:'Aufbau', A2:'Aufbau schwer', H:'höchste 
 const AP_SLOTS={
   D1:{ name:'Lower Force + Acceleration', group:'lower', time:60, slots:[
     { k:'jumpH', role:'power', prio:1, rot:false, pool:{P2:['trap_bar_jump','countermovement_jump'],P3:['trap_bar_jump','single_leg_broad_jump'],P4:['single_leg_broad_jump','broad_jump'],P5:['broad_jump','countermovement_jump']} },
-    { k:'squat', role:'main', prio:1, main:'main', pool:['high_bar_squat','ssb_squat'] },
-    { k:'hinge', role:'main', prio:1, main:'hinge', pool:['trap_bar_deadlift'] },
+    { k:'squat', role:'main', prio:1, main:'main', pool:{P2:['high_bar_squat','ssb_squat'],P3:['pause_squat','high_bar_squat'],P4:['box_squat','high_bar_squat'],P5:['high_bar_squat','ssb_squat']} },
+    { k:'hinge', role:'main', prio:1, main:'hinge', pool:{P2:['trap_bar_deadlift'],P3:['conventional_deadlift','trap_bar_deadlift'],P4:['trap_bar_deadlift'],P5:['trap_bar_deadlift']} },
     { k:'lunge', role:'assistance', prio:2, pool:['bulgarian_split_squat','walking_lunge','reverse_lunge','high_step_up','lateral_lunge'] },
     { k:'ham', role:'assistance', prio:2, pool:['nordic_hamstring','db_single_leg_rdl','romanian_deadlift','back_extension_45'] },
     { k:'core', role:'assistance', prio:3, pool:['dead_bug','bb_rollout','hanging_knee_raise','side_plank'] } ] },
   D2:{ name:'Upper Strength + Contact', group:'upper', time:58, slots:[
     { k:'throw', role:'power', prio:2, pool:['mb_chest_pass','mb_split_stance_punch','explosive_push_up','mb_slam'] },
-    { k:'bench', role:'main', prio:1, main:'main', pool:['bench_press'] },
-    { k:'pull', role:'main', prio:1, main:'pull', pool:['pull_up','chin_up'] },
+    { k:'bench', role:'main', prio:1, main:'main', pool:{P2:['bench_press'],P3:['pause_bench','bench_press'],P4:['bench_press'],P5:['bench_press']} },
+    { k:'pull', role:'main', prio:1, main:'pull', pool:{P2:['pull_up','chin_up'],P3:['chin_up','pull_up'],P4:['pull_up','chin_up'],P5:['pull_up','chin_up']} },
     { k:'row', role:'assistance', prio:2, pool:['db_row','pendlay_row','chest_supported_db_row','inverted_row'] },
     { k:'carry', role:'assistance', prio:3, pool:['farmer_carry','suitcase_carry','kb_front_rack_carry','farmer_hold'] },
     { k:'scap', role:'optional', prio:3, pool:['prone_ytw','db_reverse_fly','band_pull_apart'] } ] },
@@ -1560,14 +1560,14 @@ const AP_SLOTS={
     { k:'jumpV', role:'power', prio:2, rot:false, pool:{P2:['split_jump','countermovement_jump'],P3:['pogo_jumps','single_leg_broad_jump'],P4:['depth_jump','box_jump'],P5:['countermovement_jump','pogo_jumps']} },
     { k:'lateral', role:'power', prio:1, rot:false, pool:{P2:['skater_hop','lateral_bound'],P3:['lateral_bound','skater_hop'],P4:['lateral_bound','skater_hop'],P5:['lateral_bound']} },
     { k:'oly', role:'power', prio:1, rot:false, pool:{P2:['hang_power_clean','trap_bar_speed_pull'],P3:['power_clean','hang_power_clean'],P4:['hang_power_clean','trap_bar_speed_pull'],P5:['hang_power_clean','kb_swing']} },
-    { k:'squat2', role:'main', prio:3, second:true, pool:['ssb_squat','front_squat'], skip:['P5'] },
+    { k:'squat2', role:'main', prio:3, second:true, var:true, pool:['front_squat','ssb_squat','box_squat','high_bar_squat'], skip:['P5'] },
     { k:'lunge2', role:'assistance', prio:3, pool:['high_step_up','lateral_lunge','reverse_lunge','walking_lunge'] },
     { k:'add', role:'assistance', prio:2, rot:false, pool:['copenhagen_plank'] } ] },
   D4:{ name:'Upper Power + Hand Fight', group:'upper', time:55, slots:[
     { k:'rot', role:'power', prio:2, pool:['mb_rotational_throw','landmine_rotation','mb_slam'] },
     { k:'expl', role:'power', prio:3, pool:['explosive_push_up','mb_slam','mb_chest_pass'], skip:['P5'] },
     { k:'press', role:'power', prio:1, rot:false, pool:{P2:['bb_push_press','db_push_press_single_arm'],P3:['bb_push_press','landmine_push_press'],P4:['landmine_push_press','db_push_press_single_arm'],P5:['landmine_push_press','db_push_press_single_arm']} },
-    { k:'ohp', role:'main', prio:1, second:true, pool:['db_overhead_press','landmine_press','incline_db_press'] },
+    { k:'ohp', role:'main', prio:1, second:true, var:true, pool:['db_overhead_press','incline_bb_bench','landmine_press','close_grip_bench','floor_press','incline_db_press'] },
     { k:'pull2', role:'assistance', prio:3, pool:['inverted_row','chin_up','pull_up'] },
     { k:'shrug', role:'assistance', prio:3, pool:['trap_bar_shrug','db_shrug'], grip:true, skip:['P5'] },
     { k:'prehab', role:'optional', prio:3, pool:['db_lateral_raise','neck_plate_isometric','db_hammer_curl'] } ] }
@@ -1587,6 +1587,7 @@ function apPick(spec, phaseId, prevUsed, taken){
   const free=pool.filter(id=>ok(id) && !taken.has(id));
   let pick;
   if(spec.main) pick=free[0];
+  else if(spec.var) pick=free.find(id=>!prevUsed.has(id)) || free[0];
   else if(spec.rot===false) pick=free[0];
   else pick=free.find(id=>!prevUsed.has(id)) || free[0];    // Rotation: nicht im direkt vorherigen Block
   if(!pick) return null;
@@ -1599,7 +1600,7 @@ function apSlotDose(spec, ex, P, wt, emph){
   if(spec.main==='main'||spec.main==='hinge'){ const t=(spec.main==='main'?P.main:P.hinge)[wt==='DT'?'D':wt]; let sets=t[0]; if(emph && !D && wt[0]!=='V') sets=Math.min(6,sets+1); return { dose:[sets,String(t[1])], rpe:t[2] }; }
   if(spec.main==='pull'){ const t=P.pull[wt==='DT'?'D':wt]; return { dose:[t[0],t[1]] }; }
   const m=(ex.progression||[])[0];
-  if(spec.second){ const [s,r]=P.assist; return { dose:[D?Math.max(1,s-1):fit(s), (spec.k==='squat2'?'5':r)+S_], rpe:7, range:spec.k==='squat2'?null:P.assist[2] }; }
+  if(spec.second){ const [s,r]=P.assist; const bar=(ex.progression||[]).includes('wave'); return { dose:[D?Math.max(1,s-1):fit(s), (bar?(P===AP_PROFILE.P2?'5':'4'):r)+S_], rpe:7, range:bar?null:P.assist[2] }; }
   if(ex.pattern==='jump_loaded'){ const [s,r]=P.jump; return { dose:[D?Math.max(1,s-1):fit(s), r], rpe:'≤ 6' }; }
   if(ex.pattern==='olympic'){ const [s,r]=P.oly; return { dose:[D?Math.max(2,s-2):fit(s), r+S_], rpe:P.powRpe }; }
   if(ex.pattern==='rotation'||ex.pattern==='throw'){ return { dose:[D?2:fit(3), (P===AP_PROFILE.P2?'4':'3')+(ex.pattern==='rotation'?'/S':S_)], rpe:m==='velocity'?'≤ 6':null }; }
@@ -1630,14 +1631,15 @@ function apBuildBlock(phase, prev){
   const templates=Object.entries(AP_SLOTS).map(([tid,T])=>{
     const slots=[];
     T.slots.forEach((spec,i)=>{ if((spec.skip||[]).includes(phase.id)) return;
-      const c=apPick(spec, phase.id, prevUsed, taken); if(!c) return; if(!spec.main) taken.add(c[0]);
+      const c=apPick(spec, phase.id, prevUsed, taken); if(!c) return; taken.add(c[0]);
       const ex=REF.exMap[c[0]]; const dose={}, rw={}; let rng=null, rpe=null;
       types.forEach((wt,w)=>{ const d=apSlotDose(spec, ex, P, wt, emph && ((emph.key==='squat'&&spec.k==='squat')||(emph.key==='bench'&&spec.k==='bench')||(emph.key==='hinge'&&spec.k==='hinge')));
         dose[w+1]=d.dose; if(typeof d.rpe==='number' && spec.main && spec.main!=='pull') rw[w+1]=d.rpe; else if(d.rpe!=null) rpe=String(d.rpe); if(d.range) rng=d.range; });
-      const method = (spec.main==='main'||spec.main==='hinge') ? 'wave' : spec.main==='pull' ? 'bodyweight_reps' : spec.second ? (spec.k==='squat2'?'rpe_linear':'double') : ((ex.progression||[])[0]||'quality');
+      const method = (spec.main==='main'||spec.main==='hinge') ? 'wave' : spec.main==='pull' ? 'bodyweight_reps' : spec.second ? ((ex.progression||[]).includes('wave') ? 'rpe_linear' : 'double') : ((ex.progression||[])[0]||'quality');
       const sl={ id:tid+'-'+(i+1), role:spec.role, prio:spec.prio, method, candidates:c, dose, rest:spec.role==='main'?[150,180]:spec.role==='power'?[75,90]:[60,75] };
       if(Object.keys(rw).length) sl.rpe_wave=rw; if(rpe) sl.rpe=rpe; if(rng && method==='double') sl.range=rng; if(spec.grip) sl.grip=true;
       if(spec.k==='oly'||method==='velocity') sl.note='Jede Wdh schnell und sauber. „Alle schnell?“ notieren.';
+      if(ex.cue) sl.note=(sl.note?sl.note+' ':'')+ex.cue;
       slots.push(sl); });
     // Standortbestimmung: Broad Jump in der Testwoche (D1), wenn er nicht ohnehin geplant ist
     if(tid==='D1' && types.some(t=>t==='H'||t==='DT') && !slots.some(s=>s.candidates[0]==='broad_jump') && REF.exMap.broad_jump){
@@ -1803,11 +1805,12 @@ function plInc(id){ const r=(REF.plan.rules||{}).increments_kg||{}; const e=REF.
 const roundDown=(x,inc)=>Math.floor(x/inc+1e-9)*inc;
 /* Startgewicht schätzen wie ein Strength Coach: konservativ aus den bestätigten Startlasten der Grundübungen.
    Kurzhantel-Übungen: Gewicht je Hand. Nach der ersten Einheit steuert das Protokoll (RPE, Wdh) die Last. */
-const START_EST={ ssb_squat:['high_bar_squat',0.85], hang_power_clean:['high_bar_squat',0.45], trap_bar_shrug:['trap_bar_deadlift',1.0],
+const START_EST={ ssb_squat:['high_bar_squat',0.85], hang_power_clean:['high_bar_squat',0.45], trap_bar_shrug:['trap_bar_deadlift',0.7],
   landmine_push_press:['bench_press',0.35], bulgarian_split_squat:['high_bar_squat',0.16], high_step_up:['high_bar_squat',0.14], db_row:['bench_press',0.40],
   db_overhead_press:['bench_press',0.28], farmer_carry:['trap_bar_deadlift',0.35], prone_ytw:['bench_press',0.03], db_lateral_raise:['bench_press',0.12],
   dead_bug:['bench_press',0.12], trap_bar_speed_pull:['trap_bar_deadlift',0.65],
-  front_squat:['high_bar_squat',0.75], walking_lunge:['high_bar_squat',0.14], reverse_lunge:['high_bar_squat',0.14], lateral_lunge:['high_bar_squat',0.12],
+  front_squat:['high_bar_squat',0.8], box_squat:['high_bar_squat',0.85], pause_squat:['high_bar_squat',0.85], conventional_deadlift:['trap_bar_deadlift',0.9],
+  pause_bench:['bench_press',0.9], close_grip_bench:['bench_press',0.9], floor_press:['bench_press',0.95], incline_bb_bench:['bench_press',0.8], db_bench_press:['bench_press',0.35], walking_lunge:['high_bar_squat',0.14], reverse_lunge:['high_bar_squat',0.14], lateral_lunge:['high_bar_squat',0.12],
   db_single_leg_rdl:['trap_bar_deadlift',0.16], romanian_deadlift:['trap_bar_deadlift',0.55], pendlay_row:['bench_press',0.7], chest_supported_db_row:['bench_press',0.3],
   suitcase_carry:['trap_bar_deadlift',0.3], farmer_hold:['trap_bar_deadlift',0.35], db_reverse_fly:['bench_press',0.06], db_shrug:['trap_bar_deadlift',0.3],
   trap_bar_jump:['trap_bar_deadlift',0.25], power_clean:['hang_power_clean',1.0], kb_swing:['trap_bar_deadlift',0.2], bb_push_press:['bench_press',0.6], db_push_press_single_arm:['bench_press',0.25], landmine_press:['bench_press',0.3],
@@ -1836,9 +1839,10 @@ function plLoad(slot, exId, ctx){
   if(!weighted){ out.text='Körpergewicht'; return out; }
   const H=plHistory(exId, ctx.date); const last=H[0]; const dec=lastDecision(exId);
   // Wochenwelle: Last aus e1RM und Ziel-RPE der Woche (6.4)
-  if(m==='wave' && ctx.reps!=null){ const e=plE1RM(exId, ctx.date); const trpe=(slot.rpe_wave||{})[ctx.week]!=null ? slot.rpe_wave[ctx.week] : cap;
+  if(m==='wave' && ctx.reps!=null){ let e=plE1RM(exId, ctx.date);
+    if(!e && START_EST[exId]){ const [ref,f]=START_EST[exId]; const b0=plE1RM(ref, ctx.date); if(b0) e={ kg:b0.kg*f, date:b0.date, set:b0.set, from:(REF.exMap[ref]||{}).name_de||ref, f }; } const trpe=(slot.rpe_wave||{})[ctx.week]!=null ? slot.rpe_wave[ctx.week] : cap;
     if(e && trpe!=null){ let kg=roundDown(e.kg*pctRM(ctx.reps, trpe), inc); const lastTop=last?topKg(last.le):null;
-      out.reasons.push('Wochenwelle: '+ctx.reps+' Wdh @ RPE '+fmtNum(trpe)+' ≈ '+Math.round(pctRM(ctx.reps,trpe)*100)+' % vom geschätzten 1RM '+fmtNum(Math.round(e.kg*2)/2)+' kg ('+fmtDate(e.date)+': '+fmtNum(e.set.kg)+' kg × '+e.set.reps+' @'+fmtNum(e.set.rpe)+').');
+      out.reasons.push('Wochenwelle: '+ctx.reps+' Wdh @ RPE '+fmtNum(trpe)+' ≈ '+Math.round(pctRM(ctx.reps,trpe)*100)+' % vom geschätzten 1RM '+fmtNum(Math.round(e.kg*2)/2)+' kg'+(e.from?' (abgeleitet: '+e.from+' × '+fmtNum(e.f)+', ':' (')+fmtDate(e.date)+': '+fmtNum(e.set.kg)+' kg × '+e.set.reps+' @'+fmtNum(e.set.rpe)+').');
       if(ctx.noIncrease && lastTop!=null && kg>lastTop){ kg=lastTop; out.reasons.push('Heute keine höhere Last als zuletzt ('+ctx.noIncrease+').'); }
       out.kg=kg;
       if(ctx.readiness===2 && slot.role==='main'){ const k=roundDown(kg*0.95, inc); if(k<kg){ out.kg=k; out.decrease=true; out.reasons.push('Readiness 2 → Hauptlast ca. −5 %.'); } }
