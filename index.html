@@ -2573,6 +2573,7 @@ async function ghFetch(method, path, body){
   if(body) headers['Content-Type']='application/json';
   try{ res = await fetch(ghRepoUrl(path), { method, headers, cache:'no-store', body: body?JSON.stringify(body):undefined }); }
   catch(e){ const err=new Error('Keine Verbindung zu GitHub'); err.offline=true; throw err; }
+  ghNoteExpiry(res);
   let data=null; try{ data=await res.json(); }catch(e){}
   if(!res.ok){ const err=new Error((data&&data.message)||('HTTP '+res.status)); err.status=res.status; throw err; }
   return data;
@@ -2671,7 +2672,12 @@ function ghSetState(st){
   const w=document.getElementById('syncwarn'); if(w) w.innerHTML=ghWarn();
 }
 /* Übersicht: nur melden, wenn Speichern wirklich fehlschlägt (offline ist normal und wird nachgeholt) */
-function ghWarn(){ return gh.state==='fehler' ? '<div class="note bad"><strong>Speichern fehlgeschlagen.</strong> '+esc(gh.lastError||'')+' <button class="link" data-act="ghOpen">Details</button></div>' : ''; }
+/* Ablaufdatum des Tokens: aus der GitHub-Antwort (falls der Browser den Header lesen darf) oder von Hand eingetragen */
+function ghNoteExpiry(res){ try{ const ex=res.headers.get('github-authentication-token-expiration'); if(ex){ const d=ex.slice(0,10); if(/^\d{4}-\d{2}-\d{2}$/.test(d) && gh.cfg.tokenExp!==d){ gh.cfg.tokenExp=d; ghStore(); } } }catch(e){} }
+function ghTokenDays(){ const d=gh.cfg&&gh.cfg.tokenExp; if(!d||!ghReady()) return null; return daysBetween(todayISO(), d); }
+function ghTokenWarn(){ const n=ghTokenDays(); if(n==null || n>14) return '';
+  return '<div class="note '+(n<=3?'bad':'warn')+'"><strong>'+(n<0?'GitHub-Token ist abgelaufen.':'GitHub-Token läuft '+(n===0?'heute':n===1?'morgen':'in '+n+' Tagen')+' ab ('+fmtDate(gh.cfg.tokenExp)+').')+'</strong> Neuen Token erstellen und unter Profil → Datenspeicherung eintragen, sonst wird nicht mehr gespeichert. <button class="link" data-act="ghOpen">Öffnen</button></div>'; }
+function ghWarn(){ return ghTokenWarn() + (gh.state==='fehler' ? '<div class="note bad"><strong>Speichern fehlgeschlagen.</strong> '+esc(gh.lastError||'')+' <button class="link" data-act="ghOpen">Details</button></div>' : ''); }
 function ghStatusText(){
   if(!ghReady()) return '<span class="muted">Noch nicht verbunden.</span>';
   if(gh.state!=='aus') return ghChip().replace('data-act="ghOpen"','data-act="ghSyncNow"').replace(/title="[^"]*"/,'title="Jetzt abgleichen"')+(gh.lastError?'<br><span style="color:var(--bad)">'+esc(gh.lastError)+'</span>':'');
@@ -2686,12 +2692,13 @@ function ghSection(){
     '<div class="fields">'+inp('gh-owner','GitHub-Konto',c.owner)+inp('gh-repo','Datenrepo',c.repo)+'</div>'+
     '<div class="fields">'+inp('gh-branch','Branch',c.branch)+inp('gh-path','Datei',c.path)+'</div>'+
     inp('gh-token','Zugriffsschlüssel (Fine-grained Token)','','type="password" autocomplete="off" spellcheck="false" placeholder="'+(c.token?'gespeichert – leer lassen, um ihn zu behalten':'github_pat_…')+'"')+
+    inp('gh-exp','Token gültig bis (für die Erinnerung)',c.tokenExp||'','type="date"')+
     '<div class="row"><button class="primary" data-act="ghSave">Speichern & verbinden</button>'+(ghReady()?'<button data-act="ghSyncNow">Jetzt abgleichen</button><button class="small danger" data-act="ghForget">Token von diesem Gerät entfernen</button>':'')+'</div>'+
     '<details><summary class="small">So erstellst du den Token (einmal pro Gerät eintragen)</summary><ol class="small">'+
       '<li>GitHub → Settings → Developer settings → Personal access tokens → <strong>Fine-grained tokens</strong> → Generate new token.</li>'+
       '<li>Repository access: <strong>Only select repositories</strong> → <code>'+esc(c.repo)+'</code>.</li>'+
       '<li>Permissions → Repository permissions → <strong>Contents: Read and write</strong> (sonst nichts).</li>'+
-      '<li>Ablaufdatum wählen, Token kopieren und hier einfügen.</li></ol>'+
+      '<li>Ablaufdatum wählen, Token kopieren und hier einfügen. Das Ablaufdatum oben eintragen – AOS erinnert dich zwei Wochen vorher.</li></ol>'+
       '<p class="small muted">Der Token bleibt nur auf diesem Gerät, steht in keiner Sicherung und wird nur an api.github.com gesendet. Er kann ausschließlich das Datenrepo lesen und schreiben.</p></details>'+
     '');
 }
@@ -2701,7 +2708,7 @@ ACT.ghSave = async ()=>{
   if(!owner||!repo){ toast('Bitte Konto und Repo eintragen.'); return; }
   if(!token && !gh.cfg.token){ toast('Bitte den Token einfügen.'); return; }
   if(token && !/^(github_pat_|ghp_)[A-Za-z0-9_]+$/.test(token)){ toast('Das sieht nicht nach einem GitHub-Token aus (beginnt mit github_pat_).'); return; }
-  Object.assign(gh.cfg, { owner, repo, branch, path }); if(token) gh.cfg.token=token;
+  Object.assign(gh.cfg, { owner, repo, branch, path, tokenExp:val('gh-exp')||null }); if(token) gh.cfg.token=token;
   ghStore(); render();
   const ok = await ghSync('einrichten');
   if(ok){ toast('Verbunden. Deine Daten sind jetzt im Datenrepo gespeichert.'); refLoad(true); }
