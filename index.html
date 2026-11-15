@@ -400,6 +400,22 @@ button.primary:active,nav.tabs button[aria-current="page"]:active{background:var
 .sysbar .sd.run{animation:sdp 1s ease-in-out infinite}@keyframes sdp{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.sysbar .sd.run{animation:none}}
 /* Countdown & Kalender */
+.meal{padding-top:12px;padding-bottom:12px}
+.meal-head{display:flex;align-items:center;gap:10px}
+.meal-done{min-height:30px!important;width:30px;padding:0!important;margin:0!important;flex-shrink:0;justify-content:center}
+.meal-tg{flex:1;min-width:0;display:grid;grid-template-columns:1fr auto auto;align-items:baseline;gap:2px 10px;background:none!important;border:0!important;box-shadow:none!important;padding:4px 0!important;min-height:0;text-align:left;color:var(--text);border-radius:0}
+.meal-tg::before{display:none!important}
+.meal-t{font-weight:600}.meal-k{font-size:.8rem;color:var(--muted);white-space:nowrap}.meal-k b{color:var(--text)}
+.meal-s{grid-column:1/3;font-size:.74rem;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meal-c{grid-row:1;grid-column:3;color:var(--muted)}
+.meal .tpl-pick{margin:8px 0 0 40px}
+.tpl-pick{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}.tpl-pick .chip.std{border-color:rgba(246,1,0,.55)}
+.tpl-det:not([open]){padding-top:14px;padding-bottom:14px}.tpl-det[open]>summary{margin-bottom:8px}
+.chips7{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.chips7 .chip{margin:0;padding-left:0;padding-right:0;min-width:0}
+.shop-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none!important;border:0!important;border-bottom:1px solid var(--line)!important;border-radius:0!important;padding:9px 2px!important;min-height:44px;color:var(--text)!important;box-shadow:none!important;margin:0!important;font:inherit}
+.shop-row::before{display:none}.shop-box{width:20px;height:20px;border:1px solid var(--line2);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;flex-shrink:0}
+.shop-n{flex:1;font-weight:500}.shop-q{color:var(--muted);font-size:.82rem;text-align:right}
+.shop-row.on .shop-n,.shop-row.on .shop-q{text-decoration:line-through;opacity:.45}.shop-row.on .shop-box{background:var(--sig);border-color:var(--sig);color:#fff}
 .sv-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0}.sv-row+.sv-row{border-top:1px solid var(--line)}
 .sv-name{text-align:left;font-weight:600}
 .tc-kcal{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:.85rem;color:var(--muted)}
@@ -591,7 +607,7 @@ function migrate(d){
   d.calendar = Array.isArray(d.calendar) ? d.calendar : [];   // Kalender: Spieltage (Kickoff) und wichtige Termine   // Feldtraining (Football, Team): ein Eintrag pro Tag
   d.suggestionDecisions = d.suggestionDecisions || {};
   if(!d.nutrition || !Array.isArray(d.nutrition.items)) d.nutrition = defaultNutrition();
-  const n=d.nutrition; n.combos=n.combos||[]; n.meals=n.meals||[]; n.dayOverrides=n.dayOverrides||{}; n.constraints=n.constraints||''; n.guides=n.guides||defaultNutrition().guides;
+  const n=d.nutrition; n.combos=n.combos||[]; n.meals=n.meals||[]; n.templates=Array.isArray(n.templates)?n.templates:[]; n.dayOverrides=n.dayOverrides||{}; n.constraints=n.constraints||''; n.guides=n.guides||defaultNutrition().guides;
   Object.keys(n.dayOverrides).forEach(k=>{ if(typeof n.dayOverrides[k]!=='object' || n.dayOverrides[k]===null) n.dayOverrides[k]={}; });   // alte Tagesarten (Text) → neues Format
   d.settings = d.settings || {};
   (d.tests||[]).forEach(t=>{ if(t.name==='High-Bar Squatü') t.name='High-Bar Squat'; });   // Tippfehler aus der Ersterfassung
@@ -749,7 +765,7 @@ function defaultNutrition(){
   };
   const items=[]; Object.keys(L).forEach(cat=>L[cat].forEach(name=>items.push({id:'seed-food-'+cat+'-'+slug(name),name,cat,pref:'neutral',tags:[],source:'ausgangsdaten'})));
   return {
-    status:'aktiv', items, combos:[], meals:[], dayOverrides:{}, constraints:'',
+    status:'aktiv', items, combos:[], meals:[], templates:[], dayOverrides:{}, constraints:'',
     guides:{
       'Trainingstag':'Mahlzeiten aus Protein-, Kohlenhydrat- und Obst-/Gemüsebausteinen zusammenstellen. Vor dem Training etwas, das du gut verträgst; danach eine Mahlzeit mit Protein und Kohlenhydraten. Ausreichend trinken.',
       'Ruhetag':'Dieselben Bausteine, Kohlenhydrate eher nach Hunger und Appetit. Ein guter Tag für Gemüse, Obst und in Ruhe gekochte Mahlzeiten.',
@@ -773,6 +789,7 @@ const SYNC_ARRAYS = [
   ['sessions','Trainingseinheiten', d=>d.sessions, (d,v)=>d.sessions=v],
   ['food','Ernährungsbausteine', d=>d.nutrition.items, (d,v)=>d.nutrition.items=v],
   ['combo','Ernährungskombinationen', d=>d.nutrition.combos, (d,v)=>d.nutrition.combos=v],
+  ['mtpl','Gespeicherte Mahlzeiten', d=>d.nutrition.templates, (d,v)=>d.nutrition.templates=v],
   ['meal','Mahlzeiten', d=>d.nutrition.meals, (d,v)=>d.nutrition.meals=v],
   ['field','Feldtraining', d=>d.fieldLogs, (d,v)=>d.fieldLogs=v],
   ['cal','Kalender', d=>d.calendar, (d,v)=>d.calendar=v]
@@ -2463,14 +2480,6 @@ function nutMealPlan(T){ const mp=NUT().meal_plans[T.time] || NUT().meal_plans.r
 function nutMeal(date, slotId){ return (S.nutrition.meals||[]).find(m=>m.v===2 && m.date===date && m.slot===slotId) || null; }
 function nutEnsureMeal(date, slotId){ let m=nutMeal(date, slotId); if(!m){ m={ id:'meal-'+date+'-'+slotId, v:2, date, slot:slotId, items:[], done:false, createdAt:new Date().toISOString() }; S.nutrition.meals.push(m); } return m; }
 
-/* Meal-Prep-Box für ein Datum aus der Rezeptdatenbank (12.6) */
-function nutPrepBox(date){
-  const w=(REF.recipes&&REF.recipes.beispiel_woche_23_27_11)||[]; const d=parseISO(date);
-  const key=pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.';
-  return w.find(x=>x.day.endsWith(key) && date.startsWith('2026')) || null;
-}
-function compName(id){ const c=((REF.recipes&&REF.recipes.components)||[]).find(x=>x.id===id); return c?c.name:id; }
-
 /* ---------- Ansicht ---------- */
 function viewNutrition(){
   let h='<h1>Ernährung</h1>';
@@ -2489,15 +2498,19 @@ function viewNutrition(){
   h+='<details><summary class="small muted">Tagestyp ändern</summary>'+sel('nut-type','Tagestyp',[['','automatisch']].concat(Object.entries(NUT().day_types).map(([k,v])=>[k,v.label])),cfg.type||'','data-chg="nutType"')+'</details></div>';
 
   // Mahlzeiten
-  const plan=nutMealPlan(T); const box=nutPrepBox(date); const prepStart=(NUT().mealprep||{}).start;
+  const plan=nutMealPlan(T);
   const all=[]; let doneN=0;
   h+='<h2>Mahlzeiten</h2>';
   plan.forEach(({slot,P,K,F})=>{
     const m=nutMeal(date, slot.id); const items=m?m.items:[]; items.forEach(i=>all.push(i)); if(m&&m.done) doneN++;
-    const ist=sumMac(items);
-    h+='<div class="ex"><div class="ex-head"><span class="ex-name"><button class="chip" style="min-height:30px;padding:2px 9px;margin:0 6px 0 0" data-act="nutDone" data-s="'+slot.id+'" aria-pressed="'+(m&&m.done?'true':'false')+'" aria-label="gegessen">'+(m&&m.done?'☑':'☐')+'</button>'+esc(slot.time+' · '+slot.name)+'</span><span class="plan-hint">Ziel P '+P+' · KH '+K+' · F '+F+'</span></div>';
-    if(slot.lunch && box && (!prepStart || date>=prepStart)) h+='<div class="note small">Meal-Prep-Box: '+esc(box.components.map(compName).join(' + '))+' ('+box.macros.kcal+' kcal · P '+box.macros.P+' · KH '+box.macros.K+' · F '+box.macros.F+'). <button class="link" data-act="nutBox" data-s="'+slot.id+'">Box übernehmen</button></div>';
-    else if(slot.lunch && prepStart && date<prepStart) h+='<div class="small muted">Bis zum Meal-Prep-Start ('+fmtDate(prepStart)+'): Kantine klein/mittel/groß wählen.</div>';
+    const ist=sumMac(items); const open=!!(ui.mealOpen||{})[slot.id]; const zk=Math.round(4*P+4*K+9*F);
+    const names=items.map(i=>(nutFood(i.food)||{}).name||'?').join(', ');
+    h+='<div class="ex meal'+(open?' open':'')+'"><div class="meal-head"><button class="chip meal-done" data-act="nutDone" data-s="'+slot.id+'" aria-pressed="'+(m&&m.done?'true':'false')+'" aria-label="gegessen">'+(m&&m.done?'✓':'')+'</button>'+
+      '<button class="meal-tg" data-act="nutOpen" data-s="'+slot.id+'" aria-expanded="'+open+'"><span class="meal-t">'+esc(slot.time+' · '+slot.name.replace(/ \(.*\)$/,''))+'</span><span class="meal-k">'+(items.length?'<b>'+Math.round(ist.kcal)+'</b> / ':'')+zk+' kcal</span>'+
+      '<span class="meal-s">'+(items.length?esc(names):'noch leer')+'</span><span class="meal-c" aria-hidden="true">'+(open?'–':'+')+'</span></button></div>';
+    if(!open){ const st=!items.length && nutStdTpl(date, slot.id); if(st) h+='<div class="tpl-pick"><button class="chip std" data-act="nutTplUse" data-t="'+st.id+'" data-s="'+slot.id+'">★ '+esc(st.name)+'</button></div>'; h+='</div>'; return; }
+    h+='<div class="plan-hint" style="margin:6px 0">Ziel P '+P+' · KH '+K+' · F '+F+'</div>';
+    if(!items.length){ const tl=nutTplsForSlot(date, slot.id); if(tl.length) h+='<div class="tpl-pick">'+tl.map(t=>'<button class="chip'+(t._std?' std':'')+'" data-act="nutTplUse" data-t="'+t.id+'" data-s="'+slot.id+'">'+(t._std?'★ ':'')+esc(t.name)+'</button>').join('')+'</div>'; }
     items.forEach((it,j)=>{ const f=nutFood(it.food); const mm=itemMac(it);
       const us=nutUnits(f), uu=itemUnit(it,f), q=itemQty(it,f);
       h+='<div class="setrow nut-row"><span>'+esc(f?f.name:it.food)+(it.fixed?' <span class="small muted" title="von dir festgelegt">📌</span>':'')+'<br><span class="small muted">P '+fmtNum(Math.round(mm.P))+' · KH '+fmtNum(Math.round(mm.K))+' · F '+fmtNum(Math.round(mm.F))+' · '+Math.round(mm.kcal)+' kcal</span></span>'+
@@ -2505,32 +2518,19 @@ function viewNutrition(){
         (us.length>1 ? '<select aria-label="Einheit" data-chg="nutU" data-s="'+slot.id+'" data-j="'+j+'">'+us.map(([k,l])=>'<option value="'+k+'"'+(k===uu?' selected':'')+'>'+esc(l)+'</option>').join('')+'</select>' : '<span class="nut-u">'+esc(us[0][1])+'</span>')+
         '<button class="small" data-act="nutDel" data-s="'+slot.id+'" data-j="'+j+'" aria-label="entfernen">✕</button></div>'; });
     h+='<div class="small">Ist: P '+Math.round(ist.P)+' · KH '+Math.round(ist.K)+' · F '+Math.round(ist.F)+' · '+Math.round(ist.kcal)+' kcal</div>';
-    h+='<div class="row" style="margin-top:6px"><button class="small" data-act="nutPick" data-s="'+slot.id+'">+ Lebensmittel</button>'+(items.some(i=>!i.fixed)?'<button class="small" data-act="nutCalc" data-s="'+slot.id+'">Mengen neu berechnen</button>':'')+(items.some(i=>i.fixed)?'<button class="small" data-act="nutUnfix" data-s="'+slot.id+'">Festlegungen lösen</button>':'')+'</div></div>';
+    h+='<div class="row" style="margin-top:6px"><button class="small" data-act="nutPick" data-s="'+slot.id+'">+ Lebensmittel</button>'+(items.length?'<button class="small" data-act="nutTplSave" data-s="'+slot.id+'">'+(m&&m.tpl&&nutTpl(m.tpl)?'Mahlzeit aktualisieren':'Als Mahlzeit speichern')+'</button>':'')+(items.some(i=>!i.fixed)?'<button class="small" data-act="nutCalc" data-s="'+slot.id+'">Mengen neu berechnen</button>':'')+(items.some(i=>i.fixed)?'<button class="small" data-act="nutUnfix" data-s="'+slot.id+'">Festlegungen lösen</button>':'')+'</div></div>';
   });
   const day=sumMac(all); const pct=(a,b)=>b?Math.round((a/b-1)*100):0; const tol=(NUT().tolerance||{}).day_pct||5;
   const line=(l,a,b,u)=>'<div><span class="small muted">'+l+'</span><strong>'+Math.round(a)+(u||' g')+'</strong><span class="small muted"> / '+b+(u||' g')+(all.length?' ('+(pct(a,b)>0?'+':'')+pct(a,b)+' %'+(Math.abs(pct(a,b))<=tol?' ✓':'')+')':'')+'</span></div>';
-  if(plan.length) h+='<p class="small muted">'+doneN+'/'+plan.length+' Mahlzeiten als gegessen abgehakt · Abdeckung siehe oben.</p>';
 
   // Supplements
   const sup=(NUT().supplements||[]).filter(s=>s.active);
-  if(sup.length) h+='<h2>Supplements</h2><div class="section">'+sup.map(s=>chipBtn('nutSupp','supp',s.id,(cfg.supp&&cfg.supp[s.id]?'☑ ':'☐ ')+s.name+' · '+s.dose,!!(cfg.supp&&cfg.supp[s.id]))).join('')+
-    '<p class="small muted">'+esc(NUT().caffeine||'')+'</p></div>';
-  h+='<p class="no-print"><button data-act="nutPrep">Meal-Prep & Einkaufsliste</button></p>';
-  // Lebensmittel verwalten
-  h+='<details style="margin-top:16px"><summary class="small">Lebensmittel bewerten & eigene anlegen</summary>'+nutFoodAdmin()+'</details>';
+  if(sup.length) h+='<h2>Supplements</h2><div class="section">'+sup.map(s=>chipBtn('nutSupp','supp',s.id,(cfg.supp&&cfg.supp[s.id]?'☑ ':'☐ ')+s.name+' · '+s.dose,!!(cfg.supp&&cfg.supp[s.id]))).join('')+'</div>';
+  h+='<div class="row no-print" style="margin-top:16px"><button class="primary" data-act="shopOpen">Einkaufsliste</button></div>';
+  h+=nutTplSection();
   h+='<p class="small muted" style="margin-top:16px">Richtwerte aus Nährwerttabellen, Packungsangaben haben Vorrang.</p>';
   return h;
 }
-function nutFoodAdmin(){
-  const cats={}; nutFoods(true).forEach(f=>{ (cats[f.category]=cats[f.category]||[]).push(f); });
-  let h='<p class="small muted">Bewertung 1 = schlägt AOS nicht mehr vor. Ausblenden entfernt ein Lebensmittel aus der Auswahl, alte Einträge bleiben erhalten.</p>';
-  Object.entries(cats).forEach(([c,l])=>{ h+='<h3>'+esc(c.replace(/_/g,' '))+'</h3><div class="table-wrap"><table><tbody>'+l.map(f=>'<tr><td>'+esc(f.name)+(f.tags.includes('favorit')?' ★':'')+'<br><span class="small muted">'+esc(f.per)+': '+f.kcal+' kcal · P '+fmtNum(f.protein_g)+' · KH '+fmtNum(f.carbs_g)+' · F '+fmtNum(f.fat_g)+'</span></td>'+
-    '<td style="width:84px">'+sel('fr-'+f.id,'',[['','–'],['1','1'],['2','2'],['3','3'],['4','4'],['5','5']],f.user_rating==null?'':String(f.user_rating),'data-chg="nutRate" data-f="'+esc(f.id)+'" aria-label="Bewertung"')+'</td>'+
-    '<td><button class="small" data-act="nutHide" data-f="'+esc(f.id)+'">'+(f.active===false?'einblenden':'ausblenden')+'</button></td></tr>').join('')+'</tbody></table></div>'; });
-  h+='<button data-act="nutOwn">+ Eigenes Lebensmittel (Packungsangaben)</button>';
-  return h;
-}
-
 /* ---------- Aktionen ---------- */
 const nutDate = ()=>ui.nutDate||todayISO();
 function nutRecalc(slotId){ const date=nutDate(); const T=nutTargets(date); const t=nutMealPlan(T).find(x=>x.slot.id===slotId); const m=nutMeal(date, slotId); if(t&&m) nutCalc(m.items, t); }
@@ -2539,6 +2539,7 @@ CHG.nutDate = el=>{ if(el.value){ ui.nutDate=el.value; render(); } };
 CHG.nutType = el=>{ nutSetDay(nutDate(), { type:el.value||null }); save(); render(); };
 CHG.nutTime = el=>{ nutSetDay(nutDate(), { time:el.value }); save(); render(); };
 ACT.nutTimeChip = el=>{ nutSetDay(nutDate(), { time:el.dataset.v }); save(); render(); };
+ACT.nutOpen = el=>{ ui.mealOpen=ui.mealOpen||{}; ui.mealOpen[el.dataset.s]=!ui.mealOpen[el.dataset.s]; render(); };
 ACT.nutDone = el=>{ const m=nutEnsureMeal(nutDate(), el.dataset.s); m.done=!m.done; save(); render(); };
 ACT.nutSupp = el=>{ const c=nutDayCfg(nutDate()); const s=Object.assign({}, c.supp||{}); s[el.dataset.v]=!s[el.dataset.v]; if(!s[el.dataset.v]) delete s[el.dataset.v]; nutSetDay(nutDate(), { supp:Object.keys(s).length?s:null }); save(); render(); };
 ACT.nutDel = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; m.items.splice(+el.dataset.j,1); nutRecalc(el.dataset.s); save(); render(); };
@@ -2550,19 +2551,21 @@ CHG.nutU = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; const 
   save(); render(); };
 CHG.nutG = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; const it=m.items[+el.dataset.j]; const v=num(el.value);
   if(v==null || v<0){ toast('Bitte eine Zahl eingeben.'); render(); return; } it.g=qtyToG(v,itemUnit(it),nutFood(it.food)); it.fixed=true; nutRecalc(el.dataset.s); save(); render(); };
-ACT.nutBox = el=>{ const box=nutPrepBox(nutDate()); if(!box) return; const m=nutEnsureMeal(nutDate(), el.dataset.s);
-  m.items=box.items_raw_g.map(([food,g])=>({ food, g, fixed:true })); m.box=box.components; save(); render(); toast('Box übernommen (Rohgewichte).'); };
 ACT.nutPick = el=>{ ui.nutSlot=el.dataset.s;
   const slot=nutMealPlan(nutTargets(nutDate())).find(x=>x.slot.id===el.dataset.s);
   openDlg('Lebensmittel – '+(slot?slot.slot.name:''), inp('fd-q','Suchen','','autocomplete="off" placeholder="z. B. Ei, Skyr, Huhn oder Barcode"')+'<div id="fd-amt"></div><div id="fd-list">'+nutPickList('')+'</div>'+
-    '<div class="off-box"><div class="eyebrow">Online · Open Food Facts</div><div id="off-res"><p class="small muted">Markenprodukte erscheinen hier automatisch ab 3 Zeichen (Name oder Barcode).</p></div></div>', '<button data-act="closeDlg">Fertig</button>');
+    '<div class="off-box"><div class="eyebrow">Online · Open Food Facts</div><div id="off-res"><p class="small muted">Markenprodukte erscheinen hier automatisch ab 3 Zeichen (Name oder Barcode).</p></div></div><p class="small" style="margin-top:10px"><button class="link" data-act="nutOwn">Nährwerte selbst eintragen</button></p>', '<button data-act="closeDlg">Fertig</button>');
   ui.nutSel=null; };
 function nutPickList(q){
   const slot=(NUT().meal_plans[nutTargets(nutDate()).time]||[]).find(s=>s.id===ui.nutSlot)||{};
   const pre=(slot.tags||[]).includes('pre');
   const ql=q.trim().toLowerCase();
-  let l=nutFoods(false).filter(f=>!ql || f.name.toLowerCase().includes(ql) || f.category.includes(ql));
-  l=l.filter(f=>f.category!=='kantine' || (slot.lunch && !(NUT().mealprep && nutDate()>=NUT().mealprep.start)));
+  if(!ql){ const rec=nutRecentIds().map(nutFood).filter(f=>f && f.active!==false).slice(0,16);
+    const sug=pre ? nutFoods(false).filter(f=>f.tags.includes('pre') && !rec.includes(f)).slice(0,8) : [];
+    return (sug.length?'<div class="eyebrow" style="margin:8px 0 4px">Gut vor dem Training</div>'+sug.map(f=>'<button class="chip" data-act="nutSel" data-f="'+esc(f.id)+'">'+esc(f.name)+' · vor Training</button>').join(''):'')+
+      (rec.length ? '<div class="eyebrow" style="margin:8px 0 4px">Zuletzt verwendet</div>'+rec.map(f=>'<button class="chip" data-act="nutSel" data-f="'+esc(f.id)+'">'+esc(f.name)+'</button>').join('') : (sug.length?'':'<p class="small muted">Tippe oben, um zu suchen.</p>')); }
+  let l=nutFoods(false).filter(f=>f.name.toLowerCase().includes(ql) || f.category.includes(ql));
+  l=l.filter(f=>f.category!=='kantine' || slot.lunch);
   const score=f=>(f.user_rating||0)*2+(f.tags.includes('favorit')?5:0)+(pre&&(f.tags.includes('pre')||f.tags.includes('fettarm_ballaststoffarm'))?8:0);
   l.sort((a,b)=>score(b)-score(a) || a.name.localeCompare(b.name,'de'));
   if(!l.length) return '<p class="small muted">In deinen Lebensmitteln nichts gefunden – Treffer von Open Food Facts siehe unten.</p>';
@@ -2674,24 +2677,94 @@ ACT.nutOwnOk = ()=>{ const n=val('no-name'), kc=num(val('no-kcal')), p=num(val('
   ui.offPicked=null;
   save(); closeDlg(); render(); toast('Lebensmittel angelegt.'); };
 
+/* ---------- Gespeicherte Mahlzeiten (Vorlagen) ---------- */
+function nutTpls(){ return S.nutrition.templates||[]; }
+function nutTpl(id){ return nutTpls().find(t=>t.id===id)||null; }
+function nutSlotNames(){ const m={}; Object.values(NUT().meal_plans||{}).forEach(l=>l.forEach(s=>{ if(!m[s.id]) m[s.id]=s.name.replace(/ \(.*\)$/,''); })); return m; }
+const tgtKcal=x=>4*x.P+4*x.K+9*x.F;
+function tplScaled(t, target){ const base=sumMac(t.items).kcal; let f=1;
+  if(t.scale!==false && base>0 && target) f=Math.min(1.3, Math.max(0.7, tgtKcal(target)/base));
+  return t.items.map(it=>{ const fd=nutFood(it.food); let g=(it.g||0)*f;
+    if(fd && it.unit==='stk' && fd.piece_g){ const step=fd.piece_g>=100?0.5:1; g=Math.max(step, Math.round(g/fd.piece_g/step)*step)*fd.piece_g; }
+    else if(isPortion(fd)) g=Math.max(0.5, Math.round(g*2)/2); else g=Math.max(5, r5(g));
+    return { food:it.food, g, unit:it.unit, fixed:true }; }); }
+function nutTplsForSlot(date, slotId){ const wd=weekdayOf(date);
+  return nutTpls().map(t=>Object.assign({}, t, { _std: t.slot===slotId && (t.days||[]).includes(wd) }))
+    .filter(t=>t._std || t.slot===slotId || !t.slot).sort((a,b)=>(b._std-a._std) || a.name.localeCompare(b.name,'de')); }
+function nutStdTpl(date, slotId){ const wd=weekdayOf(date); return nutTpls().find(t=>t.slot===slotId && (t.days||[]).includes(wd)) || null; }
+function nutRecentIds(){ const c={}; (S.nutrition.meals||[]).forEach(m=>(m.items||[]).forEach(i=>{ c[i.food]=(c[i.food]||0)+1; })); nutTpls().forEach(t=>t.items.forEach(i=>{ c[i.food]=(c[i.food]||0)+3; }));
+  return Object.keys(c).sort((a,b)=>c[b]-c[a]); }
+const WD_ORDER=[1,2,3,4,5,6,0];
+function nutTplSection(){ const L=nutTpls(); const sn=nutSlotNames();
+  let h='<details class="section tpl-det" id="tpl-det"'+(ui.tplOpen?' open':'')+'><summary><strong>Meine Mahlzeiten</strong> <span class="small muted">· '+(L.length?L.length+' gespeichert':'noch keine')+'</span></summary>';
+  if(!L.length) h+='<p class="small muted">Stell eine Mahlzeit einmal zusammen und tippe „Als Mahlzeit speichern“. Danach reicht ein Tipp – ★ = Standard für diesen Tag.</p>';
+  else h+='<div class="cal-list">'+L.slice().sort((a,b)=>a.name.localeCompare(b.name,'de')).map(t=>{ const k=Math.round(sumMac(t.items).kcal);
+    const d=(t.days||[]).length===7?'täglich':(t.days||[]).length?WD_ORDER.filter(x=>t.days.includes(x)).map(x=>WD[x]).join(' '):'';
+    return '<div class="cal-row"><div><span class="cal-d">'+esc(sn[t.slot]||'jede Mahlzeit')+(d?' · '+d:'')+' · '+k+' kcal'+(t.scale===false?' · feste Mengen':'')+'</span><strong>'+esc(t.name)+'</strong><span class="small muted"> · '+esc(t.items.map(i=>(nutFood(i.food)||{}).name||'?').join(', '))+'</span></div><button class="link" data-act="nutTplEdit" data-t="'+t.id+'">ändern</button></div>'; }).join('')+'</div>';
+  return h+'</details>'; }
+document.addEventListener('toggle', e=>{ if(e.target && e.target.id==='tpl-det') ui.tplOpen=e.target.open; }, true);
+function nutTplDlg(){ const d=ui.tplDraft; const sn=nutSlotNames();
+  openDlg(d.id?'Mahlzeit ändern':'Mahlzeit speichern', inp('tp-name','Name',d.name,'placeholder="z. B. Frühstück Werktag"')+
+    '<label>Standard an diesen Tagen</label><div class="chips7">'+WD_ORDER.map(x=>'<button class="chip" data-act="nutTplDay" data-v="'+x+'" aria-pressed="'+(d.days.includes(x))+'">'+WD[x]+'</button>').join('')+'</div>'+
+    '<p class="small muted">An diesen Tagen schlägt AOS die Mahlzeit für „'+esc(sn[d.slot]||d.slot)+'“ zuerst vor und plant sie in der Einkaufsliste ein.</p>'+
+    '<label>Mengen</label><div><button class="chip" data-act="nutTplScale" data-v="1" aria-pressed="'+(d.scale!==false)+'">an Tag & Gewicht anpassen</button><button class="chip" data-act="nutTplScale" data-v="0" aria-pressed="'+(d.scale===false)+'">immer gleich</button></div>'+
+    '<p class="small muted">Anpassen = alle Mengen im gleichen Verhältnis auf das kcal-Ziel der Mahlzeit (±30 %).</p>'+
+    '<div class="small">'+esc(d.items.map(i=>{ const f=nutFood(i.food); return (f?f.name:i.food)+' '+amountTxt(i); }).join(' · '))+' · '+Math.round(sumMac(d.items).kcal)+' kcal</div>',
+    (d.id?'<button class="danger" data-act="nutTplDel">Löschen</button>':'')+'<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="nutTplOk">Speichern</button>'); }
+ACT.nutTplSave = el=>{ const date=nutDate(), slot=el.dataset.s; const m=nutMeal(date, slot); if(!m||!m.items.length) return; const old=m.tpl&&nutTpl(m.tpl);
+  const items=m.items.filter(i=>i.g!=null).map(i=>({ food:i.food, g:i.g, unit:itemUnit(i) }));
+  ui.tplDraft = old ? Object.assign({}, old, { items }) : { id:null, name:nutSlotNames()[slot]||'Mahlzeit', slot, days:[weekdayOf(date)], scale:true, items };
+  nutTplDlg(); };
+ACT.nutTplEdit = el=>{ const t=nutTpl(el.dataset.t); if(!t) return; ui.tplDraft=JSON.parse(JSON.stringify(t)); nutTplDlg(); };
+ACT.nutTplDay = el=>{ const d=ui.tplDraft; d.name=val('tp-name'); const v=+el.dataset.v; d.days=d.days.includes(v)?d.days.filter(x=>x!==v):d.days.concat(v); nutTplDlg(); };
+ACT.nutTplScale = el=>{ const d=ui.tplDraft; d.name=val('tp-name'); d.scale=el.dataset.v==='1'; nutTplDlg(); };
+ACT.nutTplOk = ()=>{ const d=ui.tplDraft; d.name=(val('tp-name')||'').trim(); if(!d.name){ toast('Bitte einen Namen eingeben.'); return; }
+  S.nutrition.templates=S.nutrition.templates||[];
+  // ein Wochentag hat je Mahlzeit höchstens einen Standard
+  S.nutrition.templates.forEach(t=>{ if(t.id!==d.id && t.slot===d.slot) t.days=(t.days||[]).filter(x=>!d.days.includes(x)); });
+  const rec={ id:d.id||uid('mtpl'), name:d.name, slot:d.slot, days:d.days.slice().sort(), scale:d.scale!==false, items:d.items, createdAt:d.createdAt||new Date().toISOString() };
+  const i=S.nutrition.templates.findIndex(t=>t.id===rec.id); if(i>=0) S.nutrition.templates[i]=rec; else S.nutrition.templates.push(rec);
+  const m=nutMeal(nutDate(), d.slot); if(m && !d.id) m.tpl=rec.id;
+  save(); closeDlg(); render(); toast('Mahlzeit gespeichert.'); };
+ACT.nutTplDel = ()=>{ const id=ui.tplDraft.id; S.nutrition.templates=nutTpls().filter(t=>t.id!==id); save(); closeDlg(); render(); toast('Mahlzeit gelöscht.'); };
+ACT.nutTplUse = el=>{ const t=nutTpl(el.dataset.t); if(!t) return; const date=nutDate(); const tgt=nutMealPlan(nutTargets(date)).find(x=>x.slot.id===el.dataset.s);
+  const m=nutEnsureMeal(date, el.dataset.s); m.items=tplScaled(t, tgt); m.tpl=t.id; save(); render(); toast(t.name+' übernommen'+(t.scale!==false?' (Mengen ans Ziel angepasst)':'')+'.'); };
 
-function nutPrepText(){
-  const R=REF.recipes; if(!R) return ''; const L=[]; const F=id=>{ const f=nutFood(id); return f?f.name:id; };
-  const rounds={}; (R.beispiel_woche_23_27_11||[]).forEach(b=>{ (rounds[b.prep_round]=rounds[b.prep_round]||[]).push(b); });
-  Object.entries(rounds).forEach(([r,boxes])=>{
-    const comps=[...new Set(boxes.flatMap(b=>b.components))];
-    L.push('AOS Meal-Prep · '+r+' · für '+boxes.map(b=>b.day.split(' ')[0]).join('–'));
-    L.push('Kochen: '+comps.map(c=>'☐ '+compName(c)).join(' '));
-    L.push('Einkauf (roh): '+Object.entries((R.prep_mengen_roh_g||{})[r]||{}).sort((a,b)=>b[1]-a[1]).map(([k,g])=>F(k)+' '+g+' g').join(' · '));
-    L.push('Boxen:');
-    boxes.forEach(b=>L.push('☐ '+b.day+' · '+((NUT().day_types[b.day_type]||{}).label||b.day_type)+' · '+b.items_raw_g.map(([k,g])=>F(k)+' '+g+' g').join(', ')+' → '+b.macros.kcal+' kcal, P '+b.macros.P+' / KH '+b.macros.K+' / F '+b.macros.F));
-    L.push('');
-  });
-  const rg=R.regeln||{}; L.push('Haltbarkeit: '+(rg.haltbarkeit||'')); L.push('Aufwärmen: '+(rg.aufwaermen||''));
-  return L.join('\n');
-}
-ACT.nutPrep = ()=>openDlg('Meal-Prep & Einkauf','<p class="small muted">Erste Prep-Woche laut Rezeptdatenbank (Komponenten frei kombiniert, Mengen roh). Vorräte vor dem Einkauf abhaken.</p><pre class="out" id="prep-out">'+esc(nutPrepText())+'</pre>',
-  '<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="prep-out">Kopieren</button>');
+/* ---------- Einkaufsliste: Woche im Voraus aus Mahlzeiten und Standard-Mahlzeiten ---------- */
+const SHOP_CAT={ fleisch_fisch:'Fleisch & Fisch', eier_milch:'Eier & Milchprodukte', pflanzlich:'Pflanzlich', proteinpulver:'Proteinpulver', beilage:'Beilagen', gemuese:'Gemüse', obst:'Obst', fruehstueck:'Frühstück', brot:'Brot', fett:'Fette & Nüsse', suess:'Süßes', getraenk:'Getränke', sauce:'Saucen', eigene:'Eigene Produkte' };
+function shopRange(which){ const td=todayISO(); const mon=mondayOf(td);
+  if(which==='next') { const m2=addDays(mon,7); return { from:m2, to:addDays(m2,6) }; }
+  return { from:td, to:addDays(mon,6) }; }
+function shopBuild(from,to){ const tot={}, miss={}, src={ planned:0, std:0 }; const sn=nutSlotNames();
+  for(let d=from; d<=to; d=addDays(d,1)){ const T=nutTargets(d);
+    nutMealPlan(T).forEach(x=>{ const m=nutMeal(d,x.slot.id); let items=null;
+      if(m && m.items.length){ items=m.items; src.planned++; } else { const t=nutStdTpl(d,x.slot.id); if(t){ items=tplScaled(t,x); src.std++; } }
+      if(!items){ const n=sn[x.slot.id]||x.slot.name; miss[n]=(miss[n]||0)+1; return; }
+      items.forEach(it=>{ const f=nutFood(it.food); if(!f || f.category==='kantine' || it.g==null) return; const k=it.food; tot[k]=tot[k]||{ g:0, stk:false }; tot[k].g+=it.g; if(it.unit==='stk') tot[k].stk=true; }); }); }
+  return { tot, miss, src }; }
+function shopQty(f, e){ if(isPortion(f)) return Math.ceil(e.g)+' Port.';
+  const ml=/ml/.test(f.per||''); if(f.piece_g && (e.stk || unitDefault(f)==='stk')){ const n=Math.ceil(e.g/f.piece_g-0.05); return n+' '+(f.piece_label||'Stück')+' (≈ '+Math.round(e.g)+(ml?' ml':' g')+')'; }
+  const g=Math.ceil(e.g/10)*10; return (g>=1000?fmtNum(Math.round(g/100)/10)+(ml?' l':' kg'):g+(ml?' ml':' g')); }
+function shopLoad(){ try{ return JSON.parse(localStorage.getItem('aos-shop')||'{}'); }catch(e){ return {}; } }
+function shopStore(o){ try{ localStorage.setItem('aos-shop', JSON.stringify(o)); }catch(e){} }
+function shopHTML(){ const which=ui.shopWeek||([0,6].includes(weekdayOf(todayISO()))?'next':'this'); const r=shopRange(which); const B=shopBuild(r.from,r.to);
+  const key=r.from+'_'+r.to; const chk=(shopLoad()[key])||{};
+  const groups={}; Object.entries(B.tot).forEach(([id,e])=>{ const f=nutFood(id); if(!f) return; const c=SHOP_CAT[f.category]||'Sonstiges'; (groups[c]=groups[c]||[]).push({ id, f, e }); });
+  let h='<div class="seg" style="margin-bottom:10px">'+[['this','Diese Woche'],['next','Nächste Woche']].map(([k,l])=>'<button class="chip" data-act="shopWeek" data-v="'+k+'" aria-pressed="'+(k===which)+'">'+l+'</button>').join('')+'</div>';
+  h+='<p class="small muted">'+fmtDateShort(r.from)+' – '+fmtDateShort(r.to)+' · Mengen passend zum kcal-Ziel jedes Tages.</p>';
+  const txt=['Einkaufsliste '+fmtDateShort(r.from)+' – '+fmtDateShort(r.to)];
+  if(!Object.keys(groups).length) h+='<p class="small">Noch nichts zu planen. Speichere Mahlzeiten und lege fest, an welchen Tagen sie Standard sind (★).</p>';
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b,'de')).forEach(c=>{ h+='<div class="eyebrow" style="margin:12px 0 4px">'+esc(c)+'</div>'; txt.push('', c);
+    groups[c].sort((a,b)=>a.f.name.localeCompare(b.f.name,'de')).forEach(({id,f,e})=>{ const q=shopQty(f,e); const on=!!chk[id];
+      txt.push((on?'☑ ':'☐ ')+f.name+' – '+q);
+      h+='<button class="shop-row'+(on?' on':'')+'" data-act="shopChk" data-k="'+esc(key)+'" data-f="'+esc(id)+'"><span class="shop-box">'+(on?'✓':'')+'</span><span class="shop-n">'+esc(f.name)+'</span><span class="shop-q">'+esc(q)+'</span></button>'; }); });
+  const ms=Object.entries(B.miss); if(ms.length) h+='<p class="small muted" style="margin-top:12px">Nicht eingeplant (keine Standard-Mahlzeit): '+esc(ms.map(([n,c])=>n+' '+c+'×').join(' · '))+'</p>';
+  h+='<pre class="sr-only" id="shop-out">'+esc(txt.join('\n'))+'</pre>';
+  return h; }
+function shopShow(){ openDlg('Einkaufsliste', '<div id="shop-body">'+shopHTML()+'</div>', '<button data-act="closeDlg">Schließen</button><button class="primary" data-act="copyPre" data-src="shop-out">Kopieren</button>'); }
+ACT.shopOpen = ()=>shopShow();
+ACT.shopWeek = el=>{ ui.shopWeek=el.dataset.v; const b=document.getElementById('shop-body'); if(b) b.innerHTML=shopHTML(); };
+ACT.shopChk = el=>{ const o=shopLoad(); const k=el.dataset.k; o[k]=o[k]||{}; o[k][el.dataset.f]=!o[k][el.dataset.f]; Object.keys(o).forEach(x=>{ if(x.slice(11)<todayISO()) delete o[x]; }); shopStore(o); const b=document.getElementById('shop-body'); if(b) b.innerHTML=shopHTML(); };
 
 'use strict';
 /* ===== AOS – Plan: Ansicht des aktuellen Plans (planner/plan.json, nur lesend) ===== */
@@ -2822,9 +2895,6 @@ function ovToday(today){
     h+='<div class="tc-row tc-weight"><span class="tc-k">'+esc(fc.time||'Feld')+'</span><span>'+esc(fc.name||'Football-Training')+'<br><span class="small muted">'+(fl?esc(fieldSummary(fl)):'ca. '+(fc.duration_min||90)+' min')+'</span></span><button class="small'+(fl?' link':'')+'" data-act="fieldLog" data-d="'+today+'">'+(fl?'ändern':'Erfassen')+'</button></div>'; }
   const hints=[];
   if(T && T.entry) hints.push('Einstiegsphase: KH −'+NUT().entry.carb_minus_g+' g bis '+fmtDate(NUT().entry.until).slice(0,6));
-  const mp=REF.nut && NUT().mealprep;
-  if(mp && mp.start===addDays(today,1)) hints.push('Morgen startet Meal-Prep – heute vorkochen');
-  if(mp && mp.start===today) hints.push('Meal-Prep startet heute');
   if(hints.length) h+='<div class="tc-hints">'+hints.map(x=>'<div>› '+esc(x)+'</div>').join('')+'</div>';
   let kc=''; if(T){ const di=nutDayItems(today,T); const k=di.length?Math.round(sumMac(di).kcal):null;
     kc='<div class="tc-kcal"><span class="tc-k">Kalorien</span><span>'+(k!=null?'<b>'+fmtK(k)+'</b> / '+fmtK(T.kcal):'<b>'+fmtK(T.kcal)+'</b>')+' kcal</span></div>'; }
