@@ -1104,6 +1104,12 @@ function platesUpdate(ei){ const el=document.getElementById('plates-'+ei); if(!e
   const typed=e.sets.map(x=>x.kg).filter(v=>typeof v==='number'&&!Number.isNaN(v)).slice(-1)[0]; const kg=typed!=null?typed:+el.dataset.plan||null;
   el.textContent=platesText(kg); }
 
+/* ---------- Aufwärmsätze zur Arbeitslast (Hauptübungen) ---------- */
+function warmupSets(pe){ const kg=pe&&pe.loadKg; if(!(kg>=40) || !pe.planner || pe.planner.role!=='main') return [];
+  const bar=isBarbell(pe); const rd=x=>Math.round(x/2.5)*2.5; const out=[]; if(bar) out.push([BAR_KG,10]);
+  [[0.4,5],[0.6,3],[0.8,2]].forEach(([p,r])=>{ const w=rd(kg*p); if(w>(out.length?out[out.length-1][0]:0) && w<kg && (!bar||w>BAR_KG)) out.push([w,r]); });
+  return out; }
+
 /* Letzte Leistung einer Übung (gleicher Name und Variante), ohne die aktuelle Einheit */
 function lastPerf(e, excludeId){
   const key=e.name+'|'+(e.variant||'');
@@ -1134,6 +1140,7 @@ function logForm(){
     const F=METRIC_FIELDS[e.metric]||METRIC_FIELDS.kraft;
     h+='<div class="ex"><div class="ex-head"><span class="ex-name">'+esc(e.name+(e.variant?' ('+e.variant+')':''))+'</span>'+(pe?'<span class="plan-hint">Soll: '+esc(exPlanText(pe)||'ohne Vorgabe')+'</span>':'<span class="plan-hint">ohne Vorgabe</span>')+'</div>';
     if(isBarbell(pe)) h+='<div class="plates" id="plates-'+i+'" data-plan="'+(pe.loadKg||'')+'">'+esc(platesText((e.sets.map(x=>x.kg).filter(v=>typeof v==='number'&&!Number.isNaN(v)).slice(-1)[0])??pe.loadKg))+'</div>';
+    const wu=!s.log?warmupSets(pe):[]; if(wu.length) h+='<div class="plates">Aufwärmen: '+wu.map(([w,r])=>fmtNum(w)+' kg × '+r).join(' · ')+'</div>';
     const lp=lastPerf(e, s.id); h+='<div class="last-perf">'+(lp?'Letztes Mal ('+esc(WD[weekdayOf(lp.date)]+' '+fmtDate(lp.date).slice(0,6))+'): <strong>'+esc(lp.text)+'</strong>':'Erstes Mal – noch kein Vergleich')+'</div>';
     if(pe && pe.alternatives && pe.alternatives.length) h+='<div class="small muted">Alternativen: '+esc(pe.alternatives.map(a=>a.name).join(' / '))+'</div>';
     if(pe && pe.notes) h+='<div class="small muted">'+esc(pe.notes)+'</div>';
