@@ -1244,7 +1244,7 @@ function viewTests(){
   if(fls.length) h+=pdet('v-field','Feldtraining',fls.length===1?'1 Einheit':fls.length+' Einheiten','<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Anstrengung</th><th>Kontakt</th><th>Belastung</th></tr></thead><tbody>'+
     fls.slice(0,12).map(l=>'<tr><td><button class="link" data-act="fieldLog" data-d="'+l.date+'">'+fmtDateShort(l.date)+'</button></td><td>'+(l.status==='ausgefallen'?'fand nicht statt':l.rpe+'/10')+'</td><td>'+esc(l.contact||'—')+'</td><td>'+(l.rpe&&l.durationMin?(l.rpe*l.durationMin)+' AU':'—')+'</td></tr>').join('')+
     '</tbody></table></div><p class="small muted">Belastung = Anstrengung × Minuten (Session-RPE). Hilft, harte Wochen zu erkennen.</p>');
-  h+=loadSection();
+  h+=loadSection()+readySection();
   const pts=bws.filter(x=>x.date&&x.kg!=null).map(x=>({x:x.date,y:x.kg}));
   const lastBw=bws.filter(x=>x.kg!=null).slice(-1)[0];
   let bwb= pts.length>=2 ? lineChart(pts,{unit:'kg',goal:goalW,label:'Körpergewicht',trend:true})+'<p class="small muted" style="margin-top:4px">Linie: 7-Tage-Schnitt · Punkte: einzelne Messungen</p>' : '<p class="small muted">Für ein Diagramm werden mindestens zwei Messungen mit Datum benötigt.</p>';
@@ -1300,6 +1300,14 @@ function weeklyLoad(weeks){
     if(s.log.durationMin && rp.length) w.gym+=Math.round(s.log.durationMin*rp.reduce((a,b)=>a+b,0)/rp.length); else w.miss++; });
   (S.fieldLogs||[]).forEach(l=>{ const w=at(l.date); if(!w||l.status==='ausgefallen') return; if(l.rpe&&l.durationMin) w.field+=l.rpe*l.durationMin; else w.miss++; });
   return W;
+}
+function readySection(){
+  const L=loggedSessions().map(s=>{ const c=(s.planner&&s.planner.checkin)||{}; return { d:sessionDate(s), r:s.log.form!=null?s.log.form:(c.readiness!=null?c.readiness:null), p:c.pain||0 }; }).filter(x=>x.r!=null).slice(-20);
+  if(L.length<2) return '';
+  const avg=a=>Math.round(a.reduce((x,y)=>x+y,0)/a.length*10)/10; const last5=L.slice(-5).map(x=>x.r);
+  const pain=L.filter(x=>x.p>0);
+  const b=lineChart(L.map(x=>({x:x.d,y:x.r})),{label:'Tagesform'})+'<p class="small">Ø der letzten '+last5.length+' Einheiten: <strong>'+fmtNum(avg(last5))+'</strong> von 5'+(pain.length?' · Beschwerden in '+pain.length+' von '+L.length+' Einheiten':'')+'</p><p class="small muted">Tagesform 1 = schlecht, 5 = top – aus dem Check-in vor der Einheit.</p>';
+  return pdet('v-ready','Tagesform','Ø '+fmtNum(avg(last5))+' von 5', b);
 }
 function loadSection(){
   const W=weeklyLoad(8); const tot=w=>w.gym+w.field; if(!W.some(w=>tot(w)>0)) return '';
