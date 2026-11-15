@@ -24,7 +24,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 |---|---|---|---|---|
 | T1 | **Pausentimer** beim Erfassen: startet nach jedem Satz automatisch mit der Pause aus dem Plan, mit Vibration bzw. Ton am Ende | Kein Wechsel in eine andere App im Gym | ✅ erledigt | M |
 | T2 | **Letzte Leistung je Übung** direkt im Satz anzeigen („letztes Mal: 3×5 @RPE 7“) | Schnellere Orientierung beim Ausführen | ✅ erledigt | S |
-| T3 | **Scheibenrechner**: welche Scheiben pro Seite bei der vorgegebenen Last (Stange einstellbar) | Weniger Kopfrechnen | P2 | S |
+| T3 | **Scheibenrechner**: welche Scheiben pro Seite bei der vorgegebenen Last (Stange einstellbar) | Weniger Kopfrechnen | ✅ erledigt | S |
 | T4 | **Aufwärmsätze** automatisch zur Arbeitslast vorschlagen | Strength-Coach-Verhalten | P2 | M |
 | T5 | **Deload-Signale** sichtbar machen (Spezifikation 3.7): mehrere schlechte Tagesformen, RPE über Cap, Beschwerden → Hinweis und automatische Entlastung | Überlastung früh erkennen | P2 | M |
 | T6 | **Testwoche am Phasenende** (Spezifikation 3.8): Tests als eigene Einheit vorschlagen und Ergebnisse direkt in den Verlauf übernehmen | Tests nicht vergessen | P2 | M |

@@ -371,6 +371,7 @@ body::before{content:'';position:fixed;z-index:-1;pointer-events:none;right:-22v
 #rest-bar.go{border-color:var(--sig)}#rest-bar.go .rb-z{color:var(--sig)}
 body:has(#rest-bar) main{padding-bottom:calc(190px + env(safe-area-inset-bottom))!important}
 @media (min-width:761px){#rest-bar{left:50%;right:auto;transform:translateX(-50%);bottom:24px;width:min(560px,90vw)}}
+.plates{font-size:.78rem;color:var(--muted);margin:2px 0 0;font-variant-numeric:tabular-nums}
 .last-perf{font-size:.8rem;color:var(--muted);margin:2px 0 8px}.last-perf strong{color:var(--text);font-weight:600}
 .pdet-b>.table-wrap:last-child,.pdet-b>details:last-child{margin-bottom:2px}
 .meal{padding-top:12px;padding-bottom:12px}
@@ -1091,6 +1092,16 @@ function restTick(){
 ACT.restStop = ()=>restStop();
 ACT.restPlus = ()=>{ REST.min+=30; REST.max+=30; if(REST.beeped>0 && (Date.now()-REST.start)/1000<REST.min) REST.beeped=0; restTick(); };
 
+/* ---------- Scheibenrechner: Scheiben je Seite für Langhantel-Übungen ---------- */
+const BAR_KG=20, PLATES=[25,20,15,10,5,2.5,1.25];
+function isBarbell(pe){ const x=pe&&pe.planner&&typeof REF!=='undefined'&&REF.exMap[pe.planner.dbId]; return !!(x && (x.equipment||[]).includes('barbell')); }
+function platesText(kg){ if(kg==null||!(kg>BAR_KG)) return ''; let rest=(kg-BAR_KG)/2; const out=[];
+  PLATES.forEach(p=>{ while(rest>=p-1e-9){ out.push(p); rest-=p; } });
+  return 'Je Seite: '+out.map(fmtNum).join(' · ')+(rest>0.01?' (+'+fmtNum(Math.round(rest*2*100)/100)+' kg fehlen)':'')+' · Stange '+BAR_KG+' kg'; }
+function platesUpdate(ei){ const el=document.getElementById('plates-'+ei); if(!el||!ui.draft) return; const e=ui.draft.exercises[ei];
+  const typed=e.sets.map(x=>x.kg).filter(v=>typeof v==='number'&&!Number.isNaN(v)).slice(-1)[0]; const kg=typed!=null?typed:+el.dataset.plan||null;
+  el.textContent=platesText(kg); }
+
 /* Letzte Leistung einer Übung (gleicher Name und Variante), ohne die aktuelle Einheit */
 function lastPerf(e, excludeId){
   const key=e.name+'|'+(e.variant||'');
@@ -1120,6 +1131,7 @@ function logForm(){
     const pe=(s.plan||[]).find(p=>p.id===e.planExId);
     const F=METRIC_FIELDS[e.metric]||METRIC_FIELDS.kraft;
     h+='<div class="ex"><div class="ex-head"><span class="ex-name">'+esc(e.name+(e.variant?' ('+e.variant+')':''))+'</span>'+(pe?'<span class="plan-hint">Soll: '+esc(exPlanText(pe)||'ohne Vorgabe')+'</span>':'<span class="plan-hint">ohne Vorgabe</span>')+'</div>';
+    if(isBarbell(pe)) h+='<div class="plates" id="plates-'+i+'" data-plan="'+(pe.loadKg||'')+'">'+esc(platesText((e.sets.map(x=>x.kg).filter(v=>typeof v==='number'&&!Number.isNaN(v)).slice(-1)[0])??pe.loadKg))+'</div>';
     const lp=lastPerf(e, s.id); h+='<div class="last-perf">'+(lp?'Letztes Mal ('+esc(WD[weekdayOf(lp.date)]+' '+fmtDate(lp.date).slice(0,6))+'): <strong>'+esc(lp.text)+'</strong>':'Erstes Mal – noch kein Vergleich')+'</div>';
     if(pe && pe.alternatives && pe.alternatives.length) h+='<div class="small muted">Alternativen: '+esc(pe.alternatives.map(a=>a.name).join(' / '))+'</div>';
     if(pe && pe.notes) h+='<div class="small muted">'+esc(pe.notes)+'</div>';
@@ -1151,6 +1163,7 @@ function updateDraftFromInput(t){
   if(k==='set'){ const f=t.dataset.f; const v=t.value.trim(); const n = f==='reps' ? (v===''?null:(/^\d+$/.test(v)?parseInt(v,10):NaN)) : (v===''?null:(num(v)==null?NaN:num(v)));
     dr.exercises[+t.dataset.e].sets[+t.dataset.s][f]=n;
     restMaybeStart(+t.dataset.e, +t.dataset.s, f, n);
+    if(f==='kg') platesUpdate(+t.dataset.e);
     if(f==='rpe'){ const s=sessionById(ui.sessionId); const cap=(s.planner&&s.planner.cap!=null)?s.planner.cap:capMax(blockById(s.blockId)); const over=cap!=null&&typeof n==='number'&&n>cap; t.style.borderColor=over?'var(--warn)':''; t.style.borderWidth=over?'2px':''; t.title=over?'über der RPE-Obergrenze':''; } }
   else if(k==='exnote') dr.exercises[+t.dataset.e].note=t.value;
   else if(k==='fast') dr.exercises[+t.dataset.e].fast = t.value==='' ? null : t.value==='ja';
