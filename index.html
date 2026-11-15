@@ -1574,7 +1574,7 @@ const AP_PROFILE={
   P1:{ name:'Foundation', cap:7.5, contacts:[30,50], assist:[3,'6–8',[6,8]], powRpe:'≤ 6',
     main:{E:[3,5,6.5],A:[3,5,7],H:[3,5,7.5]}, hinge:{E:[3,4,6.5],A:[3,4,7],H:[3,4,7.5]},
     pull:{E:[4,'4'],A:[4,'5'],H:[4,'5']}, oly:[5,'2'], jump:[3,'3'], goal:'Wiedereinstieg: Technik, Grundkraft und Belastbarkeit',
-    notes:['Wiedereinstieg: Startlasten leitet AOS aus deinen Tests ab (älter als 3 Wochen → 5 % weniger). Liegt ein Satz einer Hauptübung über RPE 7,5, macht AOS die restlichen Sätze automatisch 5 % leichter.','Power-Slots am unteren Ende der Spanne halten.'] },
+    notes:['Startlasten aus deinen Tests (älter als 3 Wochen: −5 %). Satz über RPE 7,5 → restliche Sätze −5 %.','Power locker halten.'] },
   P2:{ name:'Max Strength', cap:8, contacts:[40,60], assist:[3,'6–8',[6,8]], powRpe:'≤ 7',
     main:{E:[5,5,7],A:[5,4,7.5],A2:[5,3,8],H:[4,3,8],D:[3,4,7]}, hinge:{E:[3,4,7],A:[3,3,7.5],A2:[3,2,8],H:[3,2,8],D:[2,3,7]},
     pull:{E:[4,'5'],A:[5,'5'],A2:[5,'5'],H:[5,'5'],D:[3,'4']}, oly:[5,'2'], jump:[3,'3'], goal:'Maximalkraft' },
@@ -1723,17 +1723,17 @@ function apBuildBlock(phase, prev){
   const ps=prev&&prev.week_schedule; const sched=phase.id==='IN' ? { TUE:'IN1', THU:'IN2' } : (ps && Object.values(ps).every(t=>AP_SLOTS[t])) ? ps : { MON:'D1', WED:'D2', THU:'D3', FRI:'D4' };
   const week_wave={}, week_notes={}, week_overrides={};
   types.forEach((t,w)=>{ week_wave[w+1]=AP_WAVE_LABEL[t]; });
-  week_notes[1]=['Automatisch geplant von AOS: '+P.goal+'. Hauptübungen bleiben, Ergänzungen und Power wechseln. Lasten berechnet AOS aus deinen Protokollen (geschätztes 1RM und Ziel-RPE der Woche).'];
+  week_notes[1]=[P.goal+'. Hauptübungen fix, Rest wechselt.'];
   (P.notes||[]).forEach(n=>week_notes[1].push(n));
-  if(emph) week_notes[1].push('Schwerpunkt: '+emph.name+' – am weitesten vom Ziel ('+Math.round(emph.p*100)+' %), deshalb +1 Satz.');
-  types.forEach((t,w)=>{ if(t==='D') week_overrides[w+1]={ note:'Entlastung: weniger Sätze bei gleicher Last'+(addDays(phase.start,w*7).slice(5)<='12-31'&&addDays(phase.start,w*7).slice(5)>='12-18'?' (Feiertage – nicht mögliche Tage einfach frei setzen)':'')+'.' };
-    if(t==='H'||t==='DT') (week_notes[w+1]=week_notes[w+1]||[]).push('Standortbestimmung: Broad Jump (D1), Top-Sets Kniebeuge, Kreuzheben und Bank bis RPE '+fmtNum(P.cap)+' – kein Maximaltest. AOS übernimmt die Ergebnisse beim Speichern automatisch in den Verlauf.'); });
+  if(emph) week_notes[1].push('Schwerpunkt: '+emph.name+' +1 Satz (erst '+Math.round(emph.p*100)+' % vom Ziel).');
+  types.forEach((t,w)=>{ if(t==='D') week_overrides[w+1]={ note:'Entlastung: weniger Sätze, gleiche Last'+(addDays(phase.start,w*7).slice(5)<='12-31'&&addDays(phase.start,w*7).slice(5)>='12-18'?' · Feiertage: Tage frei setzen':'') };
+    if(t==='H'||t==='DT') (week_notes[w+1]=week_notes[w+1]||[]).push('Standortbestimmung: Broad Jump (D1), Top-Sets Kniebeuge, Kreuzheben, Bank bis RPE '+fmtNum(P.cap)+', kein Maxtest. Ergebnisse gehen automatisch in den Verlauf.'); });
   // Nicht verfügbare Tage (plan.json „unavailable“): Einheiten der Woche rücken in Reihenfolge auf die übrigen Trainingstage, was nicht passt, entfällt (kein Nachholen)
   const una=(REF.plan.unavailable||[]); const ORD=['MON','TUE','WED','THU','FRI','SAT','SUN'];
   if(phase.id!=='IN' && una.length) for(let w=1; w<=weeks; w++){ const mon=addDays(phase.start,(w-1)*7); const hit=ORD.filter((d,i)=>una.includes(addDays(mon,i))); if(!hit.length) continue;
     const order=ORD.filter(d=>sched[d]).map(d=>sched[d]); const free=ORD.filter(d=>sched[d] && !hit.includes(d)); const s2={}; free.forEach((d,i)=>{ s2[d]=order[i]; });
     const skipped=order.slice(free.length); const lbl=hit.map(d=>WD[(ORD.indexOf(d)+1)%7]).join('/');
-    week_overrides[w]={ schedule:s2, skipped, note:lbl+' nicht verfügbar'+(skipped.length?'; '+skipped.join(', ')+' entfällt, kein Nachholen':'')+(week_overrides[w]&&week_overrides[w].note?' · '+week_overrides[w].note:'') }; }
+    week_overrides[w]={ schedule:s2, skipped, note:lbl+' nicht verfügbar'+(skipped.length?' · '+skipped.join(', ')+' entfällt':'')+(week_overrides[w]&&week_overrides[w].note?' · '+week_overrides[w].note:'') }; }
   // Spielwoche: letzte schwere Einheit mindestens 4 Tage vor dem Spiel (3.2.1), danach nur kurz und schnell
   const game=((REF.plan.season||{}).first_game||[])[0];
   if(phase.id==='P5' && game){ const lw=weeks; const mon=addDays(phase.start,(lw-1)*7);
@@ -2662,7 +2662,7 @@ function viewPlan(){
     const nm=pb?'<button class="link" data-act="plShowBlock" data-id="'+esc(pb.id)+'"><strong>'+esc(ph.name)+'</strong></button>':'<strong>'+esc(ph.name)+'</strong>';
     const tags=(cur?badge('aktuell','ok')+' ':'')+(pb?(pb.auto?'':badge('fester Plan','ok')):badge('offen','warn'));   // alle Phasen plant AOS – „automatisch“ nicht extra kennzeichnen
     return '<div class="ph-row'+(sel?' sel':'')+'"><div class="ph-top">'+nm+'<span class="ph-tags">'+tags+'</span></div>'+
-      '<div class="small muted ph-meta"><span>'+fmtDate(ph.start).slice(0,6)+' – '+fmtDate(ph.end).slice(0,6)+'</span><span>'+w+' Wochen</span>'+(cap!=null?'<span>RPE ≤ '+fmtNum(cap)+'</span>':'')+'</div></div>'; }).join('')+'</div><p class="small muted">Tipp auf eine Phase, um ihre Einheiten zu sehen. Alle Phasen ohne festen Plan stellt AOS selbst zusammen – Übungen, Sätze und RPE nach Phase, deinen Werten und Zielen.</p>';
+      '<div class="small muted ph-meta"><span>'+fmtDate(ph.start).slice(0,6)+' – '+fmtDate(ph.end).slice(0,6)+'</span><span>'+w+' Wochen</span>'+(cap!=null?'<span>RPE ≤ '+fmtNum(cap)+'</span>':'')+'</div></div>'; }).join('')+'</div><p class="small muted">Tipp auf eine Phase für ihre Einheiten.</p>';
   // Aktueller (oder nächster) Block
   const b=(ui.planBlock && P.blocks.find(x=>x.id===ui.planBlock)) || plBlockAt(today) || P.blocks.find(x=>x.start>today) || P.blocks[P.blocks.length-1];
   if(!b) return h;
@@ -2680,7 +2680,7 @@ function viewPlan(){
       const s=mine.find(x=>sessionDate(x)===d && x.status!=='ausgelassen') || mine.find(x=>x.plannedDate===d);
       let cell='';
       if(s){ const st=isDone(s)?'✓':(s.status==='ausgelassen'?'–':'○'); cell='<button class="link" data-act="startLog" data-id="'+s.id+'">'+st+' '+esc(s.planner.templateId)+'</button>'; }
-      else if(t){ cell = d<today ? '<span class="muted" title="nicht erfasst">'+t+' ✗</span>' : (d===today?'<strong>'+t+'</strong>':t)+(sc.changed?'*':''); }
+      else if(t){ cell = d<today ? '<span class="muted" title="verpasst">'+t+' ✗</span>' : (d===today?'<strong>'+t+'</strong>':t)+(sc.changed?'*':''); }
       else if(sc.changed && d>=today) cell='frei*';
       const tap = !s && d>=today ? ' data-act="dayEdit" data-d="'+d+'" style="cursor:pointer'+(d===today?';background:var(--accent-soft)':'')+'"' : (d===today?' style="background:var(--accent-soft)"':'');
       h+='<td'+tap+'>'+cell+'</td>'; });
@@ -2688,10 +2688,10 @@ function viewPlan(){
     const wsub=[(b.week_wave||{})[w], ov&&ov.note].filter(Boolean).join(' · ');
     if(wsub) h+='<tr class="wk-sub"><td></td><td colspan="7" class="muted">'+esc(wsub)+'</td></tr>';
   }
-  h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ gespeichert · ✗ nicht erfasst · * von dir geändert. Tipp auf einen kommenden Tag, um ihn zu ändern.</p>';
+  h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ gespeichert · ✗ verpasst · * geändert · Tag antippen zum Ändern</p>';
   if(plBlockAt(today)===b){ const wk=plWeek(b,today); const wp=plWeekPlan(b,wk); const m=Object.entries(wp.hosts).filter(([,l])=>l.some(x=>plMergeSlots(b,wk,plTemplate(b,x).slots).length));
     h+='<p class="small"><strong>Diese Woche: '+wp.count+' Einheit'+(wp.count===1?'':'en')+'.</strong> '+(m.length?m.map(([hst,l])=>'Kernübungen aus '+l.join(', ')+' → '+hst).join(' · '):'Alle Einheiten wie geplant.')+'</p>'; }
-  Object.entries(b.week_notes||{}).forEach(([w,l])=>l.forEach(n=>{ h+='<p class="small"><strong>W'+w+':</strong> '+esc(n)+'</p>'; }));
+  Object.entries(b.week_notes||{}).forEach(([w,l])=>{ if(l.length) h+='<p class="small"><strong>W'+w+':</strong> '+esc(l.join(' '))+'</p>'; });
   h+='</div>';
   // Templates
   h+='<h2>Einheiten</h2>';
