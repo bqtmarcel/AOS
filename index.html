@@ -557,7 +557,7 @@ function seedData(){
 }
 /* Neue Geräte bekommen ältere Zeitstempel als alles im Datenrepo: Beim ersten Abgleich gewinnt immer der gespeicherte Stand. */
 const FRESH_TIME = '0000-01-01T00:00:00.000Z';
-function freshData(){ const d=seedData(); syncStampAll(d, FRESH_TIME); return d; }
+function freshData(){ const d=seedData(); syncStampAll(d, FRESH_TIME); return migrate(d); }   // migrate ergänzt u. a. die Standard-Trainingsorte
 
 /* ---------- Speicher ---------- */
 let S = null;
@@ -1161,11 +1161,13 @@ function logForm(){
     const lp=lastPerf(e, s.id); h+='<div class="last-perf">'+(lp?'Letztes Mal ('+esc(WD[weekdayOf(lp.date)]+' '+fmtDate(lp.date).slice(0,6))+'): <strong>'+esc(lp.text)+'</strong>':'Erstes Mal – noch kein Vergleich')+'</div>';
     if(pe && pe.alternatives && pe.alternatives.length) h+='<div class="small muted">Alternativen: '+esc(pe.alternatives.map(a=>a.name).join(' / '))+'</div>';
     if(pe && pe.notes) h+='<div class="small muted">'+esc(pe.notes)+'</div>';
+    const ar=!s.log?autoreg(s,e):null; h+='<div class="note small" id="ar-'+i+'"'+(ar?'':' hidden')+'>'+(ar?esc(ar.text):'')+'</div>';
+    const phKg=j=> (ar && j>ar.from) ? fmtNum(ar.kg) : (pe&&pe.loadKg!=null&&pe.planner&&pe.planner.role==='main'?fmtNum(pe.loadKg):'');
     e.sets.forEach((x,j)=>{
       h+='<div class="setrow"><span class="lbl">'+(j+1)+'</span>'+F.map(([f,l,im])=>{
         const id='s-'+i+'-'+j+'-'+f; const v=x[f];
         const over = f==='rpe' && cap!=null && v!=null && v>cap;
-        return '<div><label for="'+id+'" class="'+(j===0?'small':'sr-only')+'">'+l+'</label><input id="'+id+'" inputmode="'+im+'" value="'+(v==null?'':fmtNum(v))+'" data-log="set" data-e="'+i+'" data-s="'+j+'" data-f="'+f+'"'+(over?' style="border-color:var(--warn);border-width:2px" title="über der RPE-Obergrenze"':'')+'></div>';
+        return '<div><label for="'+id+'" class="'+(j===0?'small':'sr-only')+'">'+l+'</label><input id="'+id+'" inputmode="'+im+'" value="'+(v==null?'':fmtNum(v))+'"'+(f==='kg'&&phKg(j)?' placeholder="'+phKg(j)+'"':'')+' data-log="set" data-e="'+i+'" data-s="'+j+'" data-f="'+f+'"'+(over?' style="border-color:var(--warn);border-width:2px" title="über der RPE-Obergrenze"':'')+'></div>';
       }).join('')+'</div>';
     });
     h+='<div class="row" style="margin-top:4px"><button class="small" data-act="addSet" data-e="'+i+'">+ Satz</button><button class="small" data-act="delSet" data-e="'+i+'" '+(e.sets.length<=1?'disabled':'')+'>− Satz</button>'+
@@ -1184,12 +1186,30 @@ function logForm(){
     ''+(s.log?'<button class="danger" data-act="discardLog">Protokoll verwerfen</button>':'')+'</div>';
   return h;
 }
+/* Autoregulation in der Einheit (Hauptübungen mit Lastvorgabe): Der letzte Satz mit kg + RPE entscheidet über die
+   restlichen Sätze. Über der RPE-Obergrenze −5 %, mindestens 1 RPE über dem Ziel −2,5 %. Gesteigert wird hier nie. */
+function autoreg(s, e){
+  const pe=(s.plan||[]).find(p=>p.id===e.planExId); if(!pe || pe.loadKg==null || (e.metric||'kraft')!=='kraft' || !pe.planner || pe.planner.role!=='main') return null;
+  const cap=(s.planner&&s.planner.cap!=null)?s.planner.cap:null; const tgt=pe.rpeTarget!=null?Number(String(pe.rpeTarget).replace(',','.')):null;
+  let j=-1; e.sets.forEach((x,k)=>{ if(typeof x.kg==='number' && !isNaN(x.kg) && typeof x.rpe==='number' && !isNaN(x.rpe)) j=k; }); if(j<0) return null;
+  const x=e.sets[j]; let p=0, why='';
+  if(cap!=null && x.rpe>cap){ p=0.05; why='über der Obergrenze RPE '+fmtNum(cap); }
+  else if(tgt!=null && !isNaN(tgt) && x.rpe>=tgt+1){ p=0.025; why='deutlich über dem Ziel RPE '+fmtNum(tgt); }
+  if(!p) return null;
+  const inc=plInc(pe.planner.dbId); let kg=Math.round(x.kg*(1-p)/inc)*inc; if(kg>=x.kg) kg=x.kg-inc; if(kg<=0) return null;
+  return { from:j, kg, text:'Satz '+(j+1)+' lag mit RPE '+fmtNum(x.rpe)+' '+why+' → restliche Sätze '+fmtNum(kg)+' kg ('+(p===0.05?'−5 %':'−2,5 %')+').' };
+}
+function autoregUpdate(i){ const s=sessionById(ui.sessionId); if(!s||!ui.draft) return; const e=ui.draft.exercises[i]; const a=autoreg(s,e);
+  const el=document.getElementById('ar-'+i); if(el){ el.textContent=a?a.text:''; el.hidden=!a; }
+  const pe=(s.plan||[]).find(p=>p.id===e.planExId);
+  e.sets.forEach((x,j)=>{ const inp=document.getElementById('s-'+i+'-'+j+'-kg'); if(inp) inp.placeholder = (a && j>a.from) ? fmtNum(a.kg) : (pe&&pe.loadKg!=null&&pe.planner&&pe.planner.role==='main'?fmtNum(pe.loadKg):''); }); }
 function updateDraftFromInput(t){
   const dr=ui.draft; if(!dr) return; const k=t.dataset.log;
   if(k==='set'){ const f=t.dataset.f; const v=t.value.trim(); const n = f==='reps' ? (v===''?null:(/^\d+$/.test(v)?parseInt(v,10):NaN)) : (v===''?null:(num(v)==null?NaN:num(v)));
     dr.exercises[+t.dataset.e].sets[+t.dataset.s][f]=n;
     restMaybeStart(+t.dataset.e, +t.dataset.s, f, n);
     if(f==='kg') platesUpdate(+t.dataset.e);
+    if(f==='kg'||f==='rpe') autoregUpdate(+t.dataset.e);
     if(f==='rpe'){ const s=sessionById(ui.sessionId); const cap=(s.planner&&s.planner.cap!=null)?s.planner.cap:capMax(blockById(s.blockId)); const over=cap!=null&&typeof n==='number'&&n>cap; t.style.borderColor=over?'var(--warn)':''; t.style.borderWidth=over?'2px':''; t.title=over?'über der RPE-Obergrenze':''; } }
   else if(k==='exnote') dr.exercises[+t.dataset.e].note=t.value;
   else if(k==='fast') dr.exercises[+t.dataset.e].fast = t.value==='' ? null : t.value==='ja';
@@ -1203,7 +1223,7 @@ ACT.addSet = el=>{ const e=ui.draft.exercises[+el.dataset.e]; e.sets.push(emptyS
 ACT.delSet = el=>{ const e=ui.draft.exercises[+el.dataset.e]; if(e.sets.length>1) e.sets.pop(); render(); };
 ACT.delLogEx = el=>{ ui.draft.exercises.splice(+el.dataset.e,1); render(); };
 ACT.sollToIst = el=>{ const s=sessionById(ui.sessionId); const e=ui.draft.exercises[+el.dataset.e]; const pe=s.plan.find(p=>p.id===e.planExId); if(!pe) return;
-  const r=repMin(pe.reps); e.sets.forEach(x=>{ if(x.reps==null && r!=null) x.reps=r; if(x.kg==null && pe.loadKg!=null) x.kg=pe.loadKg; }); render(); toast('Leere Felder mit der Vorgabe gefüllt – bitte bei Abweichungen korrigieren.'); };
+  const r=repMin(pe.reps); const a=autoreg(s,e); e.sets.forEach((x,j)=>{ if(x.reps==null && r!=null) x.reps=r; if(x.kg==null && pe.loadKg!=null) x.kg=(a&&j>a.from)?a.kg:pe.loadKg; }); render(); toast('Leere Felder mit der Vorgabe gefüllt – bitte bei Abweichungen korrigieren.'); };
 ACT.addLogEx = ()=>{
   const known=[...new Set(((typeof REF!=='undefined'&&REF.ex&&REF.ex.exercises)||[]).map(x=>x.name_de).concat(loggedSessions().flatMap(s=>s.log.exercises.map(e=>e.name))))].sort((a,b)=>a.localeCompare(b,'de'));
   openDlg('Übung hinzufügen', inp('le-name','Übung *','','required list="le-names" autocomplete="off"')+'<datalist id="le-names">'+known.map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>'+inp('le-var','Variante (optional)','')+sel('le-met','Messart',[['kraft','Kraft (Wdh × Gewicht)'],['zeit','Zeit'],['distanz','Distanz'],['sprung','Sprung / Weite / Höhe']],'kraft'),
@@ -1213,6 +1233,18 @@ ACT.addLogExOk = ()=>{ const n=val('le-name'); if(!n){ toast('Bitte einen Namen 
   let met=val('le-met'); const db=((typeof REF!=='undefined'&&REF.ex&&REF.ex.exercises)||[]).find(x=>x.name_de===n);
   if(db && met==='kraft' && db.pattern==='jump') met='sprung';
   ui.draft.exercises.push({planExId:null,name:n,variant:val('le-var'),metric:met,sets:[emptySet()],note:''}); closeDlg(); render(); };
+/* Standortbestimmung automatisch (Testwoche eines Blocks): Top-Satz der Grundübungen (Kniebeuge, Bank, Trap Bar)
+   und beste Weite im Broad Jump werden beim Speichern als Testergebnis übernommen. Erneutes Speichern ersetzt sie. */
+const AUTO_TEST=['high_bar_squat','bench_press','trap_bar_deadlift','broad_jump'];
+function autoTests(s){ if(!s || !s.planner || !s.log) return 0; const b=blockById(s.blockId); if(!b || !(b.test_weeks||[]).includes(s.planner.week)) return 0;
+  const date=sessionDate(s); S.tests=S.tests.filter(t=>t.fromSession!==s.id); let n=0;
+  s.log.exercises.forEach(e=>{ const pe=(s.plan||[]).find(p=>p.id===e.planExId); const id=pe&&pe.planner&&pe.planner.dbId; if(!AUTO_TEST.includes(id)) return;
+    let c=null; const kg=e.sets.filter(x=>typeof x.kg==='number'&&typeof x.reps==='number'); const ht=e.sets.filter(x=>typeof x.height==='number');
+    if(kg.length){ const t=kg.reduce((a,b)=>(b.kg>a.kg||(b.kg===a.kg&&b.reps>a.reps))?b:a); c={value:t.kg,unit:'kg',reps:t.reps,rpe:t.rpe??null,category:'Kraft'}; }
+    else if(ht.length){ const t=ht.reduce((a,b)=>b.height>a.height?b:a); c={value:t.height,unit:'cm',reps:null,rpe:null,category:'Sprung & Power'}; }
+    if(!c) return; const name=guessTest(e.name)||e.name; const prev=S.tests.filter(t=>t.name===name).slice(-1)[0];
+    S.tests.push({ id:uid('test'), source:'training', fromSession:s.id, createdAt:new Date().toISOString(), name, category:prev?prev.category:c.category, date, value:c.value, unit:c.unit, reps:c.reps, rpe:c.rpe, detail:'', conditions:'Standortbestimmung aus '+s.name, note:'' }); n++; });
+  return n; }
 ACT.saveLog = el=>{
   const s=sessionById(ui.sessionId); const dr=ui.draft;
   const bad=[]; dr.exercises.forEach(e=>e.sets.forEach((x,j)=>Object.keys(x).forEach(k=>{ if(Number.isNaN(x[k])) bad.push(e.name+' Satz '+(j+1)); })));
@@ -1224,11 +1256,12 @@ ACT.saveLog = el=>{
   const log=clone(dr); delete log.date; delete log.location;
   log.exercises.forEach(e=>{ e.sets=e.sets.filter((x,j)=>j===0||Object.values(x).some(v=>v!=null)); });
   log.loggedAt=new Date().toISOString();
-  const first=!s.log; s.log=log; s.status=el.dataset.st; save();
+  const first=!s.log; s.log=log; s.status=el.dataset.st; const nt=autoTests(s); save();
   ui.sessionId=null; ui.draft=null; render();
   if(first) finShow(s); else toast('Einheit gespeichert ('+STATUS_LABEL[s.status]+').');
+  if(nt) setTimeout(()=>toast('Standortbestimmung: '+nt+' Testergebnis'+(nt===1?'':'se')+' im Verlauf gespeichert.'), first?2500:1200);
 };
-ACT.discardLog = ()=>{ confirmDlg('Protokoll verwerfen?','Die erfassten Werte dieser Einheit werden gelöscht und die Einheit wieder auf „geplant“ gesetzt.','Verwerfen',()=>{ const s=sessionById(ui.sessionId); s.log=null; s.status='geplant'; save(); ui.sessionId=null; ui.draft=null; render(); }, true); };
+ACT.discardLog = ()=>{ confirmDlg('Protokoll verwerfen?','Die erfassten Werte dieser Einheit werden gelöscht und die Einheit wieder auf „geplant“ gesetzt.','Verwerfen',()=>{ const s=sessionById(ui.sessionId); s.log=null; s.status='geplant'; S.tests=S.tests.filter(t=>t.fromSession!==s.id); save(); ui.sessionId=null; ui.draft=null; render(); }, true); };
 
 'use strict';
 /* ===== AOS – Tests, Körpergewicht, Verlauf ===== */
@@ -1541,7 +1574,7 @@ const AP_PROFILE={
   P1:{ name:'Foundation', cap:7.5, contacts:[30,50], assist:[3,'6–8',[6,8]], powRpe:'≤ 6',
     main:{E:[3,5,6.5],A:[3,5,7],H:[3,5,7.5]}, hinge:{E:[3,4,6.5],A:[3,4,7],H:[3,4,7.5]},
     pull:{E:[4,'4'],A:[4,'5'],H:[4,'5']}, oly:[5,'2'], jump:[3,'3'], goal:'Wiedereinstieg: Technik, Grundkraft und Belastbarkeit',
-    notes:['Wiedereinstieg: Startlasten leitet AOS aus deinen Tests ab (älter als 3 Wochen → 5 % weniger). Liegt der erste Arbeitssatz einer Hauptübung trotzdem über RPE 7,5, die restlichen Sätze ca. 5 % leichter.','Power-Slots am unteren Ende der Spanne halten.'] },
+    notes:['Wiedereinstieg: Startlasten leitet AOS aus deinen Tests ab (älter als 3 Wochen → 5 % weniger). Liegt ein Satz einer Hauptübung über RPE 7,5, macht AOS die restlichen Sätze automatisch 5 % leichter.','Power-Slots am unteren Ende der Spanne halten.'] },
   P2:{ name:'Max Strength', cap:8, contacts:[40,60], assist:[3,'6–8',[6,8]], powRpe:'≤ 7',
     main:{E:[5,5,7],A:[5,4,7.5],A2:[5,3,8],H:[4,3,8],D:[3,4,7]}, hinge:{E:[3,4,7],A:[3,3,7.5],A2:[3,2,8],H:[3,2,8],D:[2,3,7]},
     pull:{E:[4,'5'],A:[5,'5'],A2:[5,'5'],H:[5,'5'],D:[3,'4']}, oly:[5,'2'], jump:[3,'3'], goal:'Maximalkraft' },
@@ -1694,7 +1727,7 @@ function apBuildBlock(phase, prev){
   (P.notes||[]).forEach(n=>week_notes[1].push(n));
   if(emph) week_notes[1].push('Schwerpunkt: '+emph.name+' – am weitesten vom Ziel ('+Math.round(emph.p*100)+' %), deshalb +1 Satz.');
   types.forEach((t,w)=>{ if(t==='D') week_overrides[w+1]={ note:'Entlastung: weniger Sätze bei gleicher Last'+(addDays(phase.start,w*7).slice(5)<='12-31'&&addDays(phase.start,w*7).slice(5)>='12-18'?' (Feiertage – nicht mögliche Tage einfach frei setzen)':'')+'.' };
-    if(t==='H'||t==='DT') (week_notes[w+1]=week_notes[w+1]||[]).push('Standortbestimmung: Broad Jump (D1), Top-Sets Kniebeuge, Kreuzheben und Bank bis RPE '+fmtNum(P.cap)+' – kein Maximaltest. Danach unter Verlauf → „Aus dem Training übernehmen“.'); });
+    if(t==='H'||t==='DT') (week_notes[w+1]=week_notes[w+1]||[]).push('Standortbestimmung: Broad Jump (D1), Top-Sets Kniebeuge, Kreuzheben und Bank bis RPE '+fmtNum(P.cap)+' – kein Maximaltest. AOS übernimmt die Ergebnisse beim Speichern automatisch in den Verlauf.'); });
   // Nicht verfügbare Tage (plan.json „unavailable“): Einheiten der Woche rücken in Reihenfolge auf die übrigen Trainingstage, was nicht passt, entfällt (kein Nachholen)
   const una=(REF.plan.unavailable||[]); const ORD=['MON','TUE','WED','THU','FRI','SAT','SUN'];
   if(phase.id!=='IN' && una.length) for(let w=1; w<=weeks; w++){ const mon=addDays(phase.start,(w-1)*7); const hit=ORD.filter((d,i)=>una.includes(addDays(mon,i))); if(!hit.length) continue;
@@ -1718,7 +1751,7 @@ function apBuildBlock(phase, prev){
       else { week_wave[w]=AP_WAVE_LABEL.B; }
     } }
   return { id:'AUTO-'+phase.id, auto:true, name:'Block '+phase.id.slice(1)+' – '+P.name, phase:phase.id, start:phase.start, weeks, rpe_cap:[P.cap,P.cap], status:'automatisch',
-    week_wave, week_schedule:sched, week_overrides, session_order:Object.keys(SL), limits:{ contacts_per_session:P.contacts, sprint_m_per_session:[0,0] }, week_notes, start_loads:{}, templates };
+    week_wave, test_weeks:types.map((t,i)=>(t==='H'||t==='DT')?i+1:0).filter(Boolean), week_schedule:sched, week_overrides, session_order:Object.keys(SL), limits:{ contacts_per_session:P.contacts, sprint_m_per_session:[0,0] }, week_notes, start_loads:{}, templates };
 }
 function apGames(){ return (typeof S!=='undefined'&&S ? (S.calendar||[]) : []).filter(e=>e.kind==='game'&&e.date).map(e=>e.date).sort(); }
 /* Saison-Phase (In-Season) direkt nach der letzten Phase bis zur Woche des letzten Spiels im Kalender (sonst 12 Wochen) */
@@ -2707,7 +2740,7 @@ function ovPhaseLine(td){
 }
 function ovTestWeek(today){ if(typeof REF==='undefined'||!REF.plan) return ''; const b=plBlockAt(today); if(!b || plWeek(b,today)!==b.weeks) return '';
   const notes=((b.week_notes||{})[b.weeks]||[]).filter(n=>/standort|test/i.test(n));
-  return '<div class="note"><strong>Letzte Blockwoche: Standortbestimmung.</strong> '+(notes.length?esc(notes.join(' ')):'Top-Sets innerhalb der RPE-Obergrenze, kein Maximaltest.')+' Nach den Einheiten die Ergebnisse unter <button class="link" data-act="go" data-view="tests">Verlauf → Aus dem Training übernehmen</button> speichern.</div>'; }
+  return '<div class="note"><strong>Letzte Blockwoche: Standortbestimmung.</strong> '+(notes.length?esc(notes.join(' ')):'Top-Sets innerhalb der RPE-Obergrenze, kein Maximaltest.')+' AOS übernimmt die Ergebnisse beim Speichern der Einheit automatisch unter <button class="link" data-act="go" data-view="tests">Verlauf</button>.</div>'; }
 function ovToday(today){
   const dayLbl='Heute · '+WD[weekdayOf(today)]+' '+fmtDate(today).slice(0,6);
   if(typeof REF==='undefined' || !REF.plan) return '<div class="section hero"><div class="eyebrow">'+dayLbl+'</div><div class="hero-title">'+(ghReady()?'Plan wird geladen …':'Noch nicht verbunden')+'</div></div>';

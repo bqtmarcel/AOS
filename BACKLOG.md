@@ -33,6 +33,9 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | T7 | **In-Season-Modus**: ab dem ersten Spiel 1–2 Einheiten pro Woche, Abstand zum Spieltag beachten (offene Punkte 5 und 8 der Spezifikation) | Planung über die Vorbereitung hinaus | ✅ erledigt | L |
 | T8 | **Templates für P2–P5** im Datenrepo anlegen; der Plan zeigt dort derzeit „noch keine Templates“ | Plan über Block 1 hinaus | ✅ erledigt: AOS plant P2–P5 automatisch (Blockgenerator, 15.11.) | M (Planung mit Claude) |
 | T9 | „+ Freie Einheit“ als richtigen Button gestalten und Übungen aus der Übungsdatenbank auswählbar machen | Einheitliche Bedienung | ✅ erledigt | M |
+| T10 | **Autoregulation in der Einheit**: Liegt ein Satz einer Hauptübung über der RPE-Obergrenze, werden die restlichen Sätze automatisch 5 % leichter (mindestens 1 RPE über dem Ziel: 2,5 %) | Wiedereinstieg und schlechte Tage ohne Rechnen | ✅ erledigt | S |
+| T11 | **Standortbestimmung automatisch übernehmen**: In der Testwoche eines Blocks landen Top-Satz Kniebeuge, Bank, Trap Bar und beste Broad-Jump-Weite beim Speichern direkt als Test im Verlauf | Neue Werte fließen ohne Knopfdruck in den nächsten Block | ✅ erledigt | S |
+| T12 | **„Tag frei“ lässt Einheiten nachrücken** (wie die nicht verfügbaren Tage im Datenrepo) statt nur Kernübungen umzuverteilen | Feiertage, kurzfristige Ausfälle | offen – Erklärung an den Athleten, Entscheidung ausstehend | M |
 
 ## 2. Verlauf und Auswertung
 
@@ -74,3 +77,4 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | W5 | **Cache-Version automatisch** aus dem Inhalt von `index.html` erzeugen (GitHub Action), damit das Erhöhen in `sw.js` nicht vergessen wird | Weniger Handarbeit | ✅ erledigt | S |
 | W6 | **Token-Ablauf**: rechtzeitig vor Ablauf des GitHub-Tokens warnen | Kein plötzlicher Ausfall der Speicherung | ✅ erledigt | S |
 | W7 | **Barrierefreiheit** prüfen (Kontraste der grauen Texte, Fokus-Rahmen, Beschriftungen der Icon-Buttons) | Bessere Lesbarkeit im Gym-Licht | ✅ erledigt | S |
+| W8 | **Klicktest prüft den Abgleich** mit einem nachgebauten Datenrepo: lokale Eingabe übersteht einen älteren Stand mit Altfeldern, neuere Änderung eines anderen Geräts kommt an. Dabei behoben: neue Installation hatte keine Standard-Trainingsorte | Fehler wie der Ausstattungs-Verlust fallen vor dem Hochladen auf | ✅ erledigt | S |
