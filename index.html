@@ -400,6 +400,8 @@ button.primary:active,nav.tabs button[aria-current="page"]:active{background:var
 .sysbar .sd.run{animation:sdp 1s ease-in-out infinite}@keyframes sdp{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.sysbar .sd.run{animation:none}}
 /* ===== Red Tigers ===== */
+input[type=date]{min-width:0;max-width:100%;width:100%;-webkit-appearance:none;appearance:none;text-align:left;box-sizing:border-box}
+.fields>*{min-width:0}
 .claw{width:22px;height:22px;fill:none;stroke:url(#clawg);stroke-width:3.2;stroke-linecap:round}
 .weekstrip .day .tp.claw-tp{display:flex;justify-content:center;align-items:center;gap:1px;color:var(--muted)}
 .weekstrip .day .tp .claw{width:18px;height:18px;margin-top:1px;filter:drop-shadow(0 0 4px rgba(246,1,0,.55))}
@@ -2943,10 +2945,9 @@ function plSection(){
   }
   // Seltene Angaben eingeklappt
   const more = p.date!==today || p.tpl || p.sleep!=null || p.avail!=null || p.noEquip.length || p.grip;
-  h+='<details'+(more?' open':'')+'><summary class="small">Mehr Angaben (Zeit, Schlaf, Geräte, anderer Tag)</summary>';
+  h+='<details'+(more?' open':'')+'><summary class="small">Mehr Angaben (Zeit, Schlaf, anderer Tag)</summary>';
   h+='<div class="fields">'+inp('pl-avail','Zeit (min)',p.avail==null?'':p.avail,'inputmode="numeric" placeholder="'+((REF.plan.rules||{}).max_session_min||65)+'" data-chg="plIn"')+inp('pl-sleep','Schlaf (h)',p.sleep==null?'':fmtNum(p.sleep),'inputmode="decimal" data-chg="plIn"')+'</div>';
-  if(t){ const eq=[...new Set(t.slots.filter(s=>(s.dose||{})[due.week]).flatMap(s=>{ const e=REF.exMap[s.candidates[0]]; return e?e.equipment:[]; }))].filter(q=>q!=='floor_space' && EQUIP_LABEL[q]);
-    if(eq.length) h+='<label>Gerät heute nicht frei?</label><div>'+eq.map(q=>chipBtn('plChip','noEquip',q,EQUIP_LABEL[q],p.noEquip.includes(q))).join('')+'</div>';
+  if(t){
     if(t.slots.some(s=>s.grip && (s.dose||{})[due.week])) h+='<div>'+chipBtn('plChip','grip','1','Griff stark ermüdet',p.grip)+'</div>'; }
   h+='<div class="fields">'+inp('pl-date','Anderer Tag',p.date,'type="date" data-chg="plIn"')+(b?sel('pl-tpl','Andere Einheit',b.templates.map(x=>[x.id, x.id+' – '+x.name]), pin.tpl||'', 'data-chg="plIn"'):'')+'</div>';
   h+='</details></div>';
