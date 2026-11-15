@@ -68,9 +68,9 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | # | Idee | Nutzen | Prio | Aufwand |
 |---|---|---|---|---|
 | W1 | **CSS zusammenführen**: Die Gestaltung besteht aus mehreren übereinanderliegenden Schichten (Grundlayout, Design, Variante B, Red Tigers, Chrome Glass) mit vielen Überschreibungen und `!important`. Eine Schicht mit klaren Variablen | Änderungen am Design werden einfacher und sicherer | P1 | M |
-| W2 | **Automatischer Klicktest** (Playwright) als GitHub Action: alle Ansichten in iPhone- und Laptop-Breite öffnen, jeden Button einmal antippen, Fehler melden – mit neutralen Testdaten | Fehler vor dem Ausrollen finden | P1 | M |
+| W2 | **Automatischer Klicktest** (Playwright) als GitHub Action: alle Ansichten in iPhone- und Laptop-Breite öffnen, jeden Button einmal antippen, Fehler melden – mit neutralen Testdaten | Fehler vor dem Ausrollen finden | ✅ erledigt | M |
 | W3 | **Altfelder im Datenmodell prüfen** (z. B. `blocks`, `unavailable`, `suggestionDecisions` aus der alten Planverwaltung): was wird noch gebraucht, was kann per `migrate()` entfernt werden | Kleinere Datei, weniger Verwirrung | P2 | M |
 | W4 | **`index.html` aufteilen** (z. B. `css/`, `js/kern.js`, `js/training.js` …), weiterhin ohne Build-Schritt | Übersichtlicher bei weiterem Wachstum | P3 | M |
-| W5 | **Cache-Version automatisch** aus dem Inhalt von `index.html` erzeugen (GitHub Action), damit das Erhöhen in `sw.js` nicht vergessen wird | Weniger Handarbeit | P2 | S |
+| W5 | **Cache-Version automatisch** aus dem Inhalt von `index.html` erzeugen (GitHub Action), damit das Erhöhen in `sw.js` nicht vergessen wird | Weniger Handarbeit | ✅ erledigt | S |
 | W6 | **Token-Ablauf**: rechtzeitig vor Ablauf des GitHub-Tokens warnen | Kein plötzlicher Ausfall der Speicherung | P2 | S |
 | W7 | **Barrierefreiheit** prüfen (Kontraste der grauen Texte, Fokus-Rahmen, Beschriftungen der Icon-Buttons) | Bessere Lesbarkeit im Gym-Licht | P3 | S |

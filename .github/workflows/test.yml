@@ -1,0 +1,37 @@
+name: Klicktest
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Playwright installieren
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Klicktest iPhone- und Laptop-Breite
+        run: python tests/smoke.py
+
+  cache-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache-Version in sw.js passt zu index.html
+        run: |
+          soll="aos-$(sha1sum index.html | cut -c1-12)"
+          ist=$(grep -o "aos-[0-9a-f]*" sw.js | head -1)
+          echo "sw.js: $ist · erwartet: $soll"
+          if [ "$ist" != "$soll" ]; then
+            echo "::error file=sw.js::Cache-Version veraltet. Setze in sw.js: const CACHE = '$soll';"
+            exit 1
+          fi

@@ -989,6 +989,7 @@ function render(){
   const fn = {uebersicht:viewOverview, plan:viewPlan, training:viewTraining, tests:viewTests, profil:viewProfile, ernaehrung:viewNutrition}[ui.view] || viewOverview;
   m.innerHTML = (storageOK?'':'<div class="note bad"><strong>Lokaler Speicher nicht verfügbar.</strong> Der Browser erlaubt für diese Datei keine dauerhafte Speicherung (z. B. privater Modus oder blockierte Website-Daten). Eingaben gehen beim Schließen verloren – exportiere eine JSON-Sicherung oder öffne die Datei in einem normalen Browserfenster.</div>') + fn();
   stackTables(m);
+  if(!(ui.view==='training' && ui.sessionId) && typeof restStop==='function' && REST.iv) restStop();
   const hs=ui.view==='training'&&ui.sessionId&&ui.draft&&sessionById(ui.sessionId); document.body.classList.toggle('hunt', !!(hs&&!hs.log));
 }
 ACT.go = el=>{ ui.view=el.dataset.view; if(ui.view!=='training'){ ui.sessionId=null; ui.draft=null; } location.hash=ui.view; render(); window.scrollTo(0,0); };

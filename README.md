@@ -23,6 +23,8 @@ Die App startet mit einem leeren, neutralen Stand und lädt alles Persönliche a
 
 ## Entwicklung
 
-Einzelne Datei `index.html` ohne Build-Schritt. Bei Änderungen an `index.html` die Cache-Version in `sw.js` erhöhen, sonst sehen installierte Apps die neue Version nicht.
+Einzelne Datei `index.html` ohne Build-Schritt. Bei Änderungen an `index.html` die Cache-Version in `sw.js` erhöhen (`./tools/bump-cache.sh`), sonst sehen installierte Apps die neue Version nicht.
+
+Tests: `python tests/smoke.py` öffnet die App mit neutralen Testdaten in iPhone- und Laptop-Breite, tippt jeden Button an und prüft den Trainingsablauf. Läuft bei jedem Push als GitHub Action (`.github/workflows/test.yml`), zusammen mit einer Prüfung der Cache-Version.
 
 Geplante Verbesserungen und Ideen: siehe [BACKLOG.md](BACKLOG.md).
