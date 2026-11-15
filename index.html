@@ -2520,7 +2520,7 @@ setInterval(()=>{ const els=document.querySelectorAll('.cd-live[data-t]'); if(!e
 
 const CAL_KIND={ game:'Spiel', event:'Termin' };
 function calSection(){ const L=calSorted(); const td=todayISO(); const c=cdNext(); const up=L.filter(e=>e.date>=td);
-  const sum=up.length ? (c&&L.some(e=>e.kind==='game')?'Spiel '+fmtDateShort(c.g.date).slice(3):up.length+' Termine') : 'leer';
+  const sum=up.length ? (c&&L.some(e=>e.kind==='game')?(c.first?'Saisonstart ':'nächstes Spiel ')+fmtDateShort(c.g.date).slice(3):up.length+' Termine') : 'leer';
   let h='<details class="section cal-det pdet" id="cal-det"'+(ui.calOpen?' open':'')+'><summary><strong>Kalender</strong> <span class="small muted">· '+esc(sum)+'</span></summary>';
   if(L.length) h+='<div class="cal-list">'+L.map(e=>'<div class="cal-row'+(e.date<td?' past':'')+'"><div><span class="cal-d">'+fmtDateShort(e.date)+(e.time?' · '+esc(e.time):'')+'</span><strong>'+esc(e.title||CAL_KIND[e.kind])+'</strong>'+(e.place?'<span class="small muted"> · '+esc(e.place)+'</span>':'')+'</div>'+
     '<span class="cal-k '+e.kind+'">'+CAL_KIND[e.kind]+'</span><button class="link" data-act="calEdit" data-id="'+e.id+'">ändern</button></div>').join('')+'</div>';
