@@ -2691,7 +2691,6 @@ function viewPlan(){
   h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ gespeichert · ✗ verpasst · * geändert · Tag antippen zum Ändern</p>';
   if(plBlockAt(today)===b){ const wk=plWeek(b,today); const wp=plWeekPlan(b,wk); const m=Object.entries(wp.hosts).filter(([,l])=>l.some(x=>plMergeSlots(b,wk,plTemplate(b,x).slots).length));
     h+='<p class="small"><strong>Diese Woche: '+wp.count+' Einheit'+(wp.count===1?'':'en')+'.</strong> '+(m.length?m.map(([hst,l])=>'Kernübungen aus '+l.join(', ')+' → '+hst).join(' · '):'Alle Einheiten wie geplant.')+'</p>'; }
-  Object.entries(b.week_notes||{}).forEach(([w,l])=>{ if(l.length) h+='<p class="small"><strong>W'+w+':</strong> '+esc(l.join(' '))+'</p>'; });
   h+='</div>';
   // Templates
   h+='<h2>Einheiten</h2>';
