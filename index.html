@@ -2704,7 +2704,7 @@ function viewPlan(){
         '<td>'+esc(plCurrentLoad(s, s.candidates[0], b))+'</td></tr>'; });
     h+=pdet('tpl-'+t.id, t.id+' – '+t.name, (t.group==='lower'?'Unterkörper':'Oberkörper')+' · ca. '+t.time_min+' min', tb+'</tbody></table></div>');
   });
-  h+='<p class="small muted">„Kern“ = wird nachgeholt, wenn eine Einheit ausfällt.</p>';
+  h+='<p class="small muted">„Kern“ = wandert in eine andere Einheit, wenn eine ausfällt.</p>';
   return h;
 }
 
