@@ -386,6 +386,7 @@ main table:not(.stack) td button{white-space:nowrap}
 .mb-bar i{display:block;height:100%;background:var(--muted);border-radius:3px}
 .mb-row.ok .mb-bar i{background:var(--sig)} .mb-row.ok .mb-n{color:var(--sig)}
 .mb-row.over .mb-bar i{background:var(--warn)} .mb-row.over .mb-n{color:var(--warn)}
+.off-at{display:inline-block;font-size:.6rem;font-weight:700;letter-spacing:.08em;color:#000;background:var(--sig);border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:2px}
 @media print{
   header.top,nav.tabs,.no-print,button{display:none!important}
   .print-only{display:block}
@@ -2406,7 +2407,7 @@ ACT.nutHide = el=>{ const id=el.dataset.f; const own=(S.nutrition.items||[]).fin
 /* ---------- Open Food Facts: Markenprodukte online suchen ----------
    Gesendet wird nur der Suchbegriff bzw. Barcode – keine persönlichen Daten. Suche nur auf Knopfdruck (Limit 10 Suchen/Minute). */
 const OFF_BASE='https://world.openfoodfacts.org';
-const OFF_FIELDS='code,product_name,product_name_de,generic_name_de,brands,nutriments,serving_quantity,quantity';
+const OFF_FIELDS='code,product_name,product_name_de,generic_name_de,brands,nutriments,serving_quantity,quantity,countries_tags';
 const offCache={};
 function offMap(p){ const n=p.nutriments||{}; const g=k=>{ const v=n[k+'_100g']; return v==null||v===''?null:Math.round(Number(v)*10)/10; };
   let kcal=g('energy-kcal'); if(kcal==null && n['energy_100g']!=null) kcal=Math.round(Number(n['energy_100g'])/4.184);
@@ -2418,15 +2419,18 @@ function offMap(p){ const n=p.nutriments||{}; const g=k=>{ const v=n[k+'_100g'];
   const qn=parseFloat(String(p.quantity||'').replace(',','.')); const sv=p.serving_quantity?Number(p.serving_quantity):null;
   const piece = sv && qn && Math.abs(qn-sv)<0.5 ? Math.round(sv) : null;   // Einzelpackung (z. B. Riegel): 1 Stück = Packung
   return { code:String(p.code||''), name:(brand&&!name.toLowerCase().includes(brand.toLowerCase())?name+' ('+brand+')':name), kcal:Math.round(kcal), P, K, F, per,
-    portion:p.serving_quantity?Math.round(Number(p.serving_quantity)):null, piece, main, qty:p.quantity||'' }; }
+    portion:p.serving_quantity?Math.round(Number(p.serving_quantity)):null, piece, main, qty:p.quantity||'', at:(p.countries_tags||[]).includes('en:austria') }; }
 async function offQuery(q){
   q=q.trim(); if(offCache[q]) return offCache[q];
   let list;
   if(/^\d{8,14}$/.test(q)){ const r=await fetch(OFF_BASE+'/api/v2/product/'+q+'.json?fields='+OFF_FIELDS);
     if(r.status===404){ list=[]; } else { if(!r.ok) throw new Error('HTTP '+r.status); const j=await r.json(); list=j.product?[Object.assign({code:q},j.product)]:[]; } }
-  else { const r=await fetch(OFF_BASE+'/cgi/search.pl?action=process&json=1&search_simple=1&lc=de&page_size=20&search_terms='+encodeURIComponent(q)+'&fields='+OFF_FIELDS);
+  else { const r=await fetch(OFF_BASE+'/cgi/search.pl?action=process&json=1&search_simple=1&lc=de&page_size=50&search_terms='+encodeURIComponent(q)+'&fields='+OFF_FIELDS);
     if(!r.ok) throw new Error(r.status===429?'zu viele Suchen – bitte eine Minute warten':'HTTP '+r.status); const j=await r.json(); list=j.products||[]; }
-  const out=list.map(offMap).filter(Boolean); offCache[q]=out; return out; }
+  const out=list.map(offMap).filter(Boolean);
+  // In Österreich verkaufte Produkte zuerst, sonst Reihenfolge von Open Food Facts beibehalten
+  out.forEach((r,i)=>r._i=i); out.sort((a,b)=>(b.at-a.at)||(a._i-b._i));
+  offCache[q]=out; return out; }
 /* Automatische Online-Suche: 700 ms nach dem letzten Tastendruck, ab 3 Zeichen, max. 9 Suchen pro Minute (Limit 10) */
 let offTimer=null, offSeq=0; const offTimes=[];
 function offAuto(q,mode,now){ clearTimeout(offTimer); q=(q||'').trim();
@@ -2442,7 +2446,7 @@ async function offRun(q,mode){
   box.innerHTML='<p class="small muted">Suche online nach „'+esc(q)+'“ …</p>';
   try{ const res=await offQuery(q); if(my!==offSeq || !document.getElementById('off-res')) return; ui.offRes=res; ui.offMode=mode;
     if(!res.length){ box.innerHTML='<p class="small muted">Online nichts mit vollständigen Nährwerten gefunden.</p>'; return; }
-    box.innerHTML='<div class="off-list">'+res.slice(0,15).map((r,i)=>'<button class="off-item" data-act="offPick" data-mode="'+mode+'" data-i="'+i+'"><span class="off-n">'+esc(r.name)+'</span><span class="off-m">'+r.kcal+' kcal · P '+fmtNum(r.P)+' · KH '+fmtNum(r.K)+' · F '+fmtNum(r.F)+' / '+r.per+(r.qty?' · '+esc(r.qty):'')+'</span></button>').join('')+'</div><p class="small muted" style="margin-top:6px">Daten von Open Food Facts (von Nutzern gepflegt) – Werte mit der Packung vergleichen.</p>';
+    box.innerHTML='<div class="off-list">'+res.slice(0,15).map((r,i)=>'<button class="off-item" data-act="offPick" data-mode="'+mode+'" data-i="'+i+'"><span class="off-n">'+(r.at?'<span class="off-at">AT</span>':'')+esc(r.name)+'</span><span class="off-m">'+r.kcal+' kcal · P '+fmtNum(r.P)+' · KH '+fmtNum(r.K)+' · F '+fmtNum(r.F)+' / '+r.per+(r.qty?' · '+esc(r.qty):'')+'</span></button>').join('')+'</div><p class="small muted" style="margin-top:6px">Daten von Open Food Facts (von Nutzern gepflegt) – Werte mit der Packung vergleichen.</p>';
   }catch(e){ if(my===offSeq) box.innerHTML='<p class="small" style="color:var(--bad)">Online-Suche fehlgeschlagen: '+esc(e.message||String(e))+'</p>'; } }
 ACT.offSearch = el=>{ const mode=el.dataset.mode; offAuto(val(mode==='fill'?'off-q':'fd-q'),mode,true); };
 function offExcluded(name){ const ex=(NUT().exclusions||[]).map(x=>x.split(' ')[0].toLowerCase()); return ex.some(x=>x.length>3 && name.toLowerCase().includes(x)); }
