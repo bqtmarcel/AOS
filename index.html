@@ -400,6 +400,8 @@ button.primary:active,nav.tabs button[aria-current="page"]:active{background:var
 .sysbar .sd.run{animation:sdp 1s ease-in-out infinite}@keyframes sdp{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.sysbar .sd.run{animation:none}}
 /* Countdown & Kalender */
+.sv-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0}.sv-row+.sv-row{border-top:1px solid var(--line)}
+.sv-name{text-align:left;font-weight:600}
 .tc-kcal{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:.85rem;color:var(--muted)}
 .tc-kcal b{color:var(--sig);font-size:1.05rem;font-weight:700}
 .cd{display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -2296,7 +2298,7 @@ function plPreview(P){
   });
   if(P.dropped.length) h+='<p class="small"><strong>Weggelassen:</strong> '+P.dropped.map(d=>esc((REF.exMap[d.slot.candidates[0]]||{}).name_de||d.slot.id)+' ('+esc(d.why)+')').join('; ')+'</p>';
   P.valid.forEach(v=>{ h+='<div class="note bad small">'+esc(v)+'</div>'; });
-  h+='<div class="row" style="margin-top:12px"><button class="primary ph" data-act="plTake" aria-label="Einheit starten">PLAY HARD<small>Einheit starten</small></button><button class="link" data-act="plSave">für später speichern</button></div>';
+  h+='<div class="row" style="margin-top:12px"><button class="primary ph" data-act="plTake" aria-label="Einheit starten">PLAY HARD<small>Einheit starten</small></button></div>';
   return h+'</div>';
 }
 
@@ -2313,6 +2315,7 @@ ACT.plChip = el=>{ const p=ui.pl, k=el.dataset.k, v=el.dataset.v;
   else if(k==='loc'){ p.loc=v; p.accept={}; S.settings.lastLocId=v; save(); }
   else { const a=p[k]; const i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); }
   render(); };
+ACT.plDate = el=>{ ui.pl=ui.pl||plDefaults(); ui.pl.date=el.dataset.d; ui.pl.tpl=null; ui.pl.accept={}; render(); window.scrollTo(0,0); };
 ACT.plAccept = el=>{ const k=el.dataset.k; ui.pl.accept=ui.pl.accept||{}; if(ui.pl.accept[k]) delete ui.pl.accept[k]; else ui.pl.accept[k]=true; render(); };
 ACT.plReload = async ()=>{ const ok=await refLoad(true); toast(ok?'Planerdaten aktualisiert.':(REF.error||'Keine Verbindung – es wird der zuletzt geladene Stand verwendet.')); render(); };
 ACT.plConfirm = ()=>{ const b=plDue(ui.pl.date).block; if(!b) return;
@@ -2482,7 +2485,7 @@ function viewNutrition(){
   h+='<p class="small muted">'+(T.manual?'von dir festgelegt':esc(T.auto.why))+'</p>';
   if(T.training) h+='<div>'+Object.entries(NUT().training_times).map(([k,l])=>chipBtn('nutTimeChip','time',k,l.replace(/^Training /,''),T.time===k)).join('')+'</div>';
   { const di=nutDayItems(date,T); h+='<div class="eyebrow" style="margin:12px 0 2px">Abgedeckt '+(di.length?'· '+di.length+' Einträge':'· noch nichts eingetragen')+'</div>'+macroBars(sumMac(di),T); }
-  h+='<p class="small muted">Basis '+fmtNum(Math.round(T.w.kg*10)/10)+' kg'+(T.w.provisional?' (vorläufig – morgens wiegen in der Übersicht)':'')+(T.entry?' · Einstiegsziel bis '+fmtDate(NUT().entry.until).slice(0,6):'')+'</p>';
+  h+='<p class="small muted">Basis '+fmtNum(Math.round(T.w.kg*10)/10)+' kg · '+esc(T.w.basis)+(T.entry?' · Einstiegsziel bis '+fmtDate(NUT().entry.until).slice(0,6):'')+'</p>';
   h+='<details><summary class="small muted">Tagestyp ändern</summary>'+sel('nut-type','Tagestyp',[['','automatisch']].concat(Object.entries(NUT().day_types).map(([k,v])=>[k,v.label])),cfg.type||'','data-chg="nutType"')+'</details></div>';
 
   // Mahlzeiten
@@ -2805,7 +2808,7 @@ function ovToday(today){
   let state='rest', title='Ruhetag', sub='', btn='';
   if(due.doneToday){ state='done'; title=due.doneToday.name; sub='✓ erledigt'+(due.doneToday.durationMin?' · '+due.doneToday.durationMin+' min':'');
     btn='<button class="block" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button>'; }
-  else if(due.plannedToday){ state='open'; title=due.plannedToday.name; sub='gespeichert · bereit zum Erfassen';
+  else if(due.plannedToday && !due.plannedToday.planner){ state='open'; title=due.plannedToday.name; sub='gespeichert · bereit zum Erfassen';
     btn=phBtn('Einheit erfassen','data-act="startLog" data-id="'+due.plannedToday.id+'"'); }
   else if(due.block && due.tpl && !due.offday){ const t=plTemplate(due.block, due.tpl); state='open'; title=t.id+' – '+t.name;
     sub='ca. '+t.time_min+' min';
@@ -2943,12 +2946,10 @@ function viewTraining(){
   if(ui.sessionId && sessionById(ui.sessionId)) return logForm();
   const today=todayISO();
   let h='<h1>Training</h1>'+plSection()+fieldCard((ui.pl&&ui.pl.date)||today);
-  const saved=S.sessions.filter(s=>s.status==='geplant' && (s.plan||[]).length && !(ui.pl && s.plannedDate===ui.pl.date)).sort(bySessionDate);
-  if(saved.length){ h+='<h2>Gespeicherte Einheiten</h2>';
-    saved.forEach(s=>{ const ov=s.plannedDate&&s.plannedDate<today;
-      h+='<div class="section"><div class="row between"><div><strong>'+esc(s.name)+'</strong> <span class="small muted">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+'</span> '+(ov?badge('nicht erfasst','warn'):'')+'</div></div>'+
-        '<div class="row" style="margin-top:8px"><button class="primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button><button data-act="openSession" data-id="'+s.id+'">Verschieben / Auslassen</button></div></div>'; }); }
-  h+='<div style="margin-top:16px"><button data-act="logFree">+ Freie Einheit erfassen</button><div class="small muted" style="margin-top:6px">Für Training außerhalb des Plans.</div></div>';
+  const saved=S.sessions.filter(s=>s.status==='geplant' && (s.plan||[]).length && s.plannedDate && s.plannedDate<today).sort(bySessionDate);
+  if(saved.length){ h+='<h2>Nicht erfasst</h2><div class="section sv-list">'+saved.map(s=>{ const ov=s.plannedDate&&s.plannedDate<today; const id=(s.planner&&s.planner.templateId)||s.name;
+      return '<div class="sv-row"><button class="link sv-name" data-act="openSession" data-id="'+s.id+'" title="'+esc(s.name)+'">'+esc(id)+' <span class="small muted">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+(ov?' · nicht erfasst':'')+'</span></button><button class="small primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button></div>'; }).join('')+'</div>'; }
+  h+='<p style="margin-top:16px"><button class="link small" data-act="logFree">+ Freie Einheit</button></p>';
   const done=S.sessions.filter(s=>s.log && isDone(s)).sort((a,c)=>sessionDate(a)<sessionDate(c)?1:-1).slice(0,5);
   if(done.length) h+='<h2>Zuletzt</h2><div class="section">'+done.map(s=>'<p style="margin:6px 0"><button class="link" data-act="startLog" data-id="'+s.id+'">'+esc(s.name)+'</button> <span class="small muted">'+fmtDateShort(sessionDate(s))+(s.status==='teilweise'?' · teilweise':'')+'</span></p>').join('')+'</div>';
   return h;
@@ -3021,29 +3022,33 @@ function plSection(){
   }
   ui.pl=ui.pl||plDefaults(); const p=ui.pl; const pin=plInput(); const due=plDue(p.date); const b=due.block; const today=todayISO();
   const t=b&&pin.tpl?plTemplate(b,pin.tpl):null;
+  const back = p.date!==today ? ' · <button class="link" style="font:inherit;letter-spacing:inherit;padding:0;min-height:0;border:0" data-act="plDate" data-d="'+today+'">← heute</button>' : '';
+  if(!t && !due.doneToday){ const n=plNextTraining(addDays(p.date,1));
+    return '<div class="section"><div class="eyebrow">'+(p.date===today?'Heute':WD[weekdayOf(p.date)]+' '+fmtDate(p.date).slice(0,6))+back+'</div>'+
+      '<div style="font-size:1.45rem;font-weight:600;letter-spacing:-.03em;line-height:1.2;margin:8px 0 6px">'+(isFieldDay(p.date)?'Kein Gym – Feldtraining':'Kein Training')+'</div>'+
+      (n?'<div class="small muted">Nächste Einheit: <strong>'+esc(n.tpl)+'</strong> · '+WD[weekdayOf(n.date)]+' '+fmtDate(n.date).slice(0,6)+'</div><div class="row" style="margin-top:12px"><button data-act="plDate" data-d="'+n.date+'">Vorschau ansehen</button></div>':'')+'</div>'; }
   let h='<div class="section">';
-  h+='<div class="eyebrow">'+(p.date===today?'Heute':WD[weekdayOf(p.date)]+' '+fmtDate(p.date).slice(0,6))+(b?' · '+esc((due.phase?due.phase.id+' · ':'')+'Woche '+due.week):'')+'</div>';
+  h+='<div class="eyebrow">'+(p.date===today?'Heute':WD[weekdayOf(p.date)]+' '+fmtDate(p.date).slice(0,6))+(b?' · '+esc((due.phase?due.phase.id+' · ':'')+'Woche '+due.week):'')+back+'</div>';
   if(t) h+='<div style="font-size:1.45rem;font-weight:600;letter-spacing:-.03em;line-height:1.2;margin:8px 0 6px">'+esc(t.id+' – '+t.name)+'</div>';
   if(due.offday || (pin.tpl && due.tpl && pin.tpl!==due.tpl) || (due.why && !/^laut Wochenplan/.test(due.why))) h+='<p class="small muted">'+esc(due.why)+'</p>';
   due.warnings.filter(w=>!/entfällt/.test(w)).forEach(w=>{ h+='<div class="note warn small">'+esc(w)+'</div>'; });
   if(due.doneToday){ h+='<div class="note small">✓ '+esc(due.doneToday.name)+' ist erledigt. <button class="link" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button></div>'; }
   if(t && !due.doneToday){
     const LL=S.profile.locations||[]; if(LL.length>1) h+='<label>Wo trainierst du?</label><div>'+LL.map(l=>chipBtn('plChip','loc',l.id,l.name,pin.loc===l.id)).join('')+'</div>';
-    h+='<label>Wie fit fühlst du dich? (1 = sehr schlecht, 5 = sehr gut)</label><div class="chips5">'+[1,2,3,4,5].map(n=>chipBtn('plChip','readiness',n,String(n),p.readiness===n)).join('')+'</div>';
+    h+='<label>Wie fit? (1 schlecht – 5 top)</label><div class="chips5">'+[1,2,3,4,5].map(n=>chipBtn('plChip','readiness',n,String(n),p.readiness===n)).join('')+'</div>';
     h+='<label>Beschwerden?</label><div>'+[[0,'keine'],[2,'leicht'],[4,'mittel'],[7,'stark']].map(([v,l])=>chipBtn('plChip','painLvl',v,l,(p.pain||0)===v)).join('')+'</div>';
     if(p.pain>0) h+='<label>Wo?</label><div>'+Object.keys(REGION_LABEL).map(r=>chipBtn('plChip','regions',r,REGION_LABEL[r],p.regions.includes(r))).join('')+'</div>';
   }
   // Seltene Angaben eingeklappt
-  const more = p.date!==today || p.tpl || p.sleep!=null || p.avail!=null || p.noEquip.length || p.grip;
-  h+='<details'+(more?' open':'')+'><summary class="small">Mehr Angaben (Zeit, Schlaf, anderer Tag)</summary>';
+  const more = p.tpl || p.sleep!=null || p.avail!=null || p.noEquip.length || p.grip;
+  h+='<details'+(more?' open':'')+'><summary class="small">Mehr Angaben</summary>';
   h+='<div class="fields">'+inp('pl-avail','Zeit (min)',p.avail==null?'':p.avail,'inputmode="numeric" placeholder="'+((REF.plan.rules||{}).max_session_min||65)+'" data-chg="plIn"')+inp('pl-sleep','Schlaf (h)',p.sleep==null?'':fmtNum(p.sleep),'inputmode="decimal" data-chg="plIn"')+'</div>';
   if(t){
     if(t.slots.some(s=>s.grip && (s.dose||{})[due.week])) h+='<div>'+chipBtn('plChip','grip','1','Griff stark ermüdet',p.grip)+'</div>'; }
   h+='<div class="fields">'+inp('pl-date','Anderer Tag',p.date,'type="date" data-chg="plIn"')+(b?sel('pl-tpl','Andere Einheit',b.templates.map(x=>[x.id, x.id+' – '+x.name]), pin.tpl||'', 'data-chg="plIn"'):'')+'</div>';
   h+='</details></div>';
-  if(!t){ const P=plBuild(pin); return h+'<div class="note">'+esc(P.error||'')+'</div>'; }
   if(due.doneToday) return h;
-  if(p.readiness==null) return h+'<p class="small muted">Tippe deine Fitness an – dann steht deine Einheit hier.</p>';
+  if(p.readiness==null) return h;
   return h+plPreview(plBuild(pin));
 }
 
