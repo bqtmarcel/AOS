@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=4">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -399,6 +399,28 @@ button.primary:active,nav.tabs button[aria-current="page"]:active{background:var
 .sysbar .sd{font-size:.9rem;line-height:1}
 .sysbar .sd.run{animation:sdp 1s ease-in-out infinite}@keyframes sdp{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.sysbar .sd.run{animation:none}}
+/* ===== Red Tigers ===== */
+.claw{width:22px;height:22px;fill:none;stroke:url(#clawg);stroke-width:3.2;stroke-linecap:round}
+.weekstrip .day .tp.claw-tp{display:flex;justify-content:center;align-items:center;gap:1px;color:var(--muted)}
+.weekstrip .day .tp .claw{width:18px;height:18px;margin-top:1px;filter:drop-shadow(0 0 4px rgba(246,1,0,.55))}
+.motto{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:.62rem;letter-spacing:.32em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+.motto::before,.motto::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent)}
+.motto b{color:var(--sig);font-weight:700}
+button.ph{letter-spacing:.22em;font-weight:800;line-height:1.15;padding-top:10px;padding-bottom:10px}
+button.ph small{display:block;letter-spacing:.08em;font-weight:500;font-size:.68rem;opacity:.85;margin-top:3px;text-transform:none}
+body.hunt::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:5;box-shadow:inset 0 0 90px 10px rgba(246,1,0,.2)}
+.hunt-tag{display:inline-flex;align-items:center;gap:6px;font-size:.62rem;letter-spacing:.28em;color:var(--sig);text-transform:uppercase;margin:4px 0 2px}
+.hunt-tag::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--sig);box-shadow:0 0 8px var(--sig);animation:sdp 1.6s ease-in-out infinite}
+.fin{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;background:radial-gradient(circle at 50% 45%,rgba(140,0,0,.55),rgba(0,0,0,.92) 70%);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:finIn .25s ease-out}
+.fin .claw{width:150px;height:150px;stroke-width:3.6;filter:drop-shadow(0 0 18px rgba(246,1,0,.8))}
+.fin .claw path{stroke-dasharray:40;stroke-dashoffset:40;animation:clawDraw .35s ease-out forwards}
+.fin .claw path:nth-child(2){animation-delay:.08s}.fin .claw path:nth-child(3){animation-delay:.16s}
+.fin h1{margin:0;font-size:2.3rem;letter-spacing:.18em;font-weight:800;text-align:center;line-height:1.05;background:linear-gradient(180deg,#fff 0%,#e3e7ec 40%,#7f8692 52%,#c9ced6 70%,#f5f7f9 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.fin h1 em{font-style:normal;display:block;background:linear-gradient(180deg,#ff3b30,#c00000);-webkit-background-clip:text;background-clip:text}
+.fin p{margin:0;color:var(--muted);font-size:.8rem;letter-spacing:.06em;text-align:center}
+.fin button{margin-top:10px;min-width:140px}
+@keyframes finIn{from{opacity:0}to{opacity:1}} @keyframes clawDraw{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.fin,.hunt-tag::before{animation:none}.fin .claw path{animation:none;stroke-dashoffset:0}}
 /* ===== Chrome Glass ===== */
 .tc-phase{font-size:.72rem;color:var(--muted);margin:2px 0 8px;letter-spacing:.02em}
 .tc-phase b{color:var(--text);font-weight:600}
@@ -443,6 +465,7 @@ nav.tabs button[aria-current="page"],nav.tabs button[aria-current="page"]:not(.p
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="clawg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#c00000"/><stop offset=".6" stop-color="#ff3b30"/><stop offset="1" stop-color="#ff8a80"/></linearGradient></defs></svg>
 <a href="#main" class="sr-only">Zum Inhalt springen</a>
 <header class="top">
   <div class="top-inner">
@@ -1178,7 +1201,7 @@ function render(){
   const fn = {uebersicht:viewOverview, plan:viewPlan, training:viewTraining, tests:viewTests, profil:viewProfile, ernaehrung:viewNutrition, druck:viewPrint}[ui.view] || viewOverview;
   m.innerHTML = (storageOK?'':'<div class="note bad"><strong>Lokaler Speicher nicht verfügbar.</strong> Der Browser erlaubt für diese Datei keine dauerhafte Speicherung (z. B. privater Modus oder blockierte Website-Daten). Eingaben gehen beim Schließen verloren – exportiere eine JSON-Sicherung oder öffne die Datei in einem normalen Browserfenster.</div>') + fn();
   stackTables(m);
-  stackTables(m);
+  const hs=ui.view==='training'&&ui.sessionId&&ui.draft&&sessionById(ui.sessionId); document.body.classList.toggle('hunt', !!(hs&&!hs.log));
 }
 ACT.go = el=>{ ui.view=el.dataset.view; if(ui.view!=='training'){ ui.sessionId=null; ui.draft=null; } location.hash=ui.view; render(); window.scrollTo(0,0); };
 window.addEventListener('hashchange', ()=>{ const h=location.hash.slice(1); if(h && h!==ui.view && (VIEWS.some(v=>v[0]===h)||h==='druck')){ ui.view=h; render(); } });
@@ -1565,6 +1588,7 @@ function logForm(){
   const s=sessionById(ui.sessionId); const b=blockById(s.blockId); const dr=ui.draft; const cap=(s.planner&&s.planner.cap!=null)?s.planner.cap:capMax(b);
   const day=b?dayById(b,s.dayId):null;
   let h='<div class="row no-print"><button data-act="logBack">← Zurück</button></div>';
+  if(!s.log) h+='<div class="hunt-tag">Jagdmodus · Einheit läuft</div>';
   h+='<h1>'+esc(s.name)+'</h1><div class="row">'+(s.planner?'<span class="cap">RPE ≤ '+fmtNum(cap)+'</span> <span class="small muted">'+esc((s.planner.phase||'')+' · Woche '+s.planner.week)+'</span>':capBadge(b))+' '+statusBadge(s)+'</div>';
   if(s.planner && !s.log) (s.planner.notes||[]).forEach(n=>{ h+='<div class="note small">'+esc(n)+'</div>'; });
   if(b && b.rules) h+='<p class="small muted">Blockregeln: '+esc(b.rules)+'</p>';
@@ -1634,8 +1658,9 @@ ACT.saveLog = el=>{
   const log=clone(dr); delete log.date; delete log.location;
   log.exercises.forEach(e=>{ e.sets=e.sets.filter((x,j)=>j===0||Object.values(x).some(v=>v!=null)); });
   log.loggedAt=new Date().toISOString();
-  s.log=log; s.status=el.dataset.st; save();
-  ui.sessionId=null; ui.draft=null; toast('Einheit gespeichert ('+STATUS_LABEL[s.status]+').'); render();
+  const first=!s.log; s.log=log; s.status=el.dataset.st; save();
+  ui.sessionId=null; ui.draft=null; render();
+  if(first) finShow(s); else toast('Einheit gespeichert ('+STATUS_LABEL[s.status]+').');
 };
 ACT.discardLog = ()=>{ confirmDlg('Protokoll verwerfen?','Die erfassten Werte dieser Einheit werden gelöscht und die Einheit wieder auf „geplant“ gesetzt.','Verwerfen',()=>{ const s=sessionById(ui.sessionId); s.log=null; s.status='geplant'; save(); ui.sessionId=null; ui.draft=null; render(); }, true); };
 
@@ -2226,7 +2251,7 @@ function plPreview(P){
   });
   if(P.dropped.length) h+='<p class="small"><strong>Weggelassen:</strong> '+P.dropped.map(d=>esc((REF.exMap[d.slot.candidates[0]]||{}).name_de||d.slot.id)+' ('+esc(d.why)+')').join('; ')+'</p>';
   P.valid.forEach(v=>{ h+='<div class="note bad small">'+esc(v)+'</div>'; });
-  h+='<div class="row" style="margin-top:12px"><button class="primary" data-act="plTake">Einheit starten</button><button class="link" data-act="plSave">für später speichern</button></div>';
+  h+='<div class="row" style="margin-top:12px"><button class="primary ph" data-act="plTake" aria-label="Einheit starten">PLAY HARD<small>Einheit starten</small></button><button class="link" data-act="plSave">für später speichern</button></div>';
   return h+'</div>';
 }
 
@@ -2714,6 +2739,15 @@ function viewOverview(){
   h+=ovToday(today)+ovWeek(today);
   return h;
 }
+const CLAW='<svg class="claw" viewBox="0 0 40 40" aria-hidden="true"><path d="M9 33 Q14 18 23 6"/><path d="M16 35 Q21 20 30 8"/><path d="M23 36 Q28 23 35 13"/></svg>';
+const MOTTO='<div class="motto"><span>Play hard · <b>finish strong</b></span></div>';
+function phBtn(label,attrs){ return '<button class="primary block ph" '+attrs+' aria-label="'+esc(label)+'">PLAY HARD →<small>'+esc(label)+'</small></button>'; }
+function finShow(s){ document.querySelectorAll('.fin').forEach(x=>x.remove());
+  const sets=(s.log&&s.log.exercises||[]).reduce((a,e)=>a+e.sets.filter(x=>Object.values(x).some(v=>v!=null)).length,0);
+  const info=[(s.planner&&s.planner.templateId)||s.name, s.status==='teilweise'?'teilweise erledigt':'erledigt'].join(' ')+(s.log&&s.log.durationMin?' · '+s.log.durationMin+' min':'')+(sets?' · '+sets+' Sätze':'');
+  document.body.insertAdjacentHTML('beforeend','<div class="fin" role="dialog" aria-modal="true" aria-label="Einheit gespeichert">'+CLAW+'<h1>FINISH<em>STRONG</em></h1><p>'+esc(info)+'</p><button class="primary" data-act="finClose">Weiter</button></div>');
+  const bt=document.querySelector('.fin button'); if(bt) bt.focus(); }
+ACT.finClose=()=>document.querySelectorAll('.fin').forEach(x=>x.remove());
 function ovPhaseLine(td){
   const pb=plCurrentBlock(td); if(!pb) return '';
   const ph=plPhase(td)||REF.plan.phases.find(x=>x.id===pb.phase); const nm=ph?(ph.name||ph.id):pb.id;
@@ -2730,10 +2764,10 @@ function ovToday(today){
   if(due.doneToday){ state='done'; title=due.doneToday.name; sub='✓ erledigt'+(due.doneToday.durationMin?' · '+due.doneToday.durationMin+' min':'');
     btn='<button class="block" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button>'; }
   else if(due.plannedToday){ state='open'; title=due.plannedToday.name; sub='gespeichert · bereit zum Erfassen';
-    btn='<button class="primary block" data-act="startLog" data-id="'+due.plannedToday.id+'">Erfassen →</button>'; }
+    btn=phBtn('Einheit erfassen','data-act="startLog" data-id="'+due.plannedToday.id+'"'); }
   else if(due.block && due.tpl && !due.offday){ const t=plTemplate(due.block, due.tpl); state='open'; title=t.id+' – '+t.name;
     sub='ca. '+t.time_min+' min';
-    btn='<button class="primary block" data-act="go" data-view="training">Einheit starten →</button>'; }
+    btn=phBtn('Einheit starten','data-act="go" data-view="training"'); }
   else if(isFieldDay(today)){ title='Kein Gym – '+((fieldCfg()||{}).name||'Feldtraining'); sub=((fieldCfg()||{}).time||'')+' · siehe unten'; }
   else { const n=plNextTraining(addDays(today,1)); sub=n?'Nächste Einheit: '+n.tpl+' · '+WD[weekdayOf(n.date)]+' '+fmtDate(n.date).slice(0,6):'Erholung'; }
   let h='<div class="section hero today-card"><div class="eyebrow">'+(state==='open'?'<span class="dot"></span>':'')+esc(dayLbl+(typ&&T.training?' · '+typ:''))+'</div>';
@@ -2751,7 +2785,7 @@ function ovToday(today){
   if(mp && mp.start===addDays(today,1)) hints.push('Morgen startet Meal-Prep – heute vorkochen');
   if(mp && mp.start===today) hints.push('Meal-Prep startet heute');
   if(hints.length) h+='<div class="tc-hints">'+hints.map(x=>'<div>› '+esc(x)+'</div>').join('')+'</div>';
-  return h+(btn?'<div class="tc-btn">'+btn+'</div>':'')+'</div>';
+  return h+(btn?'<div class="tc-btn">'+btn+'</div>':'')+MOTTO+'</div>';
 }
 function ovWeightRow(today){
   const t=S.bodyweight.find(b=>b.date===today);
@@ -2766,11 +2800,11 @@ function ovWeek(today){
   const mon=mondayOf(today); const dn=['Mo','Di','Mi','Do','Fr','Sa','So']; let any=false;
   const cells=dn.map((d,i)=>{ const date=addDays(mon,i); const b=plBlockAt(date); let txt='', act='';
     const s=plSessions().find(x=>(sessionDate(x)===date) && x.status!=='ausgelassen');
-    let done=false; if(s){ done=isDone(s); txt=(done?'✓ ':'')+s.planner.templateId; act=' data-act="startLog" data-id="'+s.id+'"'; any=true; }
+    let done=false; if(s){ done=isDone(s); txt=s.planner.templateId; act=' data-act="startLog" data-id="'+s.id+'"'; any=true; }
     else if(b){ const sc=plScheduledAt(b,date); const t=sc.tpl; if(t){ txt=t+(date<today?' ✗':'')+(sc.changed?'*':''); any=true; } else if(sc.changed){ txt='frei*'; any=true; }
       if(date>=today) act=' data-act="dayEdit" data-d="'+date+'"'; }
     if(isFieldDay(date)){ const fl=fieldLog(date); txt=(txt?txt+'+':'')+(fl&&fl.status==='ausgefallen'?'F✗':'F'); any=true; }
-    return '<div class="day'+(date===today?' today':'')+'"'+act+(act&&!s?'':'')+'><span class="wd">'+d+'</span><span class="dn">'+parseISO(date).getDate()+'</span><span class="tp'+(done?' done':'')+'">'+esc(txt||'')+'</span></div>'; });
+    return '<div class="day'+(date===today?' today':'')+'"'+act+(act&&!s?'':'')+'><span class="wd">'+d+'</span><span class="dn">'+parseISO(date).getDate()+'</span>'+(done?'<span class="tp done claw-tp">'+CLAW+'<span class="sr-only">'+esc(txt)+' erledigt</span>'+(isFieldDay(date)?esc(txt.slice(txt.indexOf('+')))+'':'')+'</span>':'<span class="tp">'+esc(txt||'')+'</span>')+'</div>'; });
   if(!any) return '';
   return '<h2>Diese Woche</h2><div class="weekstrip">'+cells.join('')+'</div><p class="small muted">Tipp auf einen Tag, um ihn zu ändern.</p>';
 }
