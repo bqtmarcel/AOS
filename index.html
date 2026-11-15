@@ -2696,15 +2696,14 @@ function viewPlan(){
       const s=mine.find(x=>sessionDate(x)===d && x.status!=='ausgelassen') || mine.find(x=>x.plannedDate===d);
       let cell='';
       if(s){ const st=isDone(s)?'✓':(s.status==='ausgelassen'?'–':'○'); cell='<button class="link" data-act="startLog" data-id="'+s.id+'">'+st+' '+esc(s.planner.templateId)+'</button>'; }
-      else if(t){ cell = d<today ? '<span class="muted" title="verpasst">'+t+' ✗</span>' : (d===today?'<strong>'+t+'</strong>':t)+(sc.changed?'*':''); }
-      else if(sc.changed && d>=today) cell='frei*';
+      else if(t){ cell = d<today ? '<span class="muted" title="verpasst">'+t+' ✗</span>' : (d===today?'<strong>'+t+'</strong>':t); }
       const tap = !s && d>=today ? ' data-act="dayEdit" data-d="'+d+'" style="cursor:pointer'+(d===today?';background:var(--accent-soft)':'')+'"' : (d===today?' style="background:var(--accent-soft)"':'');
       h+='<td'+tap+'>'+cell+'</td>'; });
     h+='</tr>';
-    const wsub=[(b.week_wave||{})[w], ov&&ov.note].filter(Boolean).join(' · ');
+    const wsub=(b.week_wave||{})[w]||'';
     if(wsub) h+='<tr class="wk-sub"><td></td><td colspan="7" class="muted">'+esc(wsub)+'</td></tr>';
   }
-  h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ gespeichert · ✗ verpasst · * geändert · Tag antippen zum Ändern</p>';
+  h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ gespeichert · ✗ verpasst · Tag antippen zum Ändern</p>';
   if(plBlockAt(today)===b){ const wk=plWeek(b,today); const wp=plWeekPlan(b,wk); const m=Object.entries(wp.hosts).filter(([,l])=>l.some(x=>plMergeSlots(b,wk,plTemplate(b,x).slots).length));
     h+='<p class="small"><strong>Diese Woche: '+wp.count+' Einheit'+(wp.count===1?'':'en')+'.</strong> '+(m.length?m.map(([hst,l])=>'Kernübungen aus '+l.join(', ')+' → '+hst).join(' · '):'Alle Einheiten wie geplant.')+'</p>'; }
   h+='</div>';
