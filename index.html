@@ -400,6 +400,8 @@ button.primary:active,nav.tabs button[aria-current="page"]:active{background:var
 .sysbar .sd.run{animation:sdp 1s ease-in-out infinite}@keyframes sdp{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.sysbar .sd.run{animation:none}}
 /* Countdown & Kalender */
+.tc-kcal{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:.85rem;color:var(--muted)}
+.tc-kcal b{color:var(--sig);font-size:1.05rem;font-weight:700}
 .cd{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .cd-k{display:flex;flex-direction:column;gap:3px;min-width:0}
 .cd-k span{font-size:.62rem;letter-spacing:.24em;text-transform:uppercase;color:var(--sig);font-weight:700}
@@ -2811,9 +2813,6 @@ function ovToday(today){
   let h='<div class="section hero today-card"><div class="eyebrow">'+(state==='open'?'<span class="dot"></span>':'')+esc(dayLbl+(typ&&T.training?' · '+typ:''))+'</div>';
   h+=ovPhaseLine(today);
   h+='<div class="hero-title">'+esc(title)+'</div><div class="hero-sub">'+esc(sub)+'</div>';
-  if(T){ const di=nutDayItems(today,T);
-    h+= di.length ? '<div class="tc-row"><div class="tc-k" style="margin-bottom:6px">Ernährung · abgedeckt</div>'+macroBars(sumMac(di),T,true)+'</div>'
-      : '<div class="tc-row tc-macros"><div><b>'+fmtK(T.kcal)+'</b><span>kcal</span></div><div><b>'+T.P+'<small>g</small></b><span>Protein</span></div><div><b>'+T.K+'<small>g</small></b><span>KH</span></div><div><b>'+T.F+'<small>g</small></b><span>Fett</span></div></div>'; }
   if(isFieldDay(today)){ const fc=fieldCfg(), fl=fieldLog(today);
     h+='<div class="tc-row tc-weight"><span class="tc-k">'+esc(fc.time||'Feld')+'</span><span>'+esc(fc.name||'Football-Training')+'<br><span class="small muted">'+(fl?esc(fieldSummary(fl)):'ca. '+(fc.duration_min||90)+' min')+'</span></span><button class="small'+(fl?' link':'')+'" data-act="fieldLog" data-d="'+today+'">'+(fl?'ändern':'Erfassen')+'</button></div>'; }
   h+=ovWeightRow(today);
@@ -2823,7 +2822,9 @@ function ovToday(today){
   if(mp && mp.start===addDays(today,1)) hints.push('Morgen startet Meal-Prep – heute vorkochen');
   if(mp && mp.start===today) hints.push('Meal-Prep startet heute');
   if(hints.length) h+='<div class="tc-hints">'+hints.map(x=>'<div>› '+esc(x)+'</div>').join('')+'</div>';
-  return h+(btn?'<div class="tc-btn">'+btn+'</div>':'')+cdBlock('tc-cd')+MOTTO+'</div>';
+  let kc=''; if(T){ const di=nutDayItems(today,T); const k=di.length?Math.round(sumMac(di).kcal):null;
+    kc='<div class="tc-kcal"><span class="tc-k">Kalorien</span><span>'+(k!=null?'<b>'+fmtK(k)+'</b> / '+fmtK(T.kcal):'<b>'+fmtK(T.kcal)+'</b>')+' kcal</span></div>'; }
+  return h+(btn?'<div class="tc-btn">'+btn+'</div>':'')+cdBlock('tc-cd')+kc+MOTTO+'</div>';
 }
 function ovWeightRow(today){
   const t=S.bodyweight.find(b=>b.date===today);
