@@ -1897,9 +1897,10 @@ function viewNutrition(){
     h+='<div class="ex meal'+(open?' open':'')+'"><div class="meal-head"><button class="chip meal-done" data-act="nutDone" data-s="'+slot.id+'" aria-pressed="'+(m&&m.done?'true':'false')+'" aria-label="gegessen">'+(m&&m.done?'✓':'')+'</button>'+
       '<button class="meal-tg" data-act="nutOpen" data-s="'+slot.id+'" aria-expanded="'+open+'"><span class="meal-t">'+esc(slot.time+' · '+slot.name.replace(/ \(.*\)$/,''))+'</span><span class="meal-k">'+(items.length?'<b>'+fmtK(ist.kcal)+'</b> / ':'')+fmtK(zk)+' kcal</span>'+
       '<span class="meal-s">'+(items.length?esc(names):'noch leer')+'</span><span class="meal-c" aria-hidden="true">'+(open?'–':'+')+'</span></button></div>';
-    if(!open){ const st=!items.length && nutStdTpl(date, slot.id); if(st) h+='<div class="tpl-pick"><button class="chip std" data-act="nutTplUse" data-t="'+st.id+'" data-s="'+slot.id+'">★ '+esc(st.name)+'</button></div>'; h+='</div>'; return; }
+    const prev=!items.length ? nutMeal(addDays(date,-1), slot.id) : null; const prevBtn=prev&&prev.items.length ? '<button class="chip" data-act="nutCopyPrev" data-s="'+slot.id+'" title="'+esc(prev.items.map(i=>(nutFood(i.food)||{}).name||'?').join(', '))+'">↺ wie gestern</button>' : '';
+    if(!open){ const st=!items.length && nutStdTpl(date, slot.id); if(st||prevBtn) h+='<div class="tpl-pick">'+(st?'<button class="chip std" data-act="nutTplUse" data-t="'+st.id+'" data-s="'+slot.id+'">★ '+esc(st.name)+'</button>':'')+prevBtn+'</div>'; h+='</div>'; return; }
     h+='<div class="plan-hint" style="margin:6px 0">Ziel P '+P+' · KH '+K+' · F '+F+'</div>';
-    if(!items.length){ const tl=nutTplsForSlot(date, slot.id); if(tl.length) h+='<div class="tpl-pick">'+tl.map(t=>'<button class="chip'+(t._std?' std':'')+'" data-act="nutTplUse" data-t="'+t.id+'" data-s="'+slot.id+'">'+(t._std?'★ ':'')+esc(t.name)+'</button>').join('')+'</div>'; }
+    if(!items.length){ const tl=nutTplsForSlot(date, slot.id); if(tl.length||prevBtn) h+='<div class="tpl-pick">'+tl.map(t=>'<button class="chip'+(t._std?' std':'')+'" data-act="nutTplUse" data-t="'+t.id+'" data-s="'+slot.id+'">'+(t._std?'★ ':'')+esc(t.name)+'</button>').join('')+prevBtn+'</div>'; }
     items.forEach((it,j)=>{ const f=nutFood(it.food); const mm=itemMac(it);
       const us=nutUnits(f), uu=itemUnit(it,f), q=itemQty(it,f);
       h+='<div class="setrow nut-row"><span>'+esc(f?f.name:it.food)+(it.fixed?' <span class="small muted" title="von dir festgelegt">📌</span>':'')+'<br><span class="small muted">P '+fmtNum(Math.round(mm.P))+' · KH '+fmtNum(Math.round(mm.K))+' · F '+fmtNum(Math.round(mm.F))+' · '+Math.round(mm.kcal)+' kcal</span></span>'+
@@ -1929,6 +1930,8 @@ CHG.nutDate = el=>{ if(el.value){ ui.nutDate=el.value; render(); } };
 CHG.nutType = el=>{ nutSetDay(nutDate(), { type:el.value||null }); save(); render(); };
 ACT.nutTimeChip = el=>{ nutSetDay(nutDate(), { time:el.dataset.v }); save(); render(); };
 ACT.nutOpen = el=>{ ui.mealOpen=ui.mealOpen||{}; ui.mealOpen[el.dataset.s]=!ui.mealOpen[el.dataset.s]; render(); };
+ACT.nutCopyPrev = el=>{ const date=nutDate(); const p=nutMeal(addDays(date,-1), el.dataset.s); if(!p||!p.items.length) return;
+  const m=nutEnsureMeal(date, el.dataset.s); m.items=clone(p.items); m.tpl=p.tpl||null; m.done=false; save(); render(); toast('Mahlzeit von gestern übernommen.'); };
 ACT.nutDone = el=>{ const m=nutEnsureMeal(nutDate(), el.dataset.s); m.done=!m.done; save(); render(); };
 ACT.nutSupp = el=>{ const c=nutDayCfg(nutDate()); const s=Object.assign({}, c.supp||{}); s[el.dataset.v]=!s[el.dataset.v]; if(!s[el.dataset.v]) delete s[el.dataset.v]; nutSetDay(nutDate(), { supp:Object.keys(s).length?s:null }); save(); render(); };
 ACT.nutDel = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; m.items.splice(+el.dataset.j,1); nutRecalc(el.dataset.s); save(); render(); };
