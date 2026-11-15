@@ -2980,7 +2980,7 @@ function plSection(){
   if(due.doneToday){ h+='<div class="note small">✓ '+esc(due.doneToday.name)+' ist erledigt. <button class="link" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button></div>'; }
   if(t && !due.doneToday){
     const LL=S.profile.locations||[]; if(LL.length>1) h+='<label>Ort</label><div>'+LL.map(l=>chipBtn('plChip','loc',l.id,l.name,pin.loc===l.id)).join('')+'</div>';
-    h+='<label>Readiness (1 schlecht – 5 top)</label><div class="chips5">'+[1,2,3,4,5].map(n=>chipBtn('plChip','readiness',n,String(n),p.readiness===n)).join('')+'</div>';
+    h+='<label>Readiness</label><div class="chips5">'+[1,2,3,4,5].map(n=>chipBtn('plChip','readiness',n,String(n),p.readiness===n)).join('')+'</div>';
     h+='<label>Beschwerden?</label><div>'+[[0,'keine'],[2,'leicht'],[4,'mittel'],[7,'stark']].map(([v,l])=>chipBtn('plChip','painLvl',v,l,(p.pain||0)===v)).join('')+'</div>';
     if(p.pain>0) h+='<label>Wo?</label><div>'+Object.keys(REGION_LABEL).map(r=>chipBtn('plChip','regions',r,REGION_LABEL[r],p.regions.includes(r))).join('')+'</div>';
   }
