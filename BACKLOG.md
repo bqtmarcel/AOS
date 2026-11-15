@@ -35,7 +35,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | T9 | „+ Freie Einheit“ als richtigen Button gestalten und Übungen aus der Übungsdatenbank auswählbar machen | Einheitliche Bedienung | ✅ erledigt | M |
 | T10 | **Autoregulation in der Einheit**: Liegt ein Satz einer Hauptübung über der RPE-Obergrenze, werden die restlichen Sätze automatisch 5 % leichter (mindestens 1 RPE über dem Ziel: 2,5 %) | Wiedereinstieg und schlechte Tage ohne Rechnen | ✅ erledigt | S |
 | T11 | **Standortbestimmung automatisch übernehmen**: In der Testwoche eines Blocks landen Top-Satz Kniebeuge, Bank, Trap Bar und beste Broad-Jump-Weite beim Speichern direkt als Test im Verlauf | Neue Werte fließen ohne Knopfdruck in den nächsten Block | ✅ erledigt | S |
-| T12 | **„Tag frei“ lässt Einheiten nachrücken** (wie die nicht verfügbaren Tage im Datenrepo) statt nur Kernübungen umzuverteilen | Feiertage, kurzfristige Ausfälle | offen – Erklärung an den Athleten, Entscheidung ausstehend | M |
+| T12 | **„Tag frei“ lässt Einheiten nachrücken** (wie die nicht verfügbaren Tage im Datenrepo) statt nur Kernübungen umzuverteilen | Feiertage, kurzfristige Ausfälle | ⏸ zurückgestellt (15.11.): bleibt vorerst wie bisher, evtl. später | M |
 
 ## 2. Verlauf und Auswertung
 
