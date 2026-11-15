@@ -1304,17 +1304,18 @@ function viewTests(){
   h+=goalsSection();
   // Tests
   const names=[...new Set(S.tests.map(t=>t.name))];
-  h+='<h2>Testergebnisse</h2>';
-  if(fromTrainingCandidates().length) h+='<div class="row" style="margin:-4px 0 8px"><button class="small" data-act="testsFromTraining">Aus dem Training übernehmen</button></div>';
-  if(!names.length) h+='<div class="empty">Noch keine Tests. Erfasse z. B. Broad Jump, 40-Yard-Sprint oder einen Krafttest mit Datum und Testbedingungen.</div>';
+  let tb='';
+  if(fromTrainingCandidates().length) tb+='<div class="row" style="margin:0 0 8px"><button class="small" data-act="testsFromTraining">Aus dem Training übernehmen</button></div>';
+  if(!names.length) tb+='<div class="empty">Noch keine Tests.</div>';
   TEST_CATS.forEach(cat=>{
     const cn=names.filter(n=>S.tests.some(t=>t.name===n&&t.category===cat)); if(!cn.length) return;
-    h+='<h3>'+esc(cat)+'</h3>';
-    cn.forEach(n=>h+=testCard(n));
+    tb+='<h3>'+esc(cat)+'</h3>';
+    cn.forEach(n=>tb+=testCard(n));
   });
+  h+=pdet('v-tests','Testergebnisse',names.length===1?'1 Test':names.length+' Tests',tb);
   // Trainingsverlauf
   const nLog=loggedSessions().length;
-  h+=pdet('v-prog','Verlauf aus Trainingsprotokollen',nLog===1?'1 Einheit':nLog+' Einheiten',trainingProgress());
+  h+=pdet('v-prog','Verlauf',nLog===1?'1 Einheit':nLog+' Einheiten',trainingProgress());
   return h;
 }
 /* ---------- Standortbestimmung: beste Sätze der letzten 7 Tage als Testergebnis übernehmen (Spezifikation 3.8) ---------- */
@@ -2868,7 +2869,6 @@ function calSection(){ const L=calSorted(); const td=todayISO(); const c=cdNext(
   let h='<details class="section cal-det pdet" id="cal-det"'+(ui.calOpen?' open':'')+'><summary><strong>Kalender</strong> <span class="small muted">· '+esc(sum)+'</span></summary>';
   if(L.length) h+='<div class="cal-list">'+L.map(e=>'<div class="cal-row'+(e.date<td?' past':'')+'"><div><span class="cal-d">'+fmtDateShort(e.date)+(e.time?' · '+esc(e.time):'')+'</span><strong>'+esc(e.title||CAL_KIND[e.kind])+'</strong>'+(e.place?'<span class="small muted"> · '+esc(e.place)+'</span>':'')+'</div>'+
     '<span class="cal-k '+e.kind+'">'+CAL_KIND[e.kind]+'</span><button class="link" data-act="calEdit" data-id="'+e.id+'">ändern</button></div>').join('')+'</div>';
-  else h+='<p class="small muted">Spieltage mit Kickoff steuern den Countdown. Ohne Eintrag zählt er bis zum ersten Spiel laut Plan.</p>';
   return h+'<button class="small" data-act="calNew">+ Termin oder Spiel</button></details>'; }
 document.addEventListener('toggle', e=>{ if(e.target && e.target.id==='cal-det') ui.calOpen=e.target.open; }, true);
 function calDlgOpen(){ const d=ui.calDraft;
@@ -2919,19 +2919,17 @@ function viewProfile(){
   h+=pdet('loc','Trainingsorte',(S.profile.locations||[]).length+' Orte',locSection());
   h+=ghSection();
   const le=S.settings.lastExport;
-  h+=pdet('backup','Sicherung',le?'zuletzt '+fmtDate(le.slice(0,10)):'','<p class="small muted">Deine Daten sind im Datenrepo gesichert, jeder Abgleich ist eine Version. Zusätzlich kannst du eine Datei herunterladen'+(le?' (zuletzt '+fmtDate(le.slice(0,10))+')':'')+'.</p>'+
+  h+=pdet('backup','Sicherung',le?'zuletzt '+fmtDate(le.slice(0,10)):'',''+
     '<button data-act="exportJSON">Sicherung herunterladen</button>'+
     '<details style="margin-top:12px"><summary class="small">Erweitert</summary>'+
-      '<p class="small muted">Sicherung einspielen ersetzt die Daten auf diesem Gerät; danach wird mit dem Datenrepo abgeglichen.</p>'+
       '<div class="row"><label class="btn" for="imp-file" style="display:inline-flex;align-items:center;color:var(--text);margin:0">Sicherung einspielen …</label><input id="imp-file" type="file" accept=".json,application/json" class="sr-only" data-chg="importFile"></div>'+
       '<p class="small" style="margin-top:12px">Tabellen (CSV): <button class="link" data-act="csv" data-k="saetze">Trainingssätze</button> · <button class="link" data-act="csv" data-k="tests">Tests</button> · <button class="link" data-act="csv" data-k="bw">Körpergewicht</button></p>'+
       '<p class="small" style="margin-top:12px"><button class="link" data-act="resetAll" style="color:var(--bad)">Daten auf diesem Gerät zurücksetzen …</button></p>'+
     '</details>');
-  h+='<p class="small muted" style="margin-top:24px">AOS ist kein Ersatz für medizinische oder sportwissenschaftliche Betreuung.</p>';
   return h;
 }
 function locSection(){ const L=S.profile.locations||[]; const days=[1,2,3,4,5,6,0];
-  return '<p class="small muted">Trag ein, was es am Ort gibt oder was nicht geht – z. B. „Langhantel, Rack, Kurzhanteln, Bank“ oder „keine Sprünge oder Überkopf“. Leer = keine Einschränkung. AOS plant Einheiten an diesem Ort nur mit Übungen, die dort möglich sind.</p>'+
+  return ''+
   L.map(l=>'<div class="section loc-card"><div class="row" style="flex-wrap:nowrap;gap:8px;align-items:flex-end"><div style="flex:1;min-width:0">'+inp('loc-n-'+l.id,'Name',l.name,'data-chg="locSave" data-id="'+l.id+'"')+'</div>'+
     (L.length>1?'<button class="small" data-act="locDel" data-id="'+l.id+'" aria-label="Ort entfernen" style="margin-bottom:8px">✕</button>':'')+'</div>'+
     '<label for="loc-t-'+l.id+'">Ausstattung & Einschränkungen</label><textarea id="loc-t-'+l.id+'" rows="3" data-chg="locSave" data-id="'+l.id+'" placeholder="leer = alles möglich">'+esc(l.text||'')+'</textarea>'+
@@ -3158,7 +3156,6 @@ function ghStatusText(){
 function ghSection(){
   const c=gh.cfg;
   return pdet('gh','Datenspeicherung', ghReady()?(gh.cfg.repo):'nicht verbunden', '<span id="gh-sec"></span>'+
-    '<p class="small">AOS speichert deine Trainings-, Ernährungs- und Körperdaten in deinem <strong>privaten</strong> Repo <code>'+esc(c.owner+'/'+c.repo)+'</code>. Jede Änderung wird nach wenigen Sekunden abgeglichen; ohne Netz wird gepuffert und später nachgeholt. iPhone und Laptop arbeiten so mit demselben Stand.</p>'+
     '<p id="gh-status" class="small" aria-live="polite">'+ghStatusText()+'</p>'+
     (ghReady()?'<p class="small muted">Plan & Datenbanken geladen '+(REF.at?ghTime(REF.at):'—')+' · <button class="link" data-act="plReload">neu laden</button></p>':'')+
     '<div class="fields">'+inp('gh-owner','GitHub-Konto',c.owner)+inp('gh-repo','Datenrepo',c.repo)+'</div>'+
@@ -3170,8 +3167,7 @@ function ghSection(){
       '<li>GitHub → Settings → Developer settings → Personal access tokens → <strong>Fine-grained tokens</strong> → Generate new token.</li>'+
       '<li>Repository access: <strong>Only select repositories</strong> → <code>'+esc(c.repo)+'</code>.</li>'+
       '<li>Permissions → Repository permissions → <strong>Contents: Read and write</strong> (sonst nichts).</li>'+
-      '<li>Ablaufdatum wählen, Token kopieren und hier einfügen. Das Ablaufdatum oben eintragen – AOS erinnert dich zwei Wochen vorher.</li></ol>'+
-      '<p class="small muted">Der Token bleibt nur auf diesem Gerät, steht in keiner Sicherung und wird nur an api.github.com gesendet. Er kann ausschließlich das Datenrepo lesen und schreiben.</p></details>'+
+      '<li>Ablaufdatum wählen, Token kopieren und hier einfügen. Das Ablaufdatum oben eintragen – AOS erinnert dich zwei Wochen vorher.</li></ol>'+'</details>'+
     '');
 }
 ACT.ghOpen = ()=>{ ui.view='profil'; location.hash='profil'; ui.profOpen=ui.profOpen||{}; ui.profOpen.gh=true; render(); const el=document.getElementById('gh-sec'); if(el) el.scrollIntoView(); };
