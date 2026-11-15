@@ -49,7 +49,6 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | # | Idee | Nutzen | Prio | Aufwand |
 |---|---|---|---|---|
 | E1 | **Kalorienziel automatisch anpassen** nach Gewichtstrend (Spezifikation 4.4), mit Begründung | Weniger Nachrechnen | ⏸ braucht deine Bestätigung von Spezifikation 4.4 und den Gewichtskorridor in nutrition.json | M |
-| E2 | **Barcode per Kamera** (Foto des Strichcodes) für Open Food Facts | Schnelleres Eintragen | ⏸ technisch blockiert: Safari am iPhone liest keine Strichcodes selbst; eine Zusatzbibliothek müsste mitgeliefert werden | M |
 | E3 | **Mahlzeit vom Vortag kopieren** mit einem Tipp | Weniger Tipparbeit | ✅ erledigt | S |
 | E4 | **Supplements**: Wochenübersicht abgehakt / vergessen | Regelmäßigkeit | ✅ erledigt | S |
 | E5 | **Meal-Prep-Plan** (Spezifikation 12) als eigene Ansicht: Mengen für die Woche, direkt in die Einkaufsliste | Planung am Wochenende | ⏸ braucht deine Antwort zu offenem Punkt 7 (Mittagessen pro Woche, Gefrierschrank) | M |
@@ -59,7 +58,6 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | # | Idee | Nutzen | Prio | Aufwand |
 |---|---|---|---|---|
 | U1 | **Wochenstreifen** in der Übersicht schon am Sonntag bzw. vor Blockbeginn für die kommende Woche zeigen (derzeit erscheint er erst, wenn die laufende Woche Einheiten hat) | Woche vorausplanen | ✅ erledigt | S |
-| U2 | **Erinnerungen** (Training, Supplements, Gewicht) über Web-Push; auf dem iPhone ab iOS 16.4 für installierte Web-Apps möglich | Weniger vergessen | ⏸ nicht ohne Server möglich: echte Erinnerungen bei geschlossener App brauchen einen Push-Dienst | L |
 | U3 | **Datumsfeld in der Ernährung** durch eigene Anzeige ersetzen (Wochentag + Datum), damit es überall gleich aussieht | Einheitliches Bild | ✅ erledigt | S |
 | U4 | Begriffe angleichen: „Saisonstart“ (Übersicht, Plan) und „Spiel“ (Profil → Kalender) | Klarheit | ✅ erledigt | S |
 | U5 | **Laptop-Layout** mit zwei Spalten ab großer Breite (z. B. Ernährung: Mahlzeiten links, Abdeckung rechts) | Platz am Laptop nutzen | ✅ erledigt | M |
