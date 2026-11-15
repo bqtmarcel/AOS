@@ -36,7 +36,7 @@ DEMO = """(()=>{
           {id:'A-1',role:'power',prio:1,method:'quality',candidates:['demo_jump'],dose:{'1':[3,'3'],'2':[3,'3'],'3':[3,'3']},rest:[60,90]},
           {id:'A-2',role:'main',prio:1,method:'rpe_linear',candidates:['demo_squat'],dose,rest:[120,150],rpe:'≤ 8'}]},
         {id:'B',name:'Oberkörper',group:'upper',time_min:45,goal:'Demo',slots:[
-          {id:'B-1',role:'main',prio:1,method:'rpe_linear',candidates:['demo_bench'],dose,rest:[120,150],rpe:'≤ 8'},
+          {id:'B-1',role:'main',prio:1,method:'wave',candidates:['demo_bench'],dose,rpe_wave:{'1':7,'2':7.5,'3':8},rest:[120,150]},
           {id:'B-2',role:'main',prio:1,method:'bodyweight_reps',candidates:['demo_pullup'],dose,rest:[90,90]}]} ]}] };
   refSet(P, X, new Date().toISOString(), {nut:null,food:null,recipes:null});
 })()"""

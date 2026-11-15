@@ -1659,7 +1659,12 @@ const roundDown=(x,inc)=>Math.floor(x/inc+1e-9)*inc;
 const START_EST={ ssb_squat:['high_bar_squat',0.85], hang_power_clean:['high_bar_squat',0.45], trap_bar_shrug:['trap_bar_deadlift',1.0],
   landmine_push_press:['bench_press',0.35], bulgarian_split_squat:['high_bar_squat',0.16], high_step_up:['high_bar_squat',0.14], db_row:['bench_press',0.40],
   db_overhead_press:['bench_press',0.28], farmer_carry:['trap_bar_deadlift',0.35], prone_ytw:['bench_press',0.03], db_lateral_raise:['bench_press',0.12],
-  dead_bug:['bench_press',0.12], trap_bar_speed_pull:['trap_bar_deadlift',0.65], bench_press:['high_bar_squat',0.65], high_bar_squat:['trap_bar_deadlift',0.85], trap_bar_deadlift:['high_bar_squat',1.15] };
+  dead_bug:['bench_press',0.12], trap_bar_speed_pull:['trap_bar_deadlift',0.65],
+  front_squat:['high_bar_squat',0.75], walking_lunge:['high_bar_squat',0.14], reverse_lunge:['high_bar_squat',0.14], lateral_lunge:['high_bar_squat',0.12],
+  db_single_leg_rdl:['trap_bar_deadlift',0.16], romanian_deadlift:['trap_bar_deadlift',0.55], pendlay_row:['bench_press',0.7], chest_supported_db_row:['bench_press',0.3],
+  suitcase_carry:['trap_bar_deadlift',0.3], farmer_hold:['trap_bar_deadlift',0.35], db_reverse_fly:['bench_press',0.06], db_shrug:['trap_bar_deadlift',0.3],
+  trap_bar_jump:['trap_bar_deadlift',0.25], bb_push_press:['bench_press',0.6], db_push_press_single_arm:['bench_press',0.25], landmine_press:['bench_press',0.3],
+  landmine_rotation:['bench_press',0.2], incline_db_press:['bench_press',0.3], neck_plate_isometric:['bench_press',0.07], bench_press:['high_bar_squat',0.65], high_bar_squat:['trap_bar_deadlift',0.85], trap_bar_deadlift:['high_bar_squat',1.15] };
 const perHand=id=>{ const e=REF.exMap[id]; return !!(e && (e.equipment||[]).includes('dumbbell') && !(e.equipment||[]).includes('barbell')); };
 function plStartEst(exId, block, date){ const r=START_EST[exId]; if(!r) return null; const [ref,f]=r;
   let base=(block.start_loads||{})[ref];
@@ -1667,13 +1672,30 @@ function plStartEst(exId, block, date){ const r=START_EST[exId]; if(!r) return n
   if(base==null) return null; const inc=plInc(exId); const kg=Math.max(inc, roundDown(base*f, inc));
   return { kg, ref:(REF.exMap[ref]||{}).name_de||ref }; }
 
+/* e1RM (Spezifikation 6.4): RPE-Tabelle über Wdh + Wdh in Reserve. Es zählt der höchste Wert der letzten 3 Einheiten, nur Sätze mit RPE ≥ 6. */
+const RPE_PCT=[1,0.955,0.922,0.892,0.863,0.837,0.811,0.786,0.762,0.739,0.707,0.68,0.653,0.626,0.6];
+function pctRM(reps, rpe){ const eff=Math.max(1, reps+(10-rpe)); const i=Math.floor(eff)-1, f=eff-Math.floor(eff);
+  const a=RPE_PCT[Math.min(i,RPE_PCT.length-1)], b=RPE_PCT[Math.min(i+1,RPE_PCT.length-1)]; return a+(b-a)*f; }
+function plE1RM(exId, beforeDate){ const H=plHistory(exId, beforeDate).slice(0,3); let best=null;
+  H.forEach(h=>workSets(h.le).forEach(x=>{ if(x.kg==null||x.reps==null||x.rpe==null||x.rpe<6||x.reps<1||x.reps>12) return;
+    const e=x.kg/pctRM(x.reps,x.rpe); if(!best||e>best.kg) best={ kg:e, date:h.date, set:x }; }));
+  return best; }
+
 /* Last für einen Slot (Spezifikation 3.4, 6.3) */
 function plLoad(slot, exId, ctx){
   const out={ kg:null, text:'', reasons:[], suggest:null, calibrate:false, decrease:false };
   const m=slot.method, inc=plInc(exId), cap=ctx.cap;
-  const weighted=['rpe_linear','velocity','double','load_distance','load_time','reps_load'].includes(m);
+  const weighted=['rpe_linear','wave','velocity','double','load_distance','load_time','reps_load'].includes(m);
   if(!weighted){ out.text='Körpergewicht'; return out; }
   const H=plHistory(exId, ctx.date); const last=H[0]; const dec=lastDecision(exId);
+  // Wochenwelle: Last aus e1RM und Ziel-RPE der Woche (6.4)
+  if(m==='wave' && ctx.reps!=null){ const e=plE1RM(exId, ctx.date); const trpe=(slot.rpe_wave||{})[ctx.week]!=null ? slot.rpe_wave[ctx.week] : cap;
+    if(e && trpe!=null){ let kg=roundDown(e.kg*pctRM(ctx.reps, trpe), inc); const lastTop=last?topKg(last.le):null;
+      out.reasons.push('Wochenwelle: '+ctx.reps+' Wdh @ RPE '+fmtNum(trpe)+' ≈ '+Math.round(pctRM(ctx.reps,trpe)*100)+' % vom geschätzten 1RM '+fmtNum(Math.round(e.kg*2)/2)+' kg ('+fmtDate(e.date)+': '+fmtNum(e.set.kg)+' kg × '+e.set.reps+' @'+fmtNum(e.set.rpe)+').');
+      if(ctx.noIncrease && lastTop!=null && kg>lastTop){ kg=lastTop; out.reasons.push('Heute keine höhere Last als zuletzt ('+ctx.noIncrease+').'); }
+      out.kg=kg;
+      if(ctx.readiness===2 && slot.role==='main'){ const k=roundDown(kg*0.95, inc); if(k<kg){ out.kg=k; out.decrease=true; out.reasons.push('Readiness 2 → Hauptlast ca. −5 %.'); } }
+      return out; } }
   let base=null;
   if(last && topKg(last.le)!=null){ base=topKg(last.le); out.reasons.push('Letzte Einheit '+fmtDate(last.date)+': '+setsTxt(last.le)+'.'); }
   // Eine Bestätigung zählt nur, wenn sie nach dem letzten Protokoll dieser Übung erfolgt ist (Zeitpunkt, nicht nur Datum)
@@ -1796,7 +1818,7 @@ function plBuild(inp){
     if(ex.id!==slot.candidates[0]) reasons.push('Ersatz für '+(REF.exMap[slot.candidates[0]]?REF.exMap[slot.candidates[0]].name_de:slot.candidates[0])+(skipWhy.length?' ('+skipWhy.join('; ')+')':' (im Block bisher so gemacht)')+'.');
     let sets=d[0], reps=d[1];
     if(slot.from) reasons.unshift('Aus '+slot.from+' übernommen (diese Woche weniger Einheiten).');
-    const x={ slot, from:slot.from||null, slotId:slot.id, dbId:ex.id, ex, role:slot.role, method:slot.method, sets, reps, rest:slot.rest||[60,90], rpe:slot.rpe||'', reasons, note:slot.note||'', alternatives: filt.filter(e=>e.id!==ex.id).map(e=>e.name_de) };
+    const x={ slot, from:slot.from||null, slotId:slot.id, dbId:ex.id, ex, role:slot.role, method:slot.method, sets, reps, rest:slot.rest||[60,90], rpe:((slot.rpe_wave||{})[week]!=null ? fmtNum(slot.rpe_wave[week]) : (slot.rpe||'')), reasons, note:slot.note||'', alternatives: filt.filter(e=>e.id!==ex.id).map(e=>e.name_de) };
     // Readiness (7)
     if(fieldToday){ const lim = x.role==='main' ? 4 : 2;
       if(['power','assistance','main'].includes(x.role) && x.sets>=lim){ x.sets--; reasons.push('Abends Feldtraining → 1 Satz weniger.'); } }
@@ -1804,7 +1826,7 @@ function plBuild(inp){
     if(rd!=null && rd<=2 && x.role==='power'){ const n=Math.max(1, Math.round(x.sets*0.75)); if(n<x.sets){ reasons.push('Readiness '+rd+' → Power-Volumen ca. −25 % ('+x.sets+' → '+n+' Sätze).'); x.sets=n; } }
     if(slot.grip && inp.grip && x.sets>1){ x.sets--; reasons.push('Griff ermüdet → 1 Satz weniger.'); }
     // Last
-    const L=plLoad(slot, ex.id, { date:inp.date, cap, block:b, readiness:rd, noIncrease });
+    const L=plLoad(slot, ex.id, { date:inp.date, cap, block:b, readiness:rd, noIncrease, week, reps:repMin(String(reps)) });
     x.load=L; x.loadKg=L.kg; L.reasons.forEach(r=>reasons.push(r));
     if(L.suggest){ x.loadKg=L.suggest.kg; x.increased=true; if(L.suggest.resetReps) x.reps=String(x.reps).replace(/^\d+(–\d+)?/, String(L.suggest.resetReps));
       reasons.push('Steigerung auf '+fmtNum(L.suggest.kg)+' kg (+'+fmtNum(L.suggest.kg-L.kg)+')'+(/deutlich leichter/.test(L.suggest.basis)?' – letzte Einheit deutlich leichter als geplant, doppelter Schritt':' – Vorgabe letztes Mal sauber geschafft')+'.'); }
@@ -2322,7 +2344,8 @@ const METHOD_LABEL={ rpe_linear:'RPE-gesteuert linear', wave:'Wochenwelle', doub
   contacts:'Bodenkontakte', quality:'Qualität', reps_rom:'Wdh/Bewegungsumfang', reps_load:'Wdh/Last', load_distance:'Last/Strecke', load_time:'Last/Zeit', time:'Zeit' };
 function plCurrentLoad(slot, exId, b){
   const e=REF.exMap[exId]; const H=plHistory(exId); const dec=lastDecision(exId);
-  if(!['rpe_linear','velocity','double','load_distance','load_time','reps_load'].includes(slot.method)) return 'Körpergewicht';
+  if(slot.method==='wave'){ const x=plE1RM(exId); if(x) return 'nach Welle · 1RM ≈ '+fmtNum(Math.round(x.kg*2)/2)+' kg'; }
+  if(!['rpe_linear','wave','velocity','double','load_distance','load_time','reps_load'].includes(slot.method)) return 'Körpergewicht';
   const last=H[0]; const lastAt=last?((last.s.log&&last.s.log.loggedAt)||last.date):'';
   if(dec && (!last || dec.at>lastAt)) return fmtNum(dec.kg)+' kg (bestätigt)';
   if(last && topKg(last.le)!=null) return fmtNum(topKg(last.le))+' kg ('+fmtDateShort(last.date)+')';
@@ -2381,7 +2404,7 @@ function viewPlan(){
     t.slots.forEach(s=>{ const ex=REF.exMap[s.candidates[0]]; const alt=s.candidates.slice(1).map(id=>(REF.exMap[id]||{}).name_de||id);
       tb+='<tr><td><strong>'+esc(ex?ex.name_de:s.candidates[0])+'</strong> '+(s.prio===1?badge('Kern','ok')+' ':'')+badge(ROLE_LABEL[s.role]||s.role, s.role==='main'?'ok':(s.role==='power'?'info':''))+
         (alt.length?'<br><span class="muted">Ersatz: '+esc(alt.join(' / '))+'</span>':'')+'<br><span class="muted">'+esc(METHOD_LABEL[s.method]||s.method)+(s.range?' '+s.range[0]+'–'+s.range[1]:'')+' · Pause '+s.rest[0]+(s.rest[1]!==s.rest[0]?'–'+s.rest[1]:'')+' s'+(s.rpe?' · RPE '+esc(s.rpe):'')+'</span></td>'+
-        weeks.map(w=>{ const d=(s.dose||{})[w]; return '<td>'+(d?d[0]+'×'+esc(d[1]):'–')+'</td>'; }).join('')+
+        weeks.map(w=>{ const d=(s.dose||{})[w]; const rw=(s.rpe_wave||{})[w]; return '<td>'+(d?d[0]+'×'+esc(d[1])+(rw!=null?' @'+fmtNum(rw):''):'–')+'</td>'; }).join('')+
         '<td>'+esc(plCurrentLoad(s, s.candidates[0], b))+'</td></tr>'; });
     h+=pdet('tpl-'+t.id, t.id+' – '+t.name, (t.group==='lower'?'Unterkörper':'Oberkörper')+' · ca. '+t.time_min+' min', tb+'</tbody></table></div>');
   });
