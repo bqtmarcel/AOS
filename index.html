@@ -254,6 +254,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--sig)}
 .weekstrip .day.today .wd{color:var(--text)}
 .badge.ok{color:var(--text);border-color:rgba(246,1,0,.55)}
 .chart .ln{stroke:var(--sig)} .chart .pt{fill:var(--sig)}
+.chart .ln-raw{stroke:var(--muted);stroke-width:1;opacity:.5}.chart .pt-raw{fill:var(--muted)}.chart .ln-trend{stroke-width:2.5}
 
 .sysbar{display:flex;gap:10px;font-size:.66rem;letter-spacing:.04em;color:var(--muted);white-space:nowrap}
 .sysbar b{color:var(--text);font-weight:500}
@@ -1213,8 +1214,11 @@ function lineChart(points, opts){
   let s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(opts.label||'Verlauf')+'">';
   for(let i=0;i<=3;i++){ const v=y0+(y1-y0)*i/3; s+='<line class="gl" x1="'+P.l+'" x2="'+(W-P.r)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text x="'+(P.l-6)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+fmtNum(Math.round(v*10)/10)+'</text>'; }
   if(opts.goal!=null) s+='<line class="goal" x1="'+P.l+'" x2="'+(W-P.r)+'" y1="'+Y(opts.goal)+'" y2="'+Y(opts.goal)+'"/><text x="'+(W-P.r)+'" y="'+(Y(opts.goal)-5)+'" text-anchor="end">Ziel '+fmtNum(opts.goal)+'</text>';
-  s+='<polyline class="ln" points="'+points.map((p,i)=>X(xs[i])+','+Y(p.y)).join(' ')+'"/>';
-  points.forEach((p,i)=>{ s+='<circle class="pt" cx="'+X(xs[i])+'" cy="'+Y(p.y)+'" r="4"><title>'+fmtDate(p.x)+': '+fmtNum(p.y)+(opts.unit?' '+opts.unit:'')+'</title></circle>'; });
+  if(opts.trend){ const av=points.map((p,i)=>{ const w=points.filter((q,j)=>xs[j]<=xs[i] && xs[j]>xs[i]-7*864e5); return w.reduce((a,q)=>a+q.y,0)/w.length; });
+    s+='<polyline class="ln ln-raw" points="'+points.map((p,i)=>X(xs[i])+','+Y(p.y)).join(' ')+'"/>';
+    s+='<polyline class="ln ln-trend" points="'+av.map((v,i)=>X(xs[i])+','+Y(v)).join(' ')+'"/>'; }
+  else s+='<polyline class="ln" points="'+points.map((p,i)=>X(xs[i])+','+Y(p.y)).join(' ')+'"/>';
+  points.forEach((p,i)=>{ s+='<circle class="pt'+(opts.trend?' pt-raw':'')+'" cx="'+X(xs[i])+'" cy="'+Y(p.y)+'" r="4"><title>'+fmtDate(p.x)+': '+fmtNum(p.y)+(opts.unit?' '+opts.unit:'')+'</title></circle>'; });
   s+='<text x="'+P.l+'" y="'+(H-8)+'">'+fmtDate(points[0].x)+'</text><text x="'+(W-P.r)+'" y="'+(H-8)+'" text-anchor="end">'+fmtDate(points[points.length-1].x)+'</text></svg>';
   return s;
 }
@@ -1230,7 +1234,7 @@ function viewTests(){
     '</tbody></table></div><p class="small muted">Belastung = Anstrengung × Minuten (Session-RPE). Hilft, harte Wochen zu erkennen.</p>');
   const pts=bws.filter(x=>x.date&&x.kg!=null).map(x=>({x:x.date,y:x.kg}));
   const lastBw=bws.filter(x=>x.kg!=null).slice(-1)[0];
-  let bwb= pts.length>=2 ? lineChart(pts,{unit:'kg',goal:goalW,label:'Körpergewicht'}) : '<p class="small muted">Für ein Diagramm werden mindestens zwei Messungen mit Datum benötigt.</p>';
+  let bwb= pts.length>=2 ? lineChart(pts,{unit:'kg',goal:goalW,label:'Körpergewicht',trend:true})+'<p class="small muted" style="margin-top:4px">Linie: 7-Tage-Schnitt · Punkte: einzelne Messungen</p>' : '<p class="small muted">Für ein Diagramm werden mindestens zwei Messungen mit Datum benötigt.</p>';
   bwb+='<details><summary class="small">Alle Messungen ('+bws.length+')</summary><div class="table-wrap"><table><thead><tr><th>Datum</th><th>Gewicht</th><th>Notiz</th><th></th></tr></thead><tbody>'+
     bws.slice().reverse().map(x=>'<tr><td>'+(x.date?fmtDate(x.date):badge('Datum fehlt','warn'))+'</td><td>'+(x.approx?'≈ ':'')+fmtNum(x.kg)+' kg</td><td>'+esc(x.note)+' '+srcBadge(x)+'</td><td><button class="small" data-act="editBw" data-id="'+x.id+'">Bearbeiten</button></td></tr>').join('')+'</tbody></table></div></details>';
   h+=pdet('v-bw','Körpergewicht',lastBw?(lastBw.approx?'≈ ':'')+fmtNum(lastBw.kg)+' kg'+(lastBw.date?' · '+fmtDateShort(lastBw.date):''):'noch keine Messung',bwb);

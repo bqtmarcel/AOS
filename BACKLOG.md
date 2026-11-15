@@ -38,7 +38,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 |---|---|---|---|---|
 | V1 | **Geschätztes 1RM (e1RM)** je Hauptübung als Verlauf, klar als Schätzung gekennzeichnet | Fortschritt trotz wechselnder Wdh sichtbar | P2 | M |
 | V2 | **Wochenbelastung**: Gym-Volumen und Feld-Belastung (Session-RPE) gemeinsam als Wochenbalken, Warnung bei starkem Anstieg | Verletzungsrisiko senken | P2 | M |
-| V3 | **Körpergewicht als 7-Tage-Schnitt** im Diagramm statt nur Einzelwerte | Ruhigeres, ehrlicheres Bild | P2 | S |
+| V3 | **Körpergewicht als 7-Tage-Schnitt** im Diagramm statt nur Einzelwerte | Ruhigeres, ehrlicheres Bild | ✅ erledigt | S |
 | V4 | **Ziele mit Fortschrittsbalken** (aktuell / Ziel) statt nur Tabelle | Motivation | P3 | S |
 | V5 | **Readiness-Verlauf** (Tagesform, Beschwerden) als kleine Kurve | Muster erkennen | P3 | S |
 
