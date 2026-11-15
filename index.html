@@ -1539,7 +1539,25 @@ const AP_PROFILE={
     main:{V30:[3,2,7.5],V50:[2,2,7.5]}, hinge:{V30:[2,2,7.5],V50:[1,2,7.5]},
     pull:{V30:[2,'5'],V50:[2,'4']}, oly:[3,'2'], jump:[2,'3'], goal:'Frische zum Saisonstart' }
 };
-const AP_WAVE_LABEL={ E:'Einstieg', A:'Aufbau', A2:'Aufbau schwer', H:'höchste Belastung + Top-Sets', D:'Entlastung', DT:'Entlastung + Tests', V30:'Volumen −30 %', V50:'Spielwoche: Volumen −50 %' };
+AP_PROFILE.IN={ name:'In-Season', cap:7.5, contacts:[20,40], assist:[2,'5–6',[5,6]], powRpe:'≤ 6',
+  main:{M:[2,3,7.5],B:[3,3,7.5]}, hinge:{M:[2,3,7.5],B:[2,3,7.5]}, pull:{M:[2,'5'],B:[3,'5']}, oly:[3,'2'], jump:[2,'3'], goal:'Kraft und Schnelligkeit erhalten, frisch zum Spiel' };
+const AP_SLOTS_IN={
+  IN1:{ name:'Kraft erhalten', group:'full', time:45, slots:[
+    { k:'jumpH', role:'power', prio:2, rot:false, pool:['broad_jump','countermovement_jump'] },
+    { k:'squat', role:'main', prio:1, main:'main', pool:['high_bar_squat','ssb_squat'] },
+    { k:'bench', role:'main', prio:1, main:'main', pool:['bench_press'] },
+    { k:'hinge', role:'main', prio:2, main:'hinge', pool:['trap_bar_deadlift'] },
+    { k:'pull', role:'main', prio:1, main:'pull', pool:['pull_up','chin_up'] },
+    { k:'ham', role:'assistance', prio:3, rot:false, pool:['nordic_hamstring','db_single_leg_rdl'] } ] },
+  IN2:{ name:'Power erhalten', group:'full', time:40, slots:[
+    { k:'oly', role:'power', prio:1, rot:false, pool:['hang_power_clean','hang_power_clean_bk'] },
+    { k:'lateral', role:'power', prio:2, rot:false, pool:['lateral_bound','countermovement_jump'] },
+    { k:'press', role:'power', prio:1, rot:false, pool:['landmine_push_press','db_push_press_single_arm'] },
+    { k:'row', role:'assistance', prio:2, rot:false, pool:['db_row','chest_supported_db_row'] },
+    { k:'add', role:'assistance', prio:2, rot:false, pool:['copenhagen_plank'] },
+    { k:'prehab', role:'optional', prio:3, rot:false, pool:['neck_plate_isometric','db_lateral_raise'] } ] }
+};
+const AP_WAVE_LABEL={ M:'Saison: Kraft erhalten', B:'spielfreie Woche',  E:'Einstieg', A:'Aufbau', A2:'Aufbau schwer', H:'höchste Belastung + Top-Sets', D:'Entlastung', DT:'Entlastung + Tests', V30:'Volumen −30 %', V50:'Spielwoche: Volumen −50 %' };
 /* Übungspools je Slot; je Phase eigene Reihenfolge für Power und Sprünge. Wahl: erste passende, zulässige Übung ohne Maschine. */
 const AP_SLOTS={
   D1:{ name:'Lower Force + Acceleration', group:'lower', time:60, slots:[
@@ -1574,6 +1592,7 @@ const AP_SLOTS={
     { k:'prehab', role:'optional', prio:3, pool:['db_lateral_raise','neck_plate_isometric','db_hammer_curl'] } ] }
 };
 function apWeekTypes(phaseId, start, weeks){
+  if(phaseId==='IN'){ const g=apGames(); return Array.from({length:weeks},(_,w)=>{ const m=addDays(start,w*7); return g.some(d=>d>=m&&d<=addDays(m,6))?'M':'B'; }); }
   if(phaseId==='P5') return weeks>=2 ? Array(weeks-1).fill('V30').concat(['V50']) : ['V50'];
   if(weeks<=1) return ['H']; if(weeks===2) return ['A','H']; if(weeks===3) return ['E','A','H'];
   let xmas=-1; for(let w=0;w<weeks;w++){ const m=addDays(start,w*7); const y=m.slice(0,4); if(m<=y+'-12-24' && addDays(m,6)>=y+'-12-24') xmas=w; }
@@ -1629,8 +1648,9 @@ function apEmphasis(start){ if(typeof S==='undefined'||!S) return null;
 function apBuildBlock(phase, prev){
   const P=AP_PROFILE[phase.id]; if(!P || !REF.exMap) return null;
   const weeks=Math.max(1, Math.round((daysBetween(phase.start, phase.end)+1)/7));
-  const types=apWeekTypes(phase.id, phase.start, weeks); const prevUsed=apUsedIn(prev); const taken=new Set(); const emph=apEmphasis(phase.start);
-  const templates=Object.entries(AP_SLOTS).map(([tid,T])=>{
+  const types=apWeekTypes(phase.id, phase.start, weeks); const prevUsed=apUsedIn(prev); const taken=new Set(); const emph=phase.id==='IN'?null:apEmphasis(phase.start);
+  const SL=phase.id==='IN'?AP_SLOTS_IN:AP_SLOTS;
+  const templates=Object.entries(SL).map(([tid,T])=>{
     const slots=[];
     T.slots.forEach((spec,i)=>{ if((spec.skip||[]).includes(phase.id)) return;
       const c=apPick(spec, phase.id, prevUsed, taken); if(!c) return; taken.add(c[0]);
@@ -1648,7 +1668,7 @@ function apBuildBlock(phase, prev){
       const tw=types.findIndex(t=>t==='H'||t==='DT')+1; slots.unshift({ id:'D1-0', role:'power', prio:1, method:'quality', candidates:['broad_jump'], dose:{[tw]:[1,'3']}, rest:[60,90], note:'Standortbestimmung: 3 Versuche nach dem Aufwärmen, beste Weite notieren.' }); }
     return { id:tid, name:T.name, group:T.group, time_min:T.time, goal:P.goal, slots };
   });
-  const ps=prev&&prev.week_schedule; const sched=(ps && Object.values(ps).every(t=>AP_SLOTS[t])) ? ps : { MON:'D1', WED:'D2', THU:'D3', FRI:'D4' };
+  const ps=prev&&prev.week_schedule; const sched=phase.id==='IN' ? { TUE:'IN1', THU:'IN2' } : (ps && Object.values(ps).every(t=>AP_SLOTS[t])) ? ps : { MON:'D1', WED:'D2', THU:'D3', FRI:'D4' };
   const week_wave={}, week_notes={}, week_overrides={};
   types.forEach((t,w)=>{ week_wave[w+1]=AP_WAVE_LABEL[t]; });
   week_notes[1]=['Automatisch geplant von AOS: '+P.goal+'. Hauptübungen bleiben, Ergänzungen und Power wechseln. Lasten berechnet AOS aus deinen Protokollen (geschätztes 1RM und Ziel-RPE der Woche).'];
@@ -1660,11 +1680,32 @@ function apBuildBlock(phase, prev){
   if(phase.id==='P5' && game){ const lw=weeks; const mon=addDays(phase.start,(lw-1)*7);
     if(game>=mon && game<=addDays(mon,6)){ const order=['MON','TUE','WED','THU','FRI','SAT','SUN']; const s2={}; Object.entries(sched).forEach(([d,t])=>{ const dt=addDays(mon,order.indexOf(d)); if(daysBetween(dt,game)>=4) s2[d]=t; });
       const kept=Object.values(s2); week_overrides[lw]={ schedule:s2, skipped:Object.keys(AP_SLOTS).filter(t=>!kept.includes(t)), note:'Spielwoche: letzte Einheit spätestens 4 Tage vor dem Spiel, danach frei.' }; } }
+  // Saison: Spielwochen 1 Einheit (Kraft) mindestens 4 Tage vor dem Spiel, spielfreie Wochen 2 Einheiten (2.3 In-Season)
+  if(phase.id==='IN'){ const games=apGames(); const order=['MON','TUE','WED','THU','FRI','SAT','SUN'];
+    for(let w=1; w<=weeks; w++){ const mon=addDays(phase.start,(w-1)*7); const g=games.find(d=>d>=mon && d<=addDays(mon,6));
+      const prevG=games.filter(d=>d<mon).slice(-1)[0];
+      if(g){ let day=addDays(g,-4); if(day<mon) day=null;
+        if(day && prevG && daysBetween(prevG,day)<2) day=addDays(prevG,2)<=addDays(g,-4)?addDays(prevG,2):null;
+        week_overrides[w]= day ? { schedule:{ [order[(weekdayOf(day)+6)%7]]:'IN1' }, skipped:['IN2'], note:'Spielwoche ('+WD[weekdayOf(g)]+' '+fmtDate(g).slice(0,6)+'): eine Kraft-Einheit mindestens 4 Tage vorher, danach frei.' }
+                               : { schedule:{}, skipped:['IN1','IN2'], note:'Spielwoche: kein Gym (zu nah am Spiel).' };
+        week_wave[w]='Spielwoche '+WD[weekdayOf(g)]+' '+fmtDate(g).slice(0,6); }
+      else { week_wave[w]=AP_WAVE_LABEL.B; }
+    } }
   return { id:'AUTO-'+phase.id, auto:true, name:'Block '+phase.id.slice(1)+' – '+P.name, phase:phase.id, start:phase.start, weeks, rpe_cap:[P.cap,P.cap], status:'automatisch',
-    week_wave, week_schedule:sched, week_overrides, session_order:Object.keys(AP_SLOTS), limits:{ contacts_per_session:P.contacts, sprint_m_per_session:[0,0] }, week_notes, start_loads:{}, templates };
+    week_wave, week_schedule:sched, week_overrides, session_order:Object.keys(SL), limits:{ contacts_per_session:P.contacts, sprint_m_per_session:[0,0] }, week_notes, start_loads:{}, templates };
+}
+function apGames(){ return (typeof S!=='undefined'&&S ? (S.calendar||[]) : []).filter(e=>e.kind==='game'&&e.date).map(e=>e.date).sort(); }
+/* Saison-Phase (In-Season) direkt nach der letzten Phase bis zur Woche des letzten Spiels im Kalender (sonst 12 Wochen) */
+function apInSeason(plan){
+  plan.phases=plan.phases.filter(p=>!p.auto); if(plan.phases.some(p=>p.id==='IN')) return;
+  const last=plan.phases.slice().sort((a,b)=>a.end<b.end?-1:1).slice(-1)[0]; if(!last) return;
+  const start=addDays(last.end,1); const games=apGames().filter(d=>d>=start);
+  let end = games.length ? addDays(mondayOf(games[games.length-1]),6) : addDays(start, 12*7-1);
+  if(daysBetween(start,end)<27) end=addDays(start,27);
+  plan.phases.push({ id:'IN', name:'In-Season', start, end, rpe_cap:[7.5,7.5], auto:true });
 }
 function apGenerate(plan){
-  if(!plan || !plan.phases) return; plan.blocks=(plan.blocks||[]).filter(b=>!b.auto);
+  if(!plan || !plan.phases) return; plan.blocks=(plan.blocks||[]).filter(b=>!b.auto); apInSeason(plan);
   const phases=plan.phases.slice().sort((a,b)=>a.start<b.start?-1:1); let prev=null;
   phases.forEach(ph=>{ const own=plan.blocks.find(b=>b.phase===ph.id); if(own){ prev=own; return; }
     const b=apBuildBlock(ph, prev); if(b){ plan.blocks.push(b); prev=b; } });
