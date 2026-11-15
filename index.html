@@ -374,6 +374,8 @@ body::before{content:'';position:fixed;z-index:-1;pointer-events:none;right:-22v
 body:has(#rest-bar) main{padding-bottom:calc(190px + env(safe-area-inset-bottom))!important}
 @media (min-width:761px){#rest-bar{left:50%;right:auto;transform:translateX(-50%);bottom:24px;width:min(560px,90vw)}}
 .plates{font-size:.78rem;color:var(--muted);margin:2px 0 0;font-variant-numeric:tabular-nums}
+.chart .bar-gym{fill:var(--sig)}.chart .bar-field{fill:#9aa0a8}
+.lg{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 6px;vertical-align:-1px}.lg-gym{background:var(--sig)}.lg-field{background:#9aa0a8}
 .last-perf{font-size:.8rem;color:var(--muted);margin:2px 0 8px}.last-perf strong{color:var(--text);font-weight:600}
 .pdet-b>.table-wrap:last-child,.pdet-b>details:last-child{margin-bottom:2px}
 .meal{padding-top:12px;padding-bottom:12px}
@@ -1240,6 +1242,7 @@ function viewTests(){
   if(fls.length) h+=pdet('v-field','Feldtraining',fls.length===1?'1 Einheit':fls.length+' Einheiten','<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Anstrengung</th><th>Kontakt</th><th>Belastung</th></tr></thead><tbody>'+
     fls.slice(0,12).map(l=>'<tr><td><button class="link" data-act="fieldLog" data-d="'+l.date+'">'+fmtDateShort(l.date)+'</button></td><td>'+(l.status==='ausgefallen'?'fand nicht statt':l.rpe+'/10')+'</td><td>'+esc(l.contact||'—')+'</td><td>'+(l.rpe&&l.durationMin?(l.rpe*l.durationMin)+' AU':'—')+'</td></tr>').join('')+
     '</tbody></table></div><p class="small muted">Belastung = Anstrengung × Minuten (Session-RPE). Hilft, harte Wochen zu erkennen.</p>');
+  h+=loadSection();
   const pts=bws.filter(x=>x.date&&x.kg!=null).map(x=>({x:x.date,y:x.kg}));
   const lastBw=bws.filter(x=>x.kg!=null).slice(-1)[0];
   let bwb= pts.length>=2 ? lineChart(pts,{unit:'kg',goal:goalW,label:'Körpergewicht',trend:true})+'<p class="small muted" style="margin-top:4px">Linie: 7-Tage-Schnitt · Punkte: einzelne Messungen</p>' : '<p class="small muted">Für ein Diagramm werden mindestens zwei Messungen mit Datum benötigt.</p>';
@@ -1260,6 +1263,33 @@ function viewTests(){
   const nLog=loggedSessions().length;
   h+=pdet('v-prog','Verlauf aus Trainingsprotokollen',nLog===1?'1 Einheit':nLog+' Einheiten',trainingProgress());
   return h;
+}
+/* Wochenbelastung (Session-RPE × Minuten, „AU“): Gym aus den Protokollen (Ø RPE der Sätze × Dauer), Feld aus dem Feldprotokoll.
+   Einheiten ohne Dauer oder RPE werden nicht geschätzt, sondern weggelassen und gezählt. */
+function weeklyLoad(weeks){
+  const mon=mondayOf(todayISO()); const W=[]; for(let i=weeks-1;i>=0;i--) W.push({mon:addDays(mon,-7*i), gym:0, field:0, miss:0});
+  const at=d=>W.find(w=>d>=w.mon && d<=addDays(w.mon,6));
+  loggedSessions().forEach(s=>{ const w=at(sessionDate(s)); if(!w) return; const rp=[]; s.log.exercises.forEach(e=>e.sets.forEach(x=>{ if(x.rpe!=null) rp.push(x.rpe); }));
+    if(s.log.durationMin && rp.length) w.gym+=Math.round(s.log.durationMin*rp.reduce((a,b)=>a+b,0)/rp.length); else w.miss++; });
+  (S.fieldLogs||[]).forEach(l=>{ const w=at(l.date); if(!w||l.status==='ausgefallen') return; if(l.rpe&&l.durationMin) w.field+=l.rpe*l.durationMin; else w.miss++; });
+  return W;
+}
+function loadSection(){
+  const W=weeklyLoad(8); const tot=w=>w.gym+w.field; if(!W.some(w=>tot(w)>0)) return '';
+  const max=Math.max(...W.map(tot)); const cur=W[W.length-1], prev=W.slice(-4,-1).filter(w=>tot(w)>0);
+  const avg=prev.length?prev.reduce((a,w)=>a+tot(w),0)/prev.length:0; const ratio=avg?tot(cur)/avg:null;
+  const Wd=640,H=170,P={l:8,r:8,t:10,b:24}; const bw=(Wd-P.l-P.r)/W.length;
+  let svg='<svg class="chart" viewBox="0 0 '+Wd+' '+H+'" role="img" aria-label="Wochenbelastung">';
+  W.forEach((w,i)=>{ const x=P.l+i*bw+bw*0.18, wd=bw*0.64, sc=v=>v/max*(H-P.t-P.b); const g=sc(w.gym), f=sc(w.field); const y0=H-P.b;
+    if(w.gym) svg+='<rect class="bar-gym" x="'+x+'" y="'+(y0-g)+'" width="'+wd+'" height="'+g+'"><title>Gym '+w.gym+' AU</title></rect>';
+    if(w.field) svg+='<rect class="bar-field" x="'+x+'" y="'+(y0-g-f)+'" width="'+wd+'" height="'+f+'"><title>Feld '+w.field+' AU</title></rect>';
+    svg+='<text x="'+(x+wd/2)+'" y="'+(H-8)+'" text-anchor="middle">'+fmtDate(w.mon).slice(0,6)+'</text>'; });
+  svg+='</svg>';
+  let b=svg+'<p class="small"><span class="lg lg-gym"></span> Gym <span class="lg lg-field"></span> Feld · diese Woche <strong>'+tot(cur)+' AU</strong>'+(avg?' · Schnitt der 3 Wochen davor '+Math.round(avg)+' AU':'')+'</p>';
+  if(ratio!=null && ratio>1.3) b+='<div class="note warn small">Diese Woche liegt die Belastung <strong>'+Math.round((ratio-1)*100)+' %</strong> über dem Schnitt der Vorwochen. Starke Sprünge erhöhen das Verletzungsrisiko – Schlaf, Essen und Erholung im Blick behalten.</div>';
+  const miss=W.reduce((a,w)=>a+w.miss,0); if(miss) b+='<p class="small muted">'+miss+' Einheit'+(miss===1?'':'en')+' ohne Dauer oder RPE nicht enthalten.</p>';
+  b+='<p class="small muted">Belastung = Anstrengung (RPE) × Minuten. Gym: Ø RPE der Sätze × Dauer.</p>';
+  return pdet('v-load','Wochenbelastung','diese Woche '+tot(cur)+' AU'+(ratio!=null&&ratio>1.3?' · stark gestiegen':''), b);
 }
 function testCard(name){
   const list=S.tests.filter(t=>t.name===name).slice().sort((a,b)=>{ if(a.date&&b.date) return a.date<b.date?-1:1; if(a.date) return 1; if(b.date) return -1; return 0; });
