@@ -1492,7 +1492,13 @@ const REF_KEY = 'aos-ref-v1';
 const REF = { plan:null, ex:null, exMap:{}, nut:null, food:null, recipes:null, at:null, error:'', nutError:'', loading:false };
 function refSet(plan, ex, at, more){ REF.plan=plan; REF.ex=ex; REF.at=at; REF.exMap={}; ((ex&&ex.exercises)||[]).forEach(e=>{ REF.exMap[e.id]=e; });
   try{ apGenerate(REF.plan); }catch(e){ console.warn('Automatische Blockplanung fehlgeschlagen', e); }
+  try{ plDropStale(); }catch(e){}
   if(more){ REF.nut=more.nut||null; REF.food=more.food||null; REF.recipes=more.recipes||null; } }
+/* Gespeicherte, noch nicht begonnene Einheiten eines Blocks, den es im Plan nicht mehr gibt (z. B. fester Block → automatisch), verwerfen */
+function plDropStale(){ if(typeof S==='undefined' || !S || !REF.plan || !(REF.plan.blocks||[]).length) return;
+  const ids=new Set(REF.plan.blocks.map(b=>b.id)); const n=S.sessions.length;
+  S.sessions=S.sessions.filter(x=>!(x.status==='geplant' && !x.log && x.planner && x.planner.blockId && !ids.has(x.planner.blockId)));
+  if(S.sessions.length<n) save(true); }
 function refInit(){ try{ const c=JSON.parse(localStorage.getItem(REF_KEY)||'null'); if(c&&c.plan&&c.ex) refSet(c.plan, c.ex, c.at, c); }catch(e){} }
 async function ghRaw(path){
   let res;
@@ -1531,6 +1537,10 @@ async function refLoad(force){
    - Schwerpunkt aus den Zielen: Die Hauptübung, die am weitesten vom Ziel entfernt ist (geschätztes 1RM vor Blockbeginn), bekommt +1 Satz.
    - Lasten ergeben sich zur Laufzeit aus den Protokollen (Wochenwelle über das geschätzte 1RM, 6.4). */
 const AP_PROFILE={
+  P1:{ name:'Foundation', cap:7.5, contacts:[30,50], assist:[3,'6–8',[6,8]], powRpe:'≤ 6',
+    main:{E:[3,5,6.5],A:[3,5,7],H:[3,5,7.5]}, hinge:{E:[3,4,6.5],A:[3,4,7],H:[3,4,7.5]},
+    pull:{E:[4,'4'],A:[4,'5'],H:[4,'5']}, oly:[5,'2'], jump:[3,'3'], goal:'Wiedereinstieg: Technik, Grundkraft und Belastbarkeit',
+    notes:['Wiedereinstieg: Startlasten leitet AOS aus deinen Tests ab (älter als 3 Wochen → 5 % weniger). Liegt der erste Arbeitssatz einer Hauptübung trotzdem über RPE 7,5, die restlichen Sätze ca. 5 % leichter.','Power-Slots am unteren Ende der Spanne halten.'] },
   P2:{ name:'Max Strength', cap:8, contacts:[40,60], assist:[3,'6–8',[6,8]], powRpe:'≤ 7',
     main:{E:[5,5,7],A:[5,4,7.5],A2:[5,3,8],H:[4,3,8],D:[3,4,7]}, hinge:{E:[3,4,7],A:[3,3,7.5],A2:[3,2,8],H:[3,2,8],D:[2,3,7]},
     pull:{E:[4,'5'],A:[5,'5'],A2:[5,'5'],H:[5,'5'],D:[3,'4']}, oly:[5,'2'], jump:[3,'3'], goal:'Maximalkraft' },
@@ -1566,33 +1576,33 @@ const AP_WAVE_LABEL={ M:'Saison: Kraft erhalten', B:'spielfreie Woche',  E:'Eins
 /* Übungspools je Slot; je Phase eigene Reihenfolge für Power und Sprünge. Wahl: erste passende, zulässige Übung ohne Maschine. */
 const AP_SLOTS={
   D1:{ name:'Lower Force + Acceleration', group:'lower', time:60, slots:[
-    { k:'jumpH', role:'power', prio:1, rot:false, pool:{P2:['trap_bar_jump','countermovement_jump'],P3:['trap_bar_jump','single_leg_broad_jump'],P4:['single_leg_broad_jump','broad_jump'],P5:['broad_jump','countermovement_jump']} },
-    { k:'squat', role:'main', prio:1, main:'main', pool:{P2:['high_bar_squat','ssb_squat'],P3:['pause_squat','high_bar_squat'],P4:['box_squat','high_bar_squat'],P5:['high_bar_squat','ssb_squat']} },
-    { k:'hinge', role:'main', prio:1, main:'hinge', pool:{P2:['trap_bar_deadlift'],P3:['conventional_deadlift','trap_bar_deadlift'],P4:['trap_bar_deadlift'],P5:['trap_bar_deadlift']} },
+    { k:'jumpH', role:'power', prio:1, rot:false, pool:{P1:['broad_jump','box_jump'],P2:['trap_bar_jump','countermovement_jump'],P3:['trap_bar_jump','single_leg_broad_jump'],P4:['single_leg_broad_jump','broad_jump'],P5:['broad_jump','countermovement_jump']} },
+    { k:'squat', role:'main', prio:1, main:'main', pool:{P1:['high_bar_squat','ssb_squat'],P2:['high_bar_squat','ssb_squat'],P3:['pause_squat','high_bar_squat'],P4:['box_squat','high_bar_squat'],P5:['high_bar_squat','ssb_squat']} },
+    { k:'hinge', role:'main', prio:1, main:'hinge', pool:{P1:['trap_bar_deadlift'],P2:['trap_bar_deadlift'],P3:['conventional_deadlift','trap_bar_deadlift'],P4:['trap_bar_deadlift'],P5:['trap_bar_deadlift']} },
     { k:'lunge', role:'assistance', prio:2, pool:['bulgarian_split_squat','walking_lunge','reverse_lunge','high_step_up','lateral_lunge'] },
     { k:'ham', role:'assistance', prio:2, pool:['nordic_hamstring','db_single_leg_rdl','romanian_deadlift','back_extension_45'] },
     { k:'core', role:'assistance', prio:3, pool:['dead_bug','bb_rollout','hanging_knee_raise','side_plank'] } ] },
   D2:{ name:'Upper Strength + Contact', group:'upper', time:58, slots:[
     { k:'throw', role:'power', prio:2, pool:['mb_chest_pass','mb_split_stance_punch','explosive_push_up','mb_slam'] },
-    { k:'bench', role:'main', prio:1, main:'main', pool:{P2:['bench_press'],P3:['pause_bench','bench_press'],P4:['bench_press'],P5:['bench_press']} },
-    { k:'pull', role:'main', prio:1, main:'pull', pool:{P2:['pull_up','chin_up'],P3:['chin_up','pull_up'],P4:['pull_up','chin_up'],P5:['pull_up','chin_up']} },
+    { k:'bench', role:'main', prio:1, main:'main', pool:{P1:['bench_press'],P2:['bench_press'],P3:['pause_bench','bench_press'],P4:['bench_press'],P5:['bench_press']} },
+    { k:'pull', role:'main', prio:1, main:'pull', pool:{P1:['pull_up','chin_up'],P2:['pull_up','chin_up'],P3:['chin_up','pull_up'],P4:['pull_up','chin_up'],P5:['pull_up','chin_up']} },
     { k:'row', role:'assistance', prio:2, pool:['db_row','pendlay_row','chest_supported_db_row','inverted_row'] },
     { k:'carry', role:'assistance', prio:3, pool:['farmer_carry','suitcase_carry','kb_front_rack_carry','farmer_hold'] },
     { k:'scap', role:'optional', prio:3, pool:['prone_ytw','db_reverse_fly','band_pull_apart'] } ] },
   D3:{ name:'Lower Power + Unilateral', group:'lower', time:58, slots:[
-    { k:'jumpV', role:'power', prio:2, rot:false, pool:{P2:['split_jump','countermovement_jump'],P3:['pogo_jumps','single_leg_broad_jump'],P4:['depth_jump','box_jump'],P5:['countermovement_jump','pogo_jumps']} },
-    { k:'lateral', role:'power', prio:1, rot:false, pool:{P2:['skater_hop','lateral_bound'],P3:['lateral_bound','skater_hop'],P4:['lateral_bound','skater_hop'],P5:['lateral_bound']} },
-    { k:'oly', role:'power', prio:1, rot:false, pool:{P2:['hang_power_clean','hang_power_clean_bk'],P3:['power_clean','hang_power_clean_bk'],P4:['hang_power_clean_bk','hang_power_clean'],P5:['hang_power_clean','hang_power_clean_bk']} },
+    { k:'jumpV', role:'power', prio:2, rot:false, pool:{P1:['box_jump','countermovement_jump'],P2:['split_jump','countermovement_jump'],P3:['pogo_jumps','single_leg_broad_jump'],P4:['depth_jump','box_jump'],P5:['countermovement_jump','pogo_jumps']} },
+    { k:'lateral', role:'power', prio:1, rot:false, pool:{P1:['lateral_bound','skater_hop'],P2:['skater_hop','lateral_bound'],P3:['lateral_bound','skater_hop'],P4:['lateral_bound','skater_hop'],P5:['lateral_bound']} },
+    { k:'oly', role:'power', prio:1, rot:false, pool:{P1:['hang_power_clean','hang_power_clean_bk'],P2:['hang_power_clean','hang_power_clean_bk'],P3:['power_clean','hang_power_clean_bk'],P4:['hang_power_clean_bk','hang_power_clean'],P5:['hang_power_clean','hang_power_clean_bk']} },
     { k:'squat2', role:'main', prio:3, second:true, var:true, pool:['front_squat','ssb_squat','box_squat','high_bar_squat'], skip:['P5'] },
     { k:'lunge2', role:'assistance', prio:3, pool:['high_step_up','lateral_lunge','reverse_lunge','walking_lunge'] },
     { k:'add', role:'assistance', prio:2, rot:false, pool:['copenhagen_plank'] } ] },
   D4:{ name:'Upper Power + Hand Fight', group:'upper', time:55, slots:[
     { k:'rot', role:'power', prio:2, pool:['mb_rotational_throw','landmine_rotation','mb_slam'] },
     { k:'expl', role:'power', prio:3, pool:['explosive_push_up','mb_slam','mb_chest_pass'], skip:['P5'] },
-    { k:'press', role:'power', prio:1, rot:false, pool:{P2:['bb_push_press','db_push_press_single_arm'],P3:['bb_push_press','landmine_push_press'],P4:['landmine_push_press','db_push_press_single_arm'],P5:['landmine_push_press','db_push_press_single_arm']} },
+    { k:'press', role:'power', prio:1, rot:false, pool:{P1:['landmine_push_press','db_push_press_single_arm'],P2:['bb_push_press','db_push_press_single_arm'],P3:['bb_push_press','landmine_push_press'],P4:['landmine_push_press','db_push_press_single_arm'],P5:['landmine_push_press','db_push_press_single_arm']} },
     { k:'ohp', role:'main', prio:1, second:true, var:true, pool:['db_overhead_press','incline_bb_bench','landmine_press','close_grip_bench','floor_press','incline_db_press'] },
     { k:'pull2', role:'assistance', prio:3, pool:['inverted_row','chin_up','pull_up'] },
-    { k:'olyPull', role:'power', prio:2, rot:false, pull:true, pool:{P2:['clean_pull','hang_high_pull'],P3:['high_pull','hang_high_pull'],P4:['hang_high_pull','high_pull']}, skip:['P5'], grip:true },
+    { k:'olyPull', role:'power', prio:2, rot:false, pull:true, pool:{P2:['clean_pull','hang_high_pull'],P3:['high_pull','hang_high_pull'],P4:['hang_high_pull','high_pull']}, skip:['P1','P5'], grip:true },
     { k:'shrug', role:'assistance', prio:3, pool:['trap_bar_shrug','db_shrug'], grip:true, skip:['P2','P3','P4','P5'] },
     { k:'prehab', role:'optional', prio:3, pool:['db_lateral_raise','neck_plate_isometric','db_hammer_curl'] } ] }
 };
@@ -1625,6 +1635,9 @@ function apSlotDose(spec, ex, P, wt, emph){
   if(spec.main==='main'||spec.main==='hinge'){ const t=(spec.main==='main'?P.main:P.hinge)[wt==='DT'?'D':wt]; let sets=t[0]; if(emph && !D && wt[0]!=='V') sets=Math.min(6,sets+1); return { dose:[sets,String(t[1])], rpe:t[2] }; }
   if(spec.main==='pull'){ const t=P.pull[wt==='DT'?'D':wt]; return { dose:[t[0],t[1]] }; }
   const m=(ex.progression||[])[0];
+  // Wiedereinstieg (P1): Einstiegswoche 1 Satz weniger bei Ergänzung/Power, Nordics nur wenige Wdh
+  if(P===AP_PROFILE.P1 && wt==='E' && !spec.main){ const d=apSlotDose(spec, ex, P, 'A', emph); d.dose=[Math.max(2,d.dose[0]-1), d.dose[1]]; if(m==='reps_rom') d.dose[1]='3'; return d; }
+  if(P===AP_PROFILE.P1 && m==='reps_rom') return { dose:[wt==='H'?3:2,'4'] };
   if(spec.second){ const [s,r]=P.assist; const bar=(ex.progression||[]).includes('wave'); return { dose:[D?Math.max(1,s-1):fit(s), (bar?(P===AP_PROFILE.P2?'5':'4'):r)+S_], rpe:7, range:bar?null:P.assist[2] }; }
   if(ex.pattern==='jump_loaded'){ const [s,r]=P.jump; return { dose:[D?Math.max(1,s-1):fit(s), r], rpe:'≤ 6' }; }
   if(ex.pattern==='olympic' && spec.pull){ return { dose:[D?2:fit(P===AP_PROFILE.P2?4:3), P===AP_PROFILE.P2?'3':'2'], rpe:P===AP_PROFILE.P2?'7':P.powRpe }; }
@@ -1653,7 +1666,7 @@ function apEmphasis(start){ if(typeof S==='undefined'||!S) return null;
 function apBuildBlock(phase, prev){
   const P=AP_PROFILE[phase.id]; if(!P || !REF.exMap) return null;
   const weeks=Math.max(1, Math.round((daysBetween(phase.start, phase.end)+1)/7));
-  const types=apWeekTypes(phase.id, phase.start, weeks); const prevUsed=apUsedIn(prev); const taken=new Set(); const emph=phase.id==='IN'?null:apEmphasis(phase.start);
+  const types=apWeekTypes(phase.id, phase.start, weeks); const prevUsed=apUsedIn(prev); const taken=new Set(); const emph=(phase.id==='IN'||phase.id==='P1')?null:apEmphasis(phase.start);   // Wiedereinstieg und Saison: kein Zusatzsatz
   const SL=phase.id==='IN'?AP_SLOTS_IN:AP_SLOTS;
   const templates=Object.entries(SL).map(([tid,T])=>{
     const slots=[];
@@ -1677,9 +1690,16 @@ function apBuildBlock(phase, prev){
   const week_wave={}, week_notes={}, week_overrides={};
   types.forEach((t,w)=>{ week_wave[w+1]=AP_WAVE_LABEL[t]; });
   week_notes[1]=['Automatisch geplant von AOS: '+P.goal+'. Hauptübungen bleiben, Ergänzungen und Power wechseln. Lasten berechnet AOS aus deinen Protokollen (geschätztes 1RM und Ziel-RPE der Woche).'];
+  (P.notes||[]).forEach(n=>week_notes[1].push(n));
   if(emph) week_notes[1].push('Schwerpunkt: '+emph.name+' – am weitesten vom Ziel ('+Math.round(emph.p*100)+' %), deshalb +1 Satz.');
   types.forEach((t,w)=>{ if(t==='D') week_overrides[w+1]={ note:'Entlastung: weniger Sätze bei gleicher Last'+(addDays(phase.start,w*7).slice(5)<='12-31'&&addDays(phase.start,w*7).slice(5)>='12-18'?' (Feiertage – nicht mögliche Tage einfach frei setzen)':'')+'.' };
     if(t==='H'||t==='DT') (week_notes[w+1]=week_notes[w+1]||[]).push('Standortbestimmung: Broad Jump (D1), Top-Sets Kniebeuge, Kreuzheben und Bank bis RPE '+fmtNum(P.cap)+' – kein Maximaltest. Danach unter Verlauf → „Aus dem Training übernehmen“.'); });
+  // Nicht verfügbare Tage (plan.json „unavailable“): Einheiten der Woche rücken in Reihenfolge auf die übrigen Trainingstage, was nicht passt, entfällt (kein Nachholen)
+  const una=(REF.plan.unavailable||[]); const ORD=['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  if(phase.id!=='IN' && una.length) for(let w=1; w<=weeks; w++){ const mon=addDays(phase.start,(w-1)*7); const hit=ORD.filter((d,i)=>una.includes(addDays(mon,i))); if(!hit.length) continue;
+    const order=ORD.filter(d=>sched[d]).map(d=>sched[d]); const free=ORD.filter(d=>sched[d] && !hit.includes(d)); const s2={}; free.forEach((d,i)=>{ s2[d]=order[i]; });
+    const skipped=order.slice(free.length); const lbl=hit.map(d=>WD[(ORD.indexOf(d)+1)%7]).join('/');
+    week_overrides[w]={ schedule:s2, skipped, note:lbl+' nicht verfügbar'+(skipped.length?'; '+skipped.join(', ')+' entfällt, kein Nachholen':'')+(week_overrides[w]&&week_overrides[w].note?' · '+week_overrides[w].note:'') }; }
   // Spielwoche: letzte schwere Einheit mindestens 4 Tage vor dem Spiel (3.2.1), danach nur kurz und schnell
   const game=((REF.plan.season||{}).first_game||[])[0];
   if(phase.id==='P5' && game){ const lw=weeks; const mon=addDays(phase.start,(lw-1)*7);
@@ -1868,6 +1888,7 @@ const perHand=id=>{ const e=REF.exMap[id]; return !!(e && (e.equipment||[]).incl
 function plStartEst(exId, block, date){ const r=START_EST[exId]; if(!r) return null; const [ref,f]=r;
   let base=(block.start_loads||{})[ref];
   const h=plHistory(ref, date)[0]; if(h && topKg(h.le)!=null) base=topKg(h.le);
+  if(base==null){ const t=plTestE1RM(ref, date); if(t) base=t.kg*pctRM(5,7); }   // Arbeitslast ≈ 5 Wdh @ RPE 7 aus dem Test
   if(base==null) return null; const inc=plInc(exId); const kg=Math.max(inc, roundDown(base*f, inc));
   return { kg, ref:(REF.exMap[ref]||{}).name_de||ref }; }
 
@@ -1880,6 +1901,15 @@ function plE1RM(exId, beforeDate){ const H=plHistory(exId, beforeDate).slice(0,3
     const e=x.kg/pctRM(x.reps,x.rpe); if(!best||e>best.kg) best={ kg:e, date:h.date, set:x }; }));
   return best; }
 
+/* Ohne Trainingsprotokoll: geschätztes 1RM aus dem letzten passenden Krafttest (Wdh + RPE; ohne RPE gilt 9).
+   Tests älter als 3 Wochen zählen 5 % weniger (Wiedereinstieg). Nur für die drei Grundübungen. */
+const TEST_LIFT={ high_bar_squat:/kniebeuge|squat/i, bench_press:/bankdr|bench/i, trap_bar_deadlift:/kreuzheben|deadlift/i };
+function plTestE1RM(exId, beforeDate){ const rx=TEST_LIFT[exId]; if(!rx || typeof S==='undefined' || !S) return null;
+  const L=(S.tests||[]).filter(t=>t.unit==='kg' && t.value!=null && t.date && t.date<=beforeDate && t.reps>=1 && t.reps<=12 && rx.test(t.name) && !/front|ssb|box|pause|sumo|rumän|romanian/i.test(t.name))
+    .sort((a,b)=>a.date<b.date?1:-1); const t=L[0]; if(!t) return null;
+  const old=daysBetween(t.date, beforeDate)>21; const kg=t.value/pctRM(t.reps, t.rpe!=null?t.rpe:9)*(old?0.95:1);
+  return { kg, date:t.date, test:t.name, old }; }
+
 /* Last für einen Slot (Spezifikation 3.4, 6.3) */
 function plLoad(slot, exId, ctx){
   const out={ kg:null, text:'', reasons:[], suggest:null, calibrate:false, decrease:false };
@@ -1888,10 +1918,10 @@ function plLoad(slot, exId, ctx){
   if(!weighted){ out.text='Körpergewicht'; return out; }
   const H=plHistory(exId, ctx.date); const last=H[0]; const dec=lastDecision(exId);
   // Wochenwelle: Last aus e1RM und Ziel-RPE der Woche (6.4)
-  if(m==='wave' && ctx.reps!=null){ let e=plE1RM(exId, ctx.date);
-    if(!e && START_EST[exId]){ const [ref,f]=START_EST[exId]; const b0=plE1RM(ref, ctx.date); if(b0) e={ kg:b0.kg*f, date:b0.date, set:b0.set, from:(REF.exMap[ref]||{}).name_de||ref, f }; } const trpe=(slot.rpe_wave||{})[ctx.week]!=null ? slot.rpe_wave[ctx.week] : cap;
+  if(m==='wave' && ctx.reps!=null){ let e=plE1RM(exId, ctx.date)||plTestE1RM(exId, ctx.date);
+    if(!e && START_EST[exId]){ const [ref,f]=START_EST[exId]; const b0=plE1RM(ref, ctx.date)||plTestE1RM(ref, ctx.date); if(b0) e={ kg:b0.kg*f, date:b0.date, set:b0.set, test:b0.test, old:b0.old, from:(REF.exMap[ref]||{}).name_de||ref, f }; } const trpe=(slot.rpe_wave||{})[ctx.week]!=null ? slot.rpe_wave[ctx.week] : cap;
     if(e && trpe!=null){ let kg=roundDown(e.kg*pctRM(ctx.reps, trpe), inc); const lastTop=last?topKg(last.le):null;
-      out.reasons.push('Wochenwelle: '+ctx.reps+' Wdh @ RPE '+fmtNum(trpe)+' ≈ '+Math.round(pctRM(ctx.reps,trpe)*100)+' % vom geschätzten 1RM '+fmtNum(Math.round(e.kg*2)/2)+' kg'+(e.from?' (abgeleitet: '+e.from+' × '+fmtNum(e.f)+', ':' (')+fmtDate(e.date)+': '+fmtNum(e.set.kg)+' kg × '+e.set.reps+' @'+fmtNum(e.set.rpe)+').');
+      out.reasons.push('Wochenwelle: '+ctx.reps+' Wdh @ RPE '+fmtNum(trpe)+' ≈ '+Math.round(pctRM(ctx.reps,trpe)*100)+' % vom geschätzten 1RM '+fmtNum(Math.round(e.kg*2)/2)+' kg'+(e.from?' (abgeleitet: '+e.from+' × '+fmtNum(e.f)+', ':' (')+(e.test?'Test „'+e.test+'“ vom '+fmtDate(e.date)+(e.old?', −5 %, weil älter als 3 Wochen':''):fmtDate(e.date)+': '+fmtNum(e.set.kg)+' kg × '+e.set.reps+' @'+fmtNum(e.set.rpe))+').');
       if(ctx.noIncrease && lastTop!=null && kg>lastTop){ kg=lastTop; out.reasons.push('Heute keine höhere Last als zuletzt ('+ctx.noIncrease+').'); }
       out.kg=kg;
       if(ctx.readiness===2 && slot.role==='main'){ const k=roundDown(kg*0.95, inc); if(k<kg){ out.kg=k; out.decrease=true; out.reasons.push('Readiness 2 → Hauptlast ca. −5 %.'); } }
@@ -1958,7 +1988,7 @@ function contactsOf(x){ const e=REF.exMap[x.dbId]; const c=e?e.contacts_per_rep:
 function plBuild(inp){
   const due=plDue(inp.date); const b=due.block;
   const nx=!b ? plCurrentBlock(inp.date) : null; const nf=nx?plFirstSession(nx):null;
-  if(!b || !inp.tpl) return { due, items:[], dropped:[], notes:[], error: !b ? (due.phase ? 'Für '+due.phase.name+' gibt es noch keine Templates. Den nächsten Block planst du mit Claude; danach liegt er im Datenrepo.'
+  if(!b || !inp.tpl) return { due, items:[], dropped:[], notes:[], error: !b ? (due.phase ? 'Für '+due.phase.name+' konnte AOS noch keinen Block planen (Übungsdatenbank noch nicht geladen).'
       : (nx ? '„'+nx.name+'“ startet am '+WD_LONG[weekdayOf(nx.start)]+', '+fmtDate(nx.start)+(nf?'. Erste Einheit: '+nf.tpl+' am '+WD_LONG[weekdayOf(nf.date)]+', '+fmtDate(nf.date)+' – stell oben das Datum um, um sie vorab anzusehen.':'.') : 'Für dieses Datum gibt es keinen Block im Plan.')) : 'In dieser Woche ist keine Einheit mehr offen.' };
   const t=plTemplate(b, inp.tpl); const week=due.week; const cap=plCap(b);
   const rules=REF.plan.rules||{}; const thr=rules.pain_threshold||3;
