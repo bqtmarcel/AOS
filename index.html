@@ -1528,6 +1528,35 @@ function plWeek(b, date){ return Math.floor(daysBetween(b.start, date)/7)+1; }
 function plTemplate(b, id){ return (b.templates||[]).find(t=>t.id===id) || null; }
 function plCap(b){ const c=b.rpe_cap||[]; return c.length?c[c.length-1]:null; }
 function plSessions(){ return S.sessions.filter(s=>s.planner); }
+
+/* ---------- Erholungssignale (Spezifikation 3.7): ab zwei Signalen schlägt AOS eine Entlastung vor, entscheiden tut der Athlet ---------- */
+function deloadSignals(){
+  if(typeof REF==='undefined'||!REF.plan) return [];
+  const L=loggedSessions().filter(s=>s.planner).slice(-8); if(L.length<2) return [];
+  const thr=(REF.plan.rules||{}).pain_threshold||3; const out=[];
+  const rd=s=>{ const c=s.planner.checkin||{}; return s.log.form!=null?s.log.form:c.readiness; };
+  const last3=L.slice(-3); if(last3.length===3 && last3.every(s=>rd(s)!=null && rd(s)<=2)) out.push('Tagesform 1–2 in den letzten 3 Einheiten');
+  const over=s=>s.planner.cap!=null && s.log.exercises.some(e=>e.sets.some(x=>x.rpe!=null && x.rpe>s.planner.cap));
+  if(over(L[L.length-1]) && over(L[L.length-2])) out.push('RPE in den letzten 2 Einheiten über der Obergrenze');
+  const pain=s=>((s.planner.checkin||{}).pain||0)>=thr;
+  if(pain(L[L.length-1]) && pain(L[L.length-2])) out.push('Beschwerden in den letzten 2 Einheiten');
+  // e1RM der Hauptübungen: letzte 2 Einheiten > 5 % unter dem Bestwert im Block
+  const blk=L[L.length-1].planner.blockId; const byEx={};
+  loggedSessions().filter(s=>s.planner&&s.planner.blockId===blk).forEach(s=>s.log.exercises.forEach(e=>{ const pe=s.plan.find(p=>p.id===e.planExId); if(!pe||!pe.planner||pe.planner.role!=='main') return;
+    const c=e.sets.filter(y=>y.kg!=null&&y.reps>=1&&y.reps<=10).map(y=>y.kg*(1+(y.reps===1?0:y.reps/30))); if(c.length) (byEx[e.name]=byEx[e.name]||[]).push(Math.max(...c)); }));
+  Object.entries(byEx).forEach(([n,v])=>{ if(v.length<3) return; const best=Math.max(...v.slice(0,-2)); if(v.slice(-2).every(x=>x<best*0.95)) out.push(n+': geschätztes 1RM 2× mehr als 5 % unter dem Blockbestwert'); });
+  // Broad Jump: letzte Weite > 5 % unter der besten Testweite
+  const bj=S.tests.filter(t=>/broad jump/i.test(t.name)&&t.value!=null&&t.unit==='cm'); const base=bj.length?Math.max(...bj.map(t=>t.value)):null;
+  if(base){ const jumps=[]; L.forEach(s=>s.log.exercises.forEach(e=>{ if(/broad jump/i.test(e.name)){ const h=e.sets.map(x=>x.height).filter(v=>v!=null); if(h.length) jumps.push(Math.max(...h)); } }));
+    if(jumps.length && jumps[jumps.length-1]<base*0.95) out.push('Broad Jump mehr als 5 % unter deiner besten Testweite'); }
+  return out;
+}
+function deloadNote(){ const sg=deloadSignals(); if(sg.length<2) return '';
+  const k='deload|'+sg.join('|'); if((S.suggestionDecisions||{})[k]) return '';
+  return '<div class="note warn"><strong>Erholungssignale</strong><ul class="small" style="margin:6px 0 6px 18px;padding:0">'+sg.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'+
+    '<p class="small" style="margin:0 0 8px">Vorschlag: eine Entlastungswoche (ca. 40 % weniger Sätze, gleiche Lasten) oder die aktuelle Woche wiederholen. Die Entscheidung triffst du – plane es mit Claude ein, falls du es machst.</p>'+
+    '<button class="small" data-act="deloadSeen" data-k="'+esc(k)+'">Gesehen</button></div>'; }
+ACT.deloadSeen = el=>{ S.suggestionDecisions=S.suggestionDecisions||{}; S.suggestionDecisions[el.dataset.k]={ at:new Date().toISOString(), status:'gesehen', title:'Erholungssignale' }; save(); render(); };
 const isDone = s=>s.status==='absolviert'||s.status==='teilweise';
 
 /* Welche Einheit ist an diesem Tag fällig? (Spezifikation 5.1) */
@@ -2316,7 +2345,7 @@ function viewOverview(){
   if(!ghReady()) h+='<div class="note warn"><strong>Noch nicht verbunden.</strong> Deine Daten liegen im privaten Datenrepo. <button class="link" data-act="ghOpen">Jetzt verbinden</button></div>';
   if(isIOS() && !isStandalone() && location.protocol==='https:' && !S.settings.hideInstallHint)
     h+='<div class="note warn"><strong>Als App installieren:</strong> In Safari auf <em>Teilen</em> → <em>Zum Home-Bildschirm</em>, danach AOS immer über das Symbol öffnen. <button class="link small" data-act="hideInstall">Ausblenden</button></div>';
-  h+=ovToday(today)+ovWeek(today);
+  h+=deloadNote()+ovToday(today)+ovWeek(today);
   return h;
 }
 const CLAW='<svg class="claw" viewBox="0 0 40 40" aria-hidden="true"><path d="M9 33 Q14 18 23 6"/><path d="M16 35 Q21 20 30 8"/><path d="M23 36 Q28 23 35 13"/></svg>';
