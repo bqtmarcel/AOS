@@ -27,7 +27,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | T3 | **Scheibenrechner**: welche Scheiben pro Seite bei der vorgegebenen Last (Stange einstellbar) | Weniger Kopfrechnen | ✅ erledigt | S |
 | T4 | **Aufwärmsätze** automatisch zur Arbeitslast vorschlagen | Strength-Coach-Verhalten | ✅ erledigt | M |
 | T5 | **Deload-Signale** sichtbar machen (Spezifikation 3.7): mehrere schlechte Tagesformen, RPE über Cap, Beschwerden → Hinweis und automatische Entlastung | Überlastung früh erkennen | ✅ erledigt | M |
-| T6 | **Testwoche am Phasenende** (Spezifikation 3.8): Tests als eigene Einheit vorschlagen und Ergebnisse direkt in den Verlauf übernehmen | Tests nicht vergessen | P2 | M |
+| T6 | **Testwoche am Phasenende** (Spezifikation 3.8): Tests als eigene Einheit vorschlagen und Ergebnisse direkt in den Verlauf übernehmen | Tests nicht vergessen | ✅ erledigt | M |
 | T7 | **In-Season-Modus**: ab dem ersten Spiel 1–2 Einheiten pro Woche, Abstand zum Spieltag beachten (offene Punkte 5 und 8 der Spezifikation) | Planung über die Vorbereitung hinaus | P2 | L |
 | T8 | **Templates für P2–P5** im Datenrepo anlegen; der Plan zeigt dort derzeit „noch keine Templates“ | Plan über Block 1 hinaus | P1 | M (Planung mit Claude) |
 | T9 | „+ Freie Einheit“ als richtigen Button gestalten und Übungen aus der Übungsdatenbank auswählbar machen | Einheitliche Bedienung | P3 | M |

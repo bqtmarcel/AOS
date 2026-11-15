@@ -1253,6 +1253,7 @@ function viewTests(){
   // Tests
   const names=[...new Set(S.tests.map(t=>t.name))];
   h+='<h2>Testergebnisse</h2>';
+  if(fromTrainingCandidates().length) h+='<div class="row" style="margin:-4px 0 8px"><button class="small" data-act="testsFromTraining">Aus dem Training übernehmen</button></div>';
   if(!names.length) h+='<div class="empty">Noch keine Tests. Erfasse z. B. Broad Jump, 40-Yard-Sprint oder einen Krafttest mit Datum und Testbedingungen.</div>';
   TEST_CATS.forEach(cat=>{
     const cn=names.filter(n=>S.tests.some(t=>t.name===n&&t.category===cat)); if(!cn.length) return;
@@ -1264,6 +1265,30 @@ function viewTests(){
   h+=pdet('v-prog','Verlauf aus Trainingsprotokollen',nLog===1?'1 Einheit':nLog+' Einheiten',trainingProgress());
   return h;
 }
+/* ---------- Standortbestimmung: beste Sätze der letzten 7 Tage als Testergebnis übernehmen (Spezifikation 3.8) ---------- */
+const TEST_SYN=[['kniebeuge','squat'],['kreuzheben','deadlift'],['bankdrücken','bench'],['klimmzug','pull'],['klimmzüge','pull'],['liegestütz','push-up']];
+function normName(n){ let x=String(n||'').toLowerCase().replace(/[()–-]/g,' '); TEST_SYN.forEach(([a,b])=>{ x=x.split(a).join(b); }); return x.split(/\s+/).filter(w=>w.length>1).sort().join(' '); }
+function guessTest(exName){ const names=[...new Set(S.tests.map(t=>t.name))]; const a=normName(exName).split(' ');
+  let best=null, sc=0; names.forEach(n=>{ const b=normName(n).split(' '); const k=a.filter(w=>b.includes(w)).length/Math.max(a.length,b.length); if(k>sc){ sc=k; best=n; } }); return sc>=0.5?best:''; }
+function fromTrainingCandidates(){ const from=addDays(todayISO(),-6); const out={};
+  loggedSessions().filter(s=>sessionDate(s)>=from).forEach(s=>s.log.exercises.forEach(e=>{
+    const kg=e.sets.filter(x=>x.kg!=null&&x.reps!=null); const ht=e.sets.filter(x=>x.height!=null); let c=null;
+    if(kg.length){ const t=kg.reduce((a,b)=>(b.kg>a.kg||(b.kg===a.kg&&b.reps>a.reps))?b:a); c={value:t.kg,unit:'kg',reps:t.reps,rpe:t.rpe,category:'Kraft'}; }
+    else if(ht.length){ const t=ht.reduce((a,b)=>b.height>a.height?b:a); c={value:t.height,unit:'cm',reps:null,rpe:t.rpe,category:'Sprung & Power'}; }
+    else { const r=e.sets.filter(x=>x.reps!=null&&x.kg==null); if(r.length){ const t=r.reduce((a,b)=>b.reps>a.reps?b:a); c={value:t.reps,unit:'Wdh',reps:null,rpe:t.rpe,category:'Kraft'}; } }
+    if(!c) return; const k=e.name+(e.variant?' ('+e.variant+')':''); const prev=out[k];
+    if(!prev || c.value>prev.value) out[k]=Object.assign(c,{ex:k,date:sessionDate(s)}); }));
+  return Object.values(out); }
+ACT.testsFromTraining = ()=>{ const L=fromTrainingCandidates(); const names=[...new Set(S.tests.map(t=>t.name))];
+  const body='<p class="small muted">Beste Sätze der letzten 7 Tage. Wähle, welche als Testergebnis gespeichert werden – z. B. die Standortbestimmung am Blockende. Top-Sets innerhalb der RPE-Obergrenze, kein Maximaltest.</p>'+
+    L.map((c,i)=>'<div class="section" style="margin:8px 0;padding:10px 12px"><strong>'+esc(c.ex)+'</strong> <span class="small muted">'+fmtDateShort(c.date)+' · '+fmtNum(c.value)+' '+esc(c.unit)+(c.reps?' × '+c.reps:'')+(c.rpe!=null?' @RPE '+fmtNum(c.rpe):'')+'</span>'+
+      sel('tft-'+i,'Als Test speichern',[['','— nicht übernehmen —']].concat(names.map(n=>[n,n])).concat([['__neu','neuer Test: '+c.ex]]),guessTest(c.ex))+'</div>').join('');
+  openDlg('Aus dem Training übernehmen', body, '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="testsFromTrainingOk">Übernehmen</button>'); };
+ACT.testsFromTrainingOk = ()=>{ const L=fromTrainingCandidates(); let n=0;
+  L.forEach((c,i)=>{ const v=val('tft-'+i); if(!v) return; const name=v==='__neu'?c.ex:v; const prev=S.tests.filter(t=>t.name===name).slice(-1)[0];
+    S.tests.push({ id:uid('test'), source:'eingabe', createdAt:new Date().toISOString(), name, category:prev?prev.category:c.category, date:c.date, value:c.value, unit:c.unit, reps:c.reps, rpe:c.rpe, detail:'', conditions:'aus dem Training ('+c.ex+')', note:'' }); n++; });
+  save(); closeDlg(); toast(n?n+' Testergebnis'+(n===1?'':'se')+' gespeichert.':'Nichts übernommen.'); render(); };
+
 /* Wochenbelastung (Session-RPE × Minuten, „AU“): Gym aus den Protokollen (Ø RPE der Sätze × Dauer), Feld aus dem Feldprotokoll.
    Einheiten ohne Dauer oder RPE werden nicht geschätzt, sondern weggelassen und gezählt. */
 function weeklyLoad(weeks){
@@ -2345,7 +2370,7 @@ function viewOverview(){
   if(!ghReady()) h+='<div class="note warn"><strong>Noch nicht verbunden.</strong> Deine Daten liegen im privaten Datenrepo. <button class="link" data-act="ghOpen">Jetzt verbinden</button></div>';
   if(isIOS() && !isStandalone() && location.protocol==='https:' && !S.settings.hideInstallHint)
     h+='<div class="note warn"><strong>Als App installieren:</strong> In Safari auf <em>Teilen</em> → <em>Zum Home-Bildschirm</em>, danach AOS immer über das Symbol öffnen. <button class="link small" data-act="hideInstall">Ausblenden</button></div>';
-  h+=deloadNote()+ovToday(today)+ovWeek(today);
+  h+=deloadNote()+ovToday(today)+ovTestWeek(today)+ovWeek(today);
   return h;
 }
 const CLAW='<svg class="claw" viewBox="0 0 40 40" aria-hidden="true"><path d="M9 33 Q14 18 23 6"/><path d="M16 35 Q21 20 30 8"/><path d="M23 36 Q28 23 35 13"/></svg>';
@@ -2364,6 +2389,9 @@ function ovPhaseLine(td){
     : 'Woche '+plWeek(pb,td)+'/'+pb.weeks+' · Tag '+(daysBetween(pb.start,td)+1)+'/'+(pb.weeks*7);
   return '<div class="tc-phase"><b>'+esc(nm)+'</b> · '+esc(rest)+'</div>';
 }
+function ovTestWeek(today){ if(typeof REF==='undefined'||!REF.plan) return ''; const b=plBlockAt(today); if(!b || plWeek(b,today)!==b.weeks) return '';
+  const notes=((b.week_notes||{})[b.weeks]||[]).filter(n=>/standort|test/i.test(n));
+  return '<div class="note"><strong>Letzte Blockwoche: Standortbestimmung.</strong> '+(notes.length?esc(notes.join(' ')):'Top-Sets innerhalb der RPE-Obergrenze, kein Maximaltest.')+' Nach den Einheiten die Ergebnisse unter <button class="link" data-act="go" data-view="tests">Verlauf → Aus dem Training übernehmen</button> speichern.</div>'; }
 function ovToday(today){
   const dayLbl='Heute · '+WD[weekdayOf(today)]+' '+fmtDate(today).slice(0,6);
   if(typeof REF==='undefined' || !REF.plan) return '<div class="section hero"><div class="eyebrow">'+dayLbl+'</div><div class="hero-title">'+(ghReady()?'Plan wird geladen …':'Noch nicht verbunden')+'</div></div>';
