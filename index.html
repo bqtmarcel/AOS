@@ -376,6 +376,8 @@ body:has(#rest-bar) main{padding-bottom:calc(190px + env(safe-area-inset-bottom)
 .plates{font-size:.78rem;color:var(--muted);margin:2px 0 0;font-variant-numeric:tabular-nums}
 .chart .bar-gym{fill:var(--sig)}.chart .bar-field{fill:#9aa0a8}
 .lg{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 6px;vertical-align:-1px}.lg-gym{background:var(--sig)}.lg-field{background:#9aa0a8}
+.goal-row{padding:10px 0;border-bottom:1px solid var(--line)}.goal-row:last-of-type{border-bottom:0}
+.goal-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin:8px 0 4px}.goal-bar i{display:block;height:100%;background:var(--sig);border-radius:3px}
 .last-perf{font-size:.8rem;color:var(--muted);margin:2px 0 8px}.last-perf strong{color:var(--text);font-weight:600}
 .pdet-b>.table-wrap:last-child,.pdet-b>details:last-child{margin-bottom:2px}
 .meal{padding-top:12px;padding-bottom:12px}
@@ -2594,12 +2596,21 @@ ACT.saveProfileSlim = ()=>{
   save(); toast('Gespeichert.'); render(); };
 
 /* ---------- Ziele (im Verlauf) ---------- */
+/* Fortschritt zum Ziel in %: vom ersten Test (Start) zum Ziel; bei Zeiten (s) ist weniger besser. Ohne vergleichbaren Messwert: null */
+function goalVal(t){ return (t.unit==='kg' && t.reps>1 && t.reps<=10) ? Math.round(t.value*(1+t.reps/30)*2)/2 : t.value; }
+function goalProgress(g){ const L=S.tests.filter(t=>t.name===g.testName && t.value!=null && t.unit===g.unit && t.date).sort((a,b)=>a.date<b.date?-1:1); if(!L.length||g.target==null) return null;
+  const v=goalVal; const cur=v(L[L.length-1]), start=v(L[0]), lower=/^s$|sek/i.test(g.unit);
+  let p; if(lower){ if(L.length<2||start===g.target) return cur<=g.target?100:null; p=(start-cur)/(start-g.target); }
+  else { p = (L.length>=2 && start<g.target && start!==cur) ? (cur-start)/(g.target-start) : cur/g.target; }
+  return Math.max(0, Math.min(100, Math.round(p*100))); }
 function goalsSection(){
   const gl=S.goals.filter(g=>g.status==='aktiv');
   let h='';
   if(!gl.length) h+='<p class="small muted">Noch keine Ziele.</p>';
-  else h+='<div class="table-wrap"><table><thead><tr><th></th><th>Ziel</th><th>Aktuell</th></tr></thead><tbody>'+gl.map(g=>{ const t=latestTest(g.testName);
-    return '<tr><td><button class="link" data-act="editGoal" data-id="'+g.id+'">'+esc(g.name)+'</button></td><td>'+fmtNum(g.target)+' '+esc(g.unit)+'</td><td class="small">'+(t?esc(testValueText(t)):'<span class="muted">—</span>')+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  else h+=gl.map(g=>{ const t=latestTest(g.testName); const p=goalProgress(g);
+    return '<div class="goal-row"><div class="row between" style="flex-wrap:nowrap;gap:8px"><button class="link" data-act="editGoal" data-id="'+g.id+'">'+esc(g.name)+'</button>'+
+      '<span class="small" style="text-align:right">'+(t?esc(testValueText(t)):'<span class="muted">—</span>')+' <span class="muted">/ '+fmtNum(g.target)+' '+esc(g.unit)+'</span></span></div>'+
+      (p!=null?'<div class="goal-bar" role="img" aria-label="'+p+' % erreicht"><i style="width:'+Math.max(2,p)+'%"></i></div><div class="small muted">'+p+' %'+(t&&goalVal(t)!==t.value?' · geschätztes 1RM ≈ '+fmtNum(goalVal(t))+' kg':'')+(p>=100?' · erreicht ✓':'')+'</div>':'')+'</div>'; }).join('');
   return pdet('v-goals','Ziele',gl.length===1?'1 aktiv':gl.length+' aktiv',h+'<div class="add-row"><button class="small" data-act="editGoal">+ Ziel</button></div>');
 }
 
