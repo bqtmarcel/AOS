@@ -2431,6 +2431,13 @@ ACT.nutPick = el=>{ ui.nutSlot=el.dataset.s;
   openDlg('Lebensmittel – '+(slot?slot.slot.name:''), inp('fd-q','Suchen','','autocomplete="off" placeholder="z. B. Ei, Skyr, Huhn oder Barcode"')+'<div id="fd-amt"></div><div id="fd-list">'+nutPickList('')+'</div>'+
     '<div class="off-box"><div class="eyebrow">Online · Open Food Facts</div><div id="off-res"><p class="small muted">Markenprodukte erscheinen hier automatisch ab 3 Zeichen (Name oder Barcode).</p></div></div><p class="small" style="margin-top:10px"><button class="link" data-act="nutOwn">Nährwerte selbst eintragen</button></p>', '<button data-act="closeDlg">Fertig</button>');
   ui.nutSel=null; };
+/* Textsuche: jedes Suchwort muss ein Wort im Namen treffen (Wortanfang, Teilwort ab 4 Zeichen, kleine Tippfehler am Wortende wie „Bleue“) */
+function txtNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss'); }
+function txtMatch(name,q){ const nw=txtNorm(name).split(/[^a-z0-9]+/).filter(Boolean); const qw=txtNorm(q).split(/[^a-z0-9]+/).filter(w=>w.length>=2);
+  if(!qw.length){ const t=txtNorm(q).trim(); return { hits:0, all:!!t && txtNorm(name).includes(t), start:0 }; }
+  const hit=w=>nw.some(n=>n.startsWith(w) || (w.length>=4 && n.includes(w)) || (n.length>=4 && w.length-n.length<=1 && w.startsWith(n)));
+  const hits=qw.filter(hit).length; const start=nw.length && (nw[0].startsWith(qw[0])||(nw[0].length>=4&&qw[0].startsWith(nw[0])))?1:0;
+  return { hits, all:hits===qw.length, start }; }
 function nutPickList(q){
   const slot=(NUT().meal_plans[nutTargets(nutDate()).time]||[]).find(s=>s.id===ui.nutSlot)||{};
   const pre=(slot.tags||[]).includes('pre');
@@ -2439,10 +2446,10 @@ function nutPickList(q){
     const sug=pre ? nutFoods(false).filter(f=>f.tags.includes('pre') && !rec.includes(f)).slice(0,8) : [];
     return (sug.length?'<div class="eyebrow" style="margin:8px 0 4px">Gut vor dem Training</div>'+sug.map(f=>'<button class="chip" data-act="nutSel" data-f="'+esc(f.id)+'">'+esc(f.name)+' · vor Training</button>').join(''):'')+
       (rec.length ? '<div class="eyebrow" style="margin:8px 0 4px">Zuletzt verwendet</div>'+rec.map(f=>'<button class="chip" data-act="nutSel" data-f="'+esc(f.id)+'">'+esc(f.name)+'</button>').join('') : (sug.length?'':'<p class="small muted">Tippe oben, um zu suchen.</p>')); }
-  let l=nutFoods(false).filter(f=>f.name.toLowerCase().includes(ql) || f.category.includes(ql));
+  let l=nutFoods(false).filter(f=>txtMatch(f.name,ql).all || f.category.includes(ql));
   l=l.filter(f=>f.category!=='kantine' || slot.lunch);
   const score=f=>(f.user_rating||0)*2+(f.tags.includes('favorit')?5:0)+(pre&&(f.tags.includes('pre')||f.tags.includes('fettarm_ballaststoffarm'))?8:0);
-  l.sort((a,b)=>score(b)-score(a) || a.name.localeCompare(b.name,'de'));
+  l.sort((a,b)=>txtMatch(b.name,ql).start-txtMatch(a.name,ql).start || score(b)-score(a) || a.name.localeCompare(b.name,'de'));
   if(!l.length) return '<p class="small muted">In deinen Lebensmitteln nichts gefunden – Treffer von Open Food Facts siehe unten.</p>';
   return l.slice(0,40).map(f=>'<button class="chip" data-act="nutSel" data-f="'+esc(f.id)+'">'+esc(f.name)+(f.tags.includes('favorit')?' ★':'')+(pre&&f.tags.includes('pre')?' · vor Training':'')+'</button>').join('');
 }
@@ -2482,17 +2489,20 @@ function offMap(p){ const n=p.nutriments||{}; const g=k=>{ const v=n[k+'_100g'];
   const qn=parseFloat(String(p.quantity||'').replace(',','.')); const sv=p.serving_quantity?Number(p.serving_quantity):null;
   const piece = sv && qn && Math.abs(qn-sv)<0.5 ? Math.round(sv) : null;   // Einzelpackung (z. B. Riegel): 1 Stück = Packung
   return { code:String(p.code||''), name:(brand&&!name.toLowerCase().includes(brand.toLowerCase())?name+' ('+brand+')':name), kcal:Math.round(kcal), P, K, F, per,
-    portion:p.serving_quantity?Math.round(Number(p.serving_quantity)):null, piece, main, qty:p.quantity||'', at:(p.countries_tags||[]).includes('en:austria') }; }
+    portion:p.serving_quantity?Math.round(Number(p.serving_quantity)):null, piece, main, qty:p.quantity||'', at:(p.countries_tags||[]).includes('en:austria'),
+    dach:(p.countries_tags||[]).some(c=>c==='en:austria'||c==='en:germany'), de:!!(p.product_name_de||'').trim() }; }
 async function offQuery(q){
   q=q.trim(); if(offCache[q]) return offCache[q];
   let list;
   if(/^\d{8,14}$/.test(q)){ const r=await fetch(OFF_BASE+'/api/v2/product/'+q+'.json?fields='+OFF_FIELDS);
     if(r.status===404){ list=[]; } else { if(!r.ok) throw new Error('HTTP '+r.status); const j=await r.json(); list=j.product?[Object.assign({code:q},j.product)]:[]; } }
-  else { const r=await fetch(OFF_BASE+'/cgi/search.pl?action=process&json=1&search_simple=1&lc=de&page_size=50&search_terms='+encodeURIComponent(q)+'&fields='+OFF_FIELDS);
+  else { const r=await fetch(OFF_BASE+'/cgi/search.pl?action=process&json=1&search_simple=1&lc=de&page_size=100&search_terms='+encodeURIComponent(q)+'&fields='+OFF_FIELDS);
     if(!r.ok) throw new Error(r.status===429?'zu viele Suchen – bitte eine Minute warten':'HTTP '+r.status); const j=await r.json(); list=j.products||[]; }
-  const out=list.map(offMap).filter(Boolean);
-  // In Österreich verkaufte Produkte zuerst, sonst Reihenfolge von Open Food Facts beibehalten
-  out.forEach((r,i)=>r._i=i); out.sort((a,b)=>(b.at-a.at)||(a._i-b._i));
+  let out=list.map(offMap).filter(Boolean);
+  // Relevanz: Suchwörter im Produktnamen (alle > einige), dann Österreich, Deutschland/deutscher Name, sonst Reihenfolge von Open Food Facts
+  if(!/^\d{8,14}$/.test(q)){ out.forEach((r,i)=>{ const m=txtMatch(r.name,q); r._m=m.hits; r._all=m.all?1:0; r._st=m.start; r._i=i; });
+    if(out.some(r=>r._m>0)) out=out.filter(r=>r._m>0);
+    out.sort((a,b)=>(b._all-a._all)||(b._st-a._st)||(b.at-a.at)||((b.dach||b.de)-(a.dach||a.de))||(b._m-a._m)||(a._i-b._i)); }
   offCache[q]=out; return out; }
 /* Automatische Online-Suche: 700 ms nach dem letzten Tastendruck, ab 3 Zeichen, max. 9 Suchen pro Minute (Limit 10) */
 let offTimer=null, offSeq=0; const offTimes=[];
@@ -2597,7 +2607,7 @@ ACT.nutTplUse = el=>{ const t=nutTpl(el.dataset.t); if(!t) return; const date=nu
   const m=nutEnsureMeal(date, el.dataset.s); m.items=tplScaled(t, tgt); m.tpl=t.id; save(); render(); toast(t.name+' übernommen'+(t.scale!==false?' (Mengen ans Ziel angepasst)':'')+'.'); };
 
 /* ---------- Einkaufsliste: Woche im Voraus aus Mahlzeiten und Standard-Mahlzeiten ---------- */
-const SHOP_CAT={ fleisch_fisch:'Fleisch & Fisch', eier_milch:'Eier & Milchprodukte', pflanzlich:'Pflanzlich', proteinpulver:'Proteinpulver', beilage:'Beilagen', gemuese:'Gemüse', obst:'Obst', fruehstueck:'Frühstück', brot:'Brot', fett:'Fette & Nüsse', suess:'Süßes', getraenk:'Getränke', sauce:'Saucen', eigene:'Eigene Produkte' };
+const SHOP_CAT={ fleisch_fisch:'Fleisch & Fisch', eier_milch:'Eier & Milchprodukte', pflanzlich:'Pflanzlich', proteinpulver:'Proteinpulver', beilage:'Beilagen', gemuese:'Gemüse', obst:'Obst', fruehstueck:'Frühstück', brot:'Brot', fett:'Fette & Nüsse', suess:'Süßes', getraenk:'Getränke', sauce:'Saucen', gericht:'Gerichte', eigene:'Eigene Produkte' };
 function shopRange(which){ const td=todayISO(); const mon=mondayOf(td);
   if(which==='next') { const m2=addDays(mon,7); return { from:m2, to:addDays(m2,6) }; }
   return { from:td, to:addDays(mon,6) }; }
