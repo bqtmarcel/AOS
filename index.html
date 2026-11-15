@@ -1346,6 +1346,11 @@ function trainingProgress(){
   let h='<div class="section">'+sel('pr-ex','Übung',keys.map(k=>[k,k+' ('+map[k].length+')']),ui.exName,'data-chg="pickEx"');
   const pts=list.filter(x=>x.top).map(x=>({x:x.date,y:x.top.kg}));
   h+= pts.length>=2 ? lineChart(pts,{unit:'kg',label:'Schwerster Satz '+ui.exName}) : '<p class="small muted">Diagramm ab zwei Einheiten mit Gewichtsangabe.</p>';
+  // Geschätztes 1RM (Epley), nur Sätze mit Gewicht und 1–10 Wdh
+  const e1=x=>{ const c=x.sets.filter(y=>y.kg!=null&&y.reps>=1&&y.reps<=10).map(y=>y.kg*(1+(y.reps===1?0:y.reps/30))); return c.length?Math.round(Math.max(...c)*2)/2:null; };
+  const ep=list.map(x=>({x:x.date,y:e1(x)})).filter(p=>p.y!=null);
+  if(ep.length) h+='<h3 style="margin-top:16px">Geschätztes 1RM</h3>'+(ep.length>=2?lineChart(ep,{unit:'kg',label:'Geschätztes 1RM '+ui.exName}):'')+
+    '<p class="small muted">Aktuell ≈ <strong>'+fmtNum(ep[ep.length-1].y)+' kg</strong>'+(ep.length>=2?' ('+(ep[ep.length-1].y-ep[0].y>=0?'+':'')+fmtNum(Math.round((ep[ep.length-1].y-ep[0].y)*2)/2)+' kg seit '+fmtDate(ep[0].x)+')':'')+'. Schätzung nach Epley aus dem besten Satz bis 10 Wdh – kein getestetes Maximum.</p>';
   h+='<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Schwerster Satz</th><th>Alle Sätze</th></tr></thead><tbody>'+list.slice().reverse().map(x=>'<tr><td>'+fmtDate(x.date)+'</td><td>'+(x.top?fmtNum(x.top.kg)+' kg × '+(x.top.reps!=null?x.top.reps:'?')+(x.top.rpe!=null?' @'+fmtNum(x.top.rpe):''):'—')+'</td><td class="small">'+esc(x.sets.map(y=>istOf(y)).filter(Boolean).join(' | ')||'—')+'</td></tr>').join('')+'</tbody></table></div>';
   h+='<p class="small muted">„Schwerster Satz“ ist der erfasste Satz mit dem höchsten Gewicht – keine Schätzung eines Maximalgewichts.</p></div>';
   return h;
