@@ -373,6 +373,19 @@ main table:not(.stack) td button{white-space:nowrap}
 .nut-row input{text-align:center}
 .nut-row select{padding-right:24px;background-position:calc(100% - 14px) 50%,calc(100% - 9px) 50%}
 .nut-u{font-size:.8rem;color:var(--muted);text-align:center}
+/* Makro-Abdeckung */
+.mbars{display:grid;gap:10px;margin:8px 0 6px}
+.mb-row{display:grid;grid-template-columns:64px 1fr auto;grid-template-areas:"l v n" "b b b";gap:4px 10px;align-items:baseline}
+.mbars.compact{grid-template-columns:1fr 1fr;gap:12px 18px}
+.mbars.compact .mb-row{grid-template-columns:auto 1fr;grid-template-areas:"l l" "v v" "b b";gap:2px}
+.mb-l{grid-area:l;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.mb-v{grid-area:v;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.mb-v b{color:var(--text);font-weight:600;font-size:.95rem}
+.mb-n{grid-area:n;font-size:.75rem;color:var(--muted);white-space:nowrap}
+.mb-bar{grid-area:b;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden}
+.mb-bar i{display:block;height:100%;background:var(--muted);border-radius:3px}
+.mb-row.ok .mb-bar i{background:var(--sig)} .mb-row.ok .mb-n{color:var(--sig)}
+.mb-row.over .mb-bar i{background:var(--warn)} .mb-row.over .mb-n{color:var(--warn)}
 @media print{
   header.top,nav.tabs,.no-print,button{display:none!important}
   .print-only{display:block}
@@ -2171,6 +2184,15 @@ const isPortion = f=>f && f.per==='Portion';
 function itemMac(it){ const f=nutFood(it.food); if(!f || it.g==null) return { P:0, K:0, F:0, kcal:0 };
   const k = isPortion(f) ? it.g : it.g/100;
   return { P:(f.protein_g||0)*k, K:(f.carbs_g||0)*k, F:(f.fat_g||0)*k, kcal:(f.kcal||0)*k }; }
+/* Abdeckung: alles, was für den Tag eingetragen ist, gegen das Tagesziel */
+function nutDayItems(date,T){ const out=[]; nutMealPlan(T||nutTargets(date)).forEach(({slot})=>{ const m=nutMeal(date,slot.id); if(m) m.items.forEach(i=>out.push(i)); }); return out; }
+function macroBars(day,T,compact){
+  const tol=(NUT().tolerance||{}).day_pct||5;
+  const row=(lbl,a,b,u)=>{ a=Math.round(a); const pc=b?a/b*100:0; const rest=b-a; const ok=Math.abs(pc-100)<=tol; const over=pc>100+tol;
+    const note= ok ? '✓' : over ? '+'+fmtK(-rest)+u : 'noch '+fmtK(rest)+u;
+    return '<div class="mb-row'+(over?' over':ok?' ok':'')+'"><span class="mb-l">'+lbl+'</span><span class="mb-v"><b>'+fmtK(a)+'</b> / '+fmtK(b)+u+'</span>'+
+      '<div class="mb-bar"><i style="width:'+Math.min(100,Math.round(pc))+'%"></i></div>'+(compact?'':'<span class="mb-n">'+note+'</span>')+'</div>'; };
+  return '<div class="mbars'+(compact?' compact':'')+'">'+row('kcal',day.kcal,T.kcal,'')+row('Protein',day.P,T.P,' g')+row('KH',day.K,T.K,' g')+row('Fett',day.F,T.F,' g')+'</div>'; }
 function sumMac(items){ return items.reduce((a,it)=>{ const m=itemMac(it); a.P+=m.P; a.K+=m.K; a.F+=m.F; a.kcal+=m.kcal; return a; }, { P:0, K:0, F:0, kcal:0 }); }
 /* Mengen-Einheiten: intern immer Gramm bzw. ml (it.g); Stück nur als Anzeige/Eingabe über piece_g */
 function nutUnits(f){ if(!f) return [['g','g']]; if(isPortion(f)) return [['port','Port.']];
@@ -2268,7 +2290,7 @@ function viewNutrition(){
   h+='<div class="section"><div class="row between"><strong>'+WD_LONG[weekdayOf(date)]+', '+fmtDate(date)+'</strong>'+badge(T.label, T.training?'ok':'')+'</div>';
   h+='<p class="small muted">'+(T.manual?'von dir festgelegt':esc(T.auto.why))+'</p>';
   if(T.training) h+='<div>'+Object.entries(NUT().training_times).map(([k,l])=>chipBtn('nutTimeChip','time',k,l.replace(/^Training /,''),T.time===k)).join('')+'</div>';
-  h+='<div class="kpis"><div><span class="small muted">Energie</span><strong>≈ '+fmtK(T.kcal)+' kcal</strong></div><div><span class="small muted">Protein</span><strong>'+T.P+' g</strong></div><div><span class="small muted">Kohlenhydrate</span><strong>'+T.K+' g</strong></div><div><span class="small muted">Fett</span><strong>'+T.F+' g</strong></div></div>';
+  { const di=nutDayItems(date,T); h+='<div class="eyebrow" style="margin:12px 0 2px">Abgedeckt '+(di.length?'· '+di.length+' Einträge':'· noch nichts eingetragen')+'</div>'+macroBars(sumMac(di),T); }
   h+='<p class="small muted">Basis '+fmtNum(Math.round(T.w.kg*10)/10)+' kg'+(T.w.provisional?' (vorläufig – morgens wiegen in der Übersicht)':'')+(T.entry?' · Einstiegsziel bis '+fmtDate(NUT().entry.until).slice(0,6):'')+'</p>';
   h+='<details><summary class="small muted">Tagestyp ändern</summary>'+sel('nut-type','Tagestyp',[['','automatisch']].concat(Object.entries(NUT().day_types).map(([k,v])=>[k,v.label])),cfg.type||'','data-chg="nutType"')+'</details></div>';
 
@@ -2293,7 +2315,7 @@ function viewNutrition(){
   });
   const day=sumMac(all); const pct=(a,b)=>b?Math.round((a/b-1)*100):0; const tol=(NUT().tolerance||{}).day_pct||5;
   const line=(l,a,b,u)=>'<div><span class="small muted">'+l+'</span><strong>'+Math.round(a)+(u||' g')+'</strong><span class="small muted"> / '+b+(u||' g')+(all.length?' ('+(pct(a,b)>0?'+':'')+pct(a,b)+' %'+(Math.abs(pct(a,b))<=tol?' ✓':'')+')':'')+'</span></div>';
-  h+='<div class="section"><strong>Tag gesamt'+(plan.length?' · '+doneN+'/'+plan.length+' abgehakt':'')+'</strong><div class="kpis">'+line('Energie',day.kcal,T.kcal,' kcal')+line('Protein',day.P,T.P)+line('KH',day.K,T.K)+line('Fett',day.F,T.F)+'</div></div>';
+  if(plan.length) h+='<p class="small muted">'+doneN+'/'+plan.length+' Mahlzeiten als gegessen abgehakt · Abdeckung siehe oben.</p>';
 
   // Supplements
   const sup=(NUT().supplements||[]).filter(s=>s.active);
@@ -2583,7 +2605,9 @@ function ovToday(today){
   else { const n=plNextTraining(addDays(today,1)); sub=n?'Nächste Einheit: '+n.tpl+' · '+WD[weekdayOf(n.date)]+' '+fmtDate(n.date).slice(0,6):'Erholung'; }
   let h='<div class="section hero today-card"><div class="eyebrow">'+(state==='open'?'<span class="dot"></span>':'')+esc(dayLbl+(typ&&T.training?' · '+typ:''))+'</div>';
   h+='<div class="hero-title">'+esc(title)+'</div><div class="hero-sub">'+esc(sub)+'</div>';
-  if(T) h+='<div class="tc-row tc-macros"><div><b>'+fmtK(T.kcal)+'</b><span>kcal</span></div><div><b>'+T.P+'<small>g</small></b><span>Protein</span></div><div><b>'+T.K+'<small>g</small></b><span>KH</span></div><div><b>'+T.F+'<small>g</small></b><span>Fett</span></div></div>';
+  if(T){ const di=nutDayItems(today,T);
+    h+= di.length ? '<div class="tc-row"><div class="tc-k" style="margin-bottom:6px">Ernährung · abgedeckt</div>'+macroBars(sumMac(di),T,true)+'</div>'
+      : '<div class="tc-row tc-macros"><div><b>'+fmtK(T.kcal)+'</b><span>kcal</span></div><div><b>'+T.P+'<small>g</small></b><span>Protein</span></div><div><b>'+T.K+'<small>g</small></b><span>KH</span></div><div><b>'+T.F+'<small>g</small></b><span>Fett</span></div></div>'; }
   h+=ovWeightRow(today);
   const hints=[];
   if(T && T.entry) hints.push('Einstiegsphase: KH −'+NUT().entry.carb_minus_g+' g bis '+fmtDate(NUT().entry.until).slice(0,6));
