@@ -387,6 +387,11 @@ main table:not(.stack) td button{white-space:nowrap}
 .mb-row.ok .mb-bar i{background:var(--sig)} .mb-row.ok .mb-n{color:var(--sig)}
 .mb-row.over .mb-bar i{background:var(--warn)} .mb-row.over .mb-n{color:var(--warn)}
 .off-at{display:inline-block;font-size:.6rem;font-weight:700;letter-spacing:.08em;color:#000;background:var(--sig);border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:2px}
+/* Trainingsorte */
+.loc-card textarea{width:100%;min-height:76px}
+.loc-card .chip[data-act="locDay"]{min-width:0;padding:6px 0;width:calc((100% - 36px)/7);margin:0 6px 0 0;font-size:.8rem}
+.loc-card .chip[data-act="locDay"]:last-child{margin-right:0}
+.loc-sum{margin:6px 0 4px;color:var(--muted);border-left:2px solid var(--sig);padding-left:10px}
 @media print{
   header.top,nav.tabs,.no-print,button{display:none!important}
   .print-only{display:block}
@@ -495,6 +500,14 @@ function migrate(d){
   d.settings = d.settings || {};
   (d.tests||[]).forEach(t=>{ if(t.name==='High-Bar Squatü') t.name='High-Bar Squat'; });   // Tippfehler aus der Ersterfassung
   d.profile.positionHistory = d.profile.positionHistory || [];
+  // Trainingsorte: Public Gym, Home Gym, Feld (Name frei, Ausstattung als Freitext, Standard-Wochentage)
+  d.profile.locations = Array.isArray(d.profile.locations) ? d.profile.locations : [];
+  const L=d.profile.locations, has=id=>L.some(l=>l.id===id);
+  if(!has('loc-public')) L.push({ id:'loc-public', name:'Public Gym', equipment:[], note:'', source:'standard' });
+  if(!has('loc-own')) L.push({ id:'loc-own', name:'Home Gym', equipment:[], note:'', source:'standard' });
+  if(!has('loc-field')){ L.push({ id:'loc-field', name:'Feld', equipment:[], note:'', source:'standard' });
+    const rank={ 'loc-public':0, 'loc-own':1, 'loc-field':2 }; L.sort((a,b)=>(rank[a.id]??9)-(rank[b.id]??9)); }
+  L.forEach(l=>{ if(l.id==='loc-own' && l.name==='Eigenes Gym') l.name='Home Gym'; if(typeof l.text!=='string') l.text=''; if(!Array.isArray(l.days)) l.days=[]; });
   (d.blocks||[]).forEach(b=>{ b.changelog=b.changelog||[]; (b.days||[]).forEach(x=>{ x.version=x.version||1; x.exercises=x.exercises||[]; }); });
   if(!d.sync) syncMigrateLegacy(d);
   d.schemaVersion = SCHEMA_VERSION;
@@ -517,6 +530,55 @@ function validateData(d){
 function activeBlock(){ return S.blocks.find(b=>b.status==='aktiv') || null; }
 function blockById(id){ return S.blocks.find(b=>b.id===id)||null; }
 function dayById(block,id){ return block ? (block.days.find(d=>d.id===id)||null) : null; }
+/* ---------- Trainingsorte: Freitext → Regeln ----------
+   Leer = keine Auswirkung. Genannte Geräte = am Ort vorhanden (andere Geräte dann nicht).
+   „kein/keine/ohne/nicht …“ schließt Geräte oder Bewegungen aus (z. B. „keine Sprünge oder Überkopf“). */
+const LOC_EQ = {
+  barbell:['langhantel','hantelstange','barbell','lh'], rack:['rack','power rack','squat rack','kniebeugenständer','ständer','käfig'],
+  bench:['bank','flachbank','hantelbank','schrägbank'], dumbbell:['kurzhantel','dumbbell','kh'], kettlebell:['kettlebell','kb'],
+  medball:['medizinball','medball','slamball'], trap_bar:['trap bar','trapbar','hex bar','hexbar'], ssb:['ssb','safety squat','safety bar'],
+  landmine:['landmine'], cable:['kabelzug','kabel','seilzug','cable'], pull_up_bar:['klimmzug','pull-up','pullup'], dip_bars:['dipbarren','dip-barren','barren','dips'],
+  box:['box','kasten','plyobox'], belt_squat:['belt squat','beltsquat'], leg_curl:['beinbeuger','leg curl'], lat_pulldown:['latzug','lat pulldown'],
+  shoulder_press_machine:['schulterpresse'], adductor_machine:['adduktor'], back_extension_bench:['hyperextension','rückenstrecker','back extension'],
+  band:['widerstandsband','bänder','band'], dip_belt:['dipgürtel','gewichtsgürtel'], plate:['hantelscheibe','scheiben'], cones:['hütchen','cones','pylonen'],
+  field:['feld','rasen','kunstrasen','sprintstrecke','laufbahn'] };
+const LOC_MOVE = {
+  jump:{ label:'Sprünge', words:['sprung','sprünge','springen','jump','plyo','hüpf','hops'], test:e=>['jump','jump_loaded'].includes(e.pattern) },
+  overhead:{ label:'Überkopf', words:['überkopf','ueberkopf','über kopf','overhead'], test:e=>e.pattern==='vertical_push' || e.id==='db_snatch' || e.id==='mb_slam' },
+  sprint:{ label:'Sprints', words:['sprint','laufen','läufe'], test:e=>['sprint','cod'].includes(e.pattern) },
+  throw:{ label:'Würfe', words:['wurf','würfe','werfen','throw','slam'], test:e=>e.pattern==='throw' },
+  olympic:{ label:'Olympisches Heben', words:['olymp','umsetzen','clean','reißen','snatch'], test:e=>e.pattern==='olympic' } };
+const LOC_ALWAYS = ['floor_space','wall','step','foot_anchor'];
+const EQ_NAME = { barbell:'Langhantel', rack:'Rack', bench:'Bank', dumbbell:'Kurzhanteln', kettlebell:'Kettlebell', medball:'Medizinball', trap_bar:'Trap Bar', ssb:'SSB',
+  landmine:'Landmine', cable:'Kabelzug', pull_up_bar:'Klimmzugstange', dip_bars:'Dip-Barren', box:'Box', belt_squat:'Belt Squat', leg_curl:'Beinbeuger-Maschine', lat_pulldown:'Latzug',
+  shoulder_press_machine:'Schulterpresse', adductor_machine:'Adduktoren-Maschine', back_extension_bench:'Hyperextension', band:'Band', dip_belt:'Dipgürtel', plate:'Hantelscheiben', cones:'Hütchen', field:'Feld/Rasen' };
+function locWordPos(clause, w){ const src = w.length<=3 ? '(^|[^a-zäöüß])'+w+'(?=$|[^a-zäöüß])' : '(^|[^a-zäöüß])'+w.replace(/[-\s]/g,'[-\\s]?');
+  const m=new RegExp(src).exec(clause); return m ? m.index+m[1].length : -1; }
+function locParse(text){
+  const r={ empty:true, have:[], noEq:[], noMove:[] }; const t=String(text||'').toLowerCase().trim(); if(!t) return r; r.empty=false;
+  // Satzteile; ein „kein/keine/ohne/nicht …“ gilt für alles danach im selben Satzteil („keine Sprünge oder Überkopf“)
+  t.split(/[,;\n.\/+]|\s[–-]\s|\bund\b|\bsowie\b/).forEach(raw=>{ const c=' '+raw.trim()+' '; if(!raw.trim()) return;
+    const nm=/(^|[^a-zäöüß])(kein|keine|keinen|keiner|ohne|nicht|kaum)(?=[^a-zäöüß]|$)/.exec(c); const negAt=nm?nm.index:-1;
+    const isNeg=pos=> negAt>=0 && (pos>negAt || /\b(nicht|geht nicht|nicht möglich)\b/.test(c.slice(pos)));
+    Object.entries(LOC_MOVE).forEach(([k,m])=>{ const ps=m.words.map(w=>locWordPos(c,w)).filter(x=>x>=0); if(ps.length && isNeg(Math.min(...ps))) r.noMove.push(k); });
+    Object.entries(LOC_EQ).forEach(([k,ws])=>{ const ps=ws.map(w=>locWordPos(c,w)).filter(x=>x>=0); if(ps.length) (isNeg(Math.min(...ps))?r.noEq:r.have).push(k); }); });
+  r.noMove=[...new Set(r.noMove)]; r.noEq=[...new Set(r.noEq)]; r.have=[...new Set(r.have)].filter(k=>!r.noEq.includes(k));
+  return r; }
+function locSummary(l){ const r=locParse(l.text); if(r.empty) return 'Leer – keine Einschränkung, alle Übungen möglich.';
+  const out=[]; if(r.have.length) out.push('vorhanden: '+r.have.map(k=>EQ_NAME[k]).join(', ')+' (andere Geräte werden hier nicht geplant)');
+  if(r.noEq.length) out.push('nicht vorhanden: '+r.noEq.map(k=>EQ_NAME[k]).join(', '));
+  if(r.noMove.length) out.push('nicht möglich: '+r.noMove.map(k=>LOC_MOVE[k].label).join(', '));
+  return out.length ? out.join(' · ') : 'Nichts erkannt – Text hat keine Auswirkung. Nenne Geräte (z. B. Langhantel, Rack, Kurzhanteln) oder „keine Sprünge“.'; }
+/* Warum ist Übung e am Ort nicht möglich? null = möglich */
+function locBlocks(e, r){ if(!r || r.empty) return null;
+  for(const k of r.noMove) if(LOC_MOVE[k].test(e)) return LOC_MOVE[k].label+' nicht möglich';
+  const eq=e.equipment||[]; const bad=eq.filter(q=>r.noEq.includes(q)); if(bad.length) return bad.map(q=>EQ_NAME[q]||q).join(', ')+' nicht vorhanden';
+  if(r.have.length){ const ok=new Set(r.have.concat(LOC_ALWAYS)); if(r.have.includes('barbell')) ok.add('plate');
+    const miss=eq.filter(q=>!ok.has(q)); if(miss.length) return miss.map(q=>EQ_NAME[q]||q).join(', ')+' nicht vorhanden'; }
+  return null; }
+function locDefault(date){ const L=S.profile.locations||[]; const wd=weekdayOf(date);
+  const byDay=L.find(l=>(l.days||[]).includes(wd)); if(byDay) return byDay.id;
+  const last=S.settings.lastLocId; if(last && L.some(l=>l.id===last)) return last; return L[0]?L[0].id:null; }
 function locById(id){ return S.profile.locations.find(l=>l.id===id)||null; }
 function sessionById(id){ return S.sessions.find(s=>s.id===id)||null; }
 function capText(b){ if(!b) return ''; const a=b.rpeCapMin, z=b.rpeCapMax; if(a==null&&z==null) return ''; if(a!=null&&z!=null&&a!==z) return 'RPE ≤ '+fmtNum(a)+'–'+fmtNum(z); return 'RPE ≤ '+fmtNum(z!=null?z:a); }
@@ -1984,6 +2046,8 @@ function plBuild(inp){
   const painOn = pain>=thr;
   const legPain = painOn && regions.some(r=>(rules.leg_regions||[]).includes(r));
   const notes=[], dropped=[], items=[];
+  const locObj=inp.loc?locById(inp.loc):null; const locR=locObj?locParse(locObj.text):null;
+  if(locObj && locR && !locR.empty) notes.push('Ort '+locObj.name+': '+locSummary(locObj)+'. Übungen, die dort nicht gehen, werden ersetzt oder weggelassen.');
   const noIncrease = painOn ? 'Beschwerden '+pain+'/10' : (rd!=null && rd<=2 ? 'Readiness '+rd : '');
   ((b.week_notes||{})[week]||[]).forEach(n=>notes.push(n));
   if(rd===1) notes.push('Readiness 1: Empfehlung ist eine Recovery-/Technik-Einheit oder Pause. Falls du trotzdem trainierst, ist die Einheit unten stark reduziert.');
@@ -2008,9 +2072,12 @@ function plBuild(inp){
     const d=(slot.dose||{})[week]; if(!d){ return; }
     if(slot.role==='optional' && !(rd==null || rd>=4)){ dropped.push({ slot, why:'optional – nur bei Readiness 4–5' }); return; }
     // Kandidaten: Ausstattung, Beschwerden, Kontinuität (5.2)
-    const cands=slot.candidates.map(id=>REF.exMap[id]).filter(Boolean);
+    let cands=slot.candidates.map(id=>REF.exMap[id]).filter(Boolean);
+    // Ersatzübungen aus der Datenbank nur nachrangig (greifen, wenn der Ort die geplanten Übungen ausschließt)
+    if(locR && !locR.empty){ const ids=new Set(cands.map(e=>e.id)); cands.slice().forEach(e=>(e.substitutes||[]).forEach(id=>{ const x=REF.exMap[id]; if(x && !ids.has(id) && (!x.phases || !due.phase || x.phases.includes(due.phase.id))){ ids.add(id); cands.push(x); } })); }
     const filt=[], skipWhy=[];
     cands.forEach(e=>{
+      const lb=locBlocks(e, locR); if(lb){ if(slot.candidates.includes(e.id)) skipWhy.push(e.name_de+': '+lb+' ('+locObj.name+')'); return; }
       const miss=(e.equipment||[]).filter(q=>(inp.noEquip||[]).includes(q));
       if(miss.length){ skipWhy.push(e.name_de+': '+miss.map(q=>EQUIP_LABEL[q]||q).join(', ')+' nicht verfügbar'); return; }
       const hit=painOn ? (e.regions||[]).filter(r=>regions.includes(r)) : [];
@@ -2076,13 +2143,13 @@ function plToSession(P){
   return { id:uid('ses'), blockId:appBlock?appBlock.id:null, dayId:null, name:t.id+' – '+t.name, focus:t.goal||'', plannedDate:date, week:mondayOf(date),
     status:'geplant', location:'', plan, dayVersion:null, log:null, skipReason:'', moves:[], createdAt:new Date().toISOString(),
     planner:{ planVersion:REF.plan.version, blockId:b.id, phase:P.due.phase?P.due.phase.id:null, week:P.week, wave:P.due.wave, templateId:t.id, cap:P.cap,
-      checkin:{ readiness:P.inp.readiness, sleep:P.inp.sleep, pain:P.inp.pain, regions:P.inp.regions, avail:P.inp.avail, grip:!!P.inp.grip, noEquip:P.inp.noEquip },
+      checkin:{ readiness:P.inp.readiness, sleep:P.inp.sleep, pain:P.inp.pain, regions:P.inp.regions, avail:P.inp.avail, grip:!!P.inp.grip, noEquip:P.inp.noEquip, loc:P.inp.loc||null, locName:(P.inp.loc&&locById(P.inp.loc)||{}).name||null },
       notes:P.notes, merged:P.items.filter(x=>x.from).map(x=>x.slotId), dropped:P.dropped.map(d=>({ slot:d.slot.id, why:d.why })), contacts:P.contacts, estMin:P.estMin, generatedAt:new Date().toISOString() } };
 }
 
 /* ---------- Sessionplaner: Oberfläche ---------- */
-function plDefaults(){ return { date:todayISO(), readiness:null, sleep:null, pain:0, regions:[], avail:null, grip:false, noEquip:[], accept:{}, tpl:null }; }
-function plInput(){ const p=ui.pl; const due=plDue(p.date); return Object.assign({}, p, { tpl: p.tpl && due.block && plTemplate(due.block,p.tpl) ? p.tpl : due.tpl }); }
+function plDefaults(){ return { date:todayISO(), readiness:null, sleep:null, pain:0, regions:[], avail:null, grip:false, noEquip:[], accept:{}, tpl:null, loc:null }; }
+function plInput(){ const p=ui.pl; const due=plDue(p.date); const loc=p.loc && locById(p.loc) ? p.loc : locDefault(p.date); return Object.assign({}, p, { tpl: p.tpl && due.block && plTemplate(due.block,p.tpl) ? p.tpl : due.tpl, loc }); }
 function chipBtn(act, k, v, label, on){ return '<button class="chip" data-act="'+act+'" data-k="'+k+'" data-v="'+esc(v)+'" aria-pressed="'+(on?'true':'false')+'">'+esc(label)+'</button>'; }
 function plPlaceholders(){ return S.sessions.filter(s=>!s.planner && s.status==='geplant' && !s.log && !(s.plan||[]).length); }
 
@@ -2124,6 +2191,7 @@ ACT.plChip = el=>{ const p=ui.pl, k=el.dataset.k, v=el.dataset.v;
   if(k==='readiness') p.readiness=Number(v);
   else if(k==='painLvl'){ p.pain=Number(v); if(!p.pain) p.regions=[]; }
   else if(k==='grip') p.grip=!p.grip;
+  else if(k==='loc'){ p.loc=v; p.accept={}; S.settings.lastLocId=v; save(); }
   else { const a=p[k]; const i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); }
   render(); };
 ACT.plAccept = el=>{ const k=el.dataset.k; ui.pl.accept=ui.pl.accept||{}; if(ui.pl.accept[k]) delete ui.pl.accept[k]; else ui.pl.accept[k]=true; render(); };
@@ -2672,6 +2740,7 @@ function viewProfile(){
   h+='<div class="section"><div class="fields">'+inp('p-name','Name',p.name)+inp('p-by','Geburtsjahr',p.birthYear,'inputmode="numeric" placeholder="z. B. 1993"')+'</div>'+
     '<div class="fields">'+inp('p-h','Größe (cm)',p.heightCm,'inputmode="numeric"')+inp('p-tw','Zielgewicht (kg, optional)',fmtNum(p.targetWeightKg),'inputmode="decimal"')+'</div>'+
     '<button class="primary" data-act="saveProfileSlim">Speichern</button></div>';
+  h+='<h2>Trainingsorte</h2>'+locSection();
   h+=ghSection();
   const le=S.settings.lastExport;
   h+='<h2>Sicherung</h2><div class="section"><p class="small muted">Deine Daten sind im Datenrepo gesichert, jeder Abgleich ist eine Version. Zusätzlich kannst du eine Datei herunterladen'+(le?' (zuletzt '+fmtDate(le.slice(0,10))+')':'')+'.</p>'+
@@ -2685,6 +2754,24 @@ function viewProfile(){
   h+='<p class="small muted" style="margin-top:24px">AOS ist kein Ersatz für medizinische oder sportwissenschaftliche Betreuung.</p>';
   return h;
 }
+function locSection(){ const L=S.profile.locations||[]; const days=[1,2,3,4,5,6,0];
+  return '<p class="small muted">Trag ein, was es am Ort gibt oder was nicht geht – z. B. „Langhantel, Rack, Kurzhanteln, Bank“ oder „keine Sprünge oder Überkopf“. Leer = keine Einschränkung. AOS plant Einheiten an diesem Ort nur mit Übungen, die dort möglich sind.</p>'+
+  L.map(l=>'<div class="section loc-card"><div class="row" style="flex-wrap:nowrap;gap:8px;align-items:flex-end"><div style="flex:1;min-width:0">'+inp('loc-n-'+l.id,'Name',l.name,'data-chg="locSave" data-id="'+l.id+'"')+'</div>'+
+    (L.length>1?'<button class="small" data-act="locDel" data-id="'+l.id+'" aria-label="Ort entfernen" style="margin-bottom:8px">✕</button>':'')+'</div>'+
+    '<label for="loc-t-'+l.id+'">Ausstattung & Einschränkungen</label><textarea id="loc-t-'+l.id+'" rows="3" data-chg="locSave" data-id="'+l.id+'" placeholder="leer = alles möglich">'+esc(l.text||'')+'</textarea>'+
+    '<div class="loc-sum small">'+esc(locSummary(l))+'</div>'+
+    '<label>Standard an diesen Tagen</label><div>'+days.map(d=>chipBtn('locDay',l.id,d,WD[d],(l.days||[]).includes(d))).join('')+'</div></div>').join('')+
+  '<button class="small" data-act="locAdd">+ Ort hinzufügen</button>'; }
+CHG.locSave = el=>{ const l=locById(el.dataset.id); if(!l) return;
+  const n=(val('loc-n-'+l.id)||'').trim(); if(n) l.name=n; else { toast('Bitte einen Namen eingeben.'); }
+  const t=document.getElementById('loc-t-'+l.id); if(t) l.text=t.value.trim(); save(); render(); };
+ACT.locDay = el=>{ const l=locById(el.dataset.k); if(!l) return; const d=Number(el.dataset.v); l.days=l.days||[];
+  const i=l.days.indexOf(d); if(i>=0) l.days.splice(i,1); else { S.profile.locations.forEach(x=>{ x.days=(x.days||[]).filter(y=>y!==d); }); l.days.push(d); }
+  save(); render(); };
+ACT.locAdd = ()=>{ S.profile.locations.push({ id:uid('loc'), name:'Neuer Ort', equipment:[], note:'', source:'eingabe', text:'', days:[] }); save(); render(); };
+ACT.locDel = el=>{ const l=locById(el.dataset.id); if(!l) return;
+  confirmDlg('„'+l.name+'“ entfernen?', 'Der Ort und seine Angaben werden entfernt. Bereits erfasste Einheiten bleiben unverändert.', 'Entfernen', ()=>{
+    S.profile.locations=S.profile.locations.filter(x=>x.id!==l.id); if(S.settings.lastLocId===l.id) S.settings.lastLocId=null; save(); render(); }, true); };
 ACT.saveProfileSlim = ()=>{
   const p=S.profile; const by=val('p-by'), hgt=val('p-h'), tw=val('p-tw'); const y=new Date().getFullYear();
   if(by && (!/^\d{4}$/.test(by)||+by<y-90||+by>y-10)){ toast('Bitte ein gültiges Geburtsjahr eingeben.'); return; }
@@ -2717,6 +2804,7 @@ function plSection(){
   due.warnings.filter(w=>!/entfällt/.test(w)).forEach(w=>{ h+='<div class="note warn small">'+esc(w)+'</div>'; });
   if(due.doneToday){ h+='<div class="note small">✓ '+esc(due.doneToday.name)+' ist erledigt. <button class="link" data-act="startLog" data-id="'+due.doneToday.id+'">Protokoll ansehen</button></div>'; }
   if(t && !due.doneToday){
+    const LL=S.profile.locations||[]; if(LL.length>1) h+='<label>Wo trainierst du?</label><div>'+LL.map(l=>chipBtn('plChip','loc',l.id,l.name,pin.loc===l.id)).join('')+'</div>';
     h+='<label>Wie fit fühlst du dich? (1 = sehr schlecht, 5 = sehr gut)</label><div class="chips5">'+[1,2,3,4,5].map(n=>chipBtn('plChip','readiness',n,String(n),p.readiness===n)).join('')+'</div>';
     h+='<label>Beschwerden?</label><div>'+[[0,'keine'],[2,'leicht'],[4,'mittel'],[7,'stark']].map(([v,l])=>chipBtn('plChip','painLvl',v,l,(p.pain||0)===v)).join('')+'</div>';
     if(p.pain>0) h+='<label>Wo?</label><div>'+Object.keys(REGION_LABEL).map(r=>chipBtn('plChip','regions',r,REGION_LABEL[r],p.regions.includes(r))).join('')+'</div>';
