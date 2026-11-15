@@ -376,6 +376,14 @@ table.supw td,table.supw th{text-align:center;padding:6px 2px}table.supw td:firs
 @media (min-width:1000px){
   .nut-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);grid-template-areas:"b a" "b c";column-gap:28px;align-items:start}
   .ng-a{grid-area:a}.ng-b{grid-area:b}.ng-c{grid-area:c} .ng-b>h2:first-child{margin-top:0} }
+.ph-list{padding-top:6px;padding-bottom:6px}
+.ph-row{padding:12px 4px;border-bottom:1px solid var(--line)}.ph-row:last-child{border-bottom:0}
+.ph-row.sel{background:rgba(246,1,0,.08);margin:0 -10px;padding-left:14px;padding-right:14px;border-radius:12px}
+.ph-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.ph-top>button,.ph-top>strong{min-width:0;text-align:left}
+.ph-tags{display:flex;gap:6px;flex:none}
+.ph-meta{display:flex;flex-wrap:wrap;column-gap:16px;row-gap:2px}.ph-meta span{white-space:nowrap}
+.badge{white-space:nowrap}
 .last-perf{font-size:.8rem;color:var(--muted);margin:2px 0 8px}.last-perf strong{color:var(--text);font-weight:600}
 .pdet-b>.table-wrap:last-child,.pdet-b>details:last-child{margin-bottom:2px}
 .meal{padding-top:12px;padding-bottom:12px}
@@ -540,7 +548,7 @@ function seedData(){
   return {
     schemaVersion: SCHEMA_VERSION,
     meta: { createdAt: now, updatedAt: now, app:'AOS – Athlete Operating System' },
-    profile: { name:'', sex:'', age:null, birthYear:null, heightCm:null, targetWeightKg:null, positions:[], positionHistory:[], locations:[] },
+    profile: { name:'', birthYear:null, heightCm:null, targetWeightKg:null, positions:[], locations:[] },
     goals: [], tests: [], bodyweight: [], blocks: [], sessions: [],
     unavailable: [], suggestionDecisions: {}, calendar: [],
     nutrition: defaultNutrition(),
@@ -588,19 +596,33 @@ function migrate(d){
   Object.keys(n.dayOverrides).forEach(k=>{ if(typeof n.dayOverrides[k]!=='object' || n.dayOverrides[k]===null) n.dayOverrides[k]={}; });   // alte Tagesarten (Text) → neues Format
   d.settings = d.settings || {};
   (d.tests||[]).forEach(t=>{ if(t.name==='High-Bar Squatü') t.name='High-Bar Squat'; });   // Tippfehler aus der Ersterfassung
-  d.profile.positionHistory = d.profile.positionHistory || [];
   // Trainingsorte: Public Gym, Home Gym, Feld (Name frei, Ausstattung als Freitext, Standard-Wochentage)
   d.profile.locations = Array.isArray(d.profile.locations) ? d.profile.locations : [];
   const L=d.profile.locations, has=id=>L.some(l=>l.id===id);
-  if(!has('loc-public')) L.push({ id:'loc-public', name:'Public Gym', equipment:[], note:'', source:'standard' });
-  if(!has('loc-own')) L.push({ id:'loc-own', name:'Home Gym', equipment:[], note:'', source:'standard' });
-  if(!has('loc-field')){ L.push({ id:'loc-field', name:'Feld', equipment:[], note:'', source:'standard' });
+  if(!has('loc-public')) L.push({ id:'loc-public', name:'Public Gym', note:'', source:'standard' });
+  if(!has('loc-own')) L.push({ id:'loc-own', name:'Home Gym', note:'', source:'standard' });
+  if(!has('loc-field')){ L.push({ id:'loc-field', name:'Feld', note:'', source:'standard' });
     const rank={ 'loc-public':0, 'loc-own':1, 'loc-field':2 }; L.sort((a,b)=>(rank[a.id]??9)-(rank[b.id]??9)); }
   L.forEach(l=>{ if(l.id==='loc-own' && l.name==='Eigenes Gym') l.name='Home Gym'; if(typeof l.text!=='string') l.text=''; if(!Array.isArray(l.days)) l.days=[]; });
-  (d.blocks||[]).forEach(b=>{ b.changelog=b.changelog||[]; (b.days||[]).forEach(x=>{ x.version=x.version||1; x.exercises=x.exercises||[]; }); });
+  d.blocks = Array.isArray(d.blocks) ? d.blocks : [];   // nur noch leerer Platzhalter (W3), Pläne erzeugt der Sessionplaner
   if(!d.sync) syncMigrateLegacy(d);
+  cleanupLegacy(d);
   d.schemaVersion = SCHEMA_VERSION;
   return d;
+}
+/* Altdaten der früheren, von Hand geführten Planverwaltung entfernen (Backlog W3). Entfernte Datensätze bekommen eine
+   Löschmarke, damit sie beim Abgleich mit iPhone/Laptop/Datenrepo nicht zurückkommen. Idempotent. */
+function cleanupLegacy(d){
+  const sy=d.sync; if(!sy) return; sy.stamps=sy.stamps||{}; sy.tombstones=sy.tombstones||{}; const now=new Date().toISOString();
+  const tomb=k=>{ sy.tombstones[k]=now; delete sy.stamps[k]; };
+  (d.blocks||[]).forEach(b=>tomb('blocks:'+b.id)); d.blocks=[];                         // alte Blöcke, Trainingstage, Änderungsprotokoll
+  (d.unavailable||[]).forEach(x=>tomb('unavail:'+x)); d.unavailable=[];                 // alte „nicht verfügbar“-Tage (ersetzt durch Tag frei im Plan)
+  Object.keys(d.suggestionDecisions||{}).forEach(k=>{ if(/^(deload|plan)\|/.test(k)){ tomb('decision:'+k); delete d.suggestionDecisions[k]; } });
+  const p=d.profile||{}; let pc=false;
+  ['positionHistory','sex','age'].forEach(f=>{ if(f in p){ delete p[f]; pc=true; } });
+  // alte Ausstattungsliste wurde nie ausgewertet – maßgeblich ist der Freitext (eine positive Liste würde dort alles andere ausschließen)
+  (p.locations||[]).forEach(l=>{ if('equipment' in l){ delete l.equipment; pc=true; } });
+  if(pc) sy.stamps['profile:_']=now;
 }
 function validateData(d){
   const errors=[];
@@ -616,9 +638,7 @@ function validateData(d){
 }
 
 /* ---------- Abfragen ---------- */
-function activeBlock(){ return S.blocks.find(b=>b.status==='aktiv') || null; }
-function blockById(id){ return S.blocks.find(b=>b.id===id)||null; }
-function dayById(block,id){ return block ? (block.days.find(d=>d.id===id)||null) : null; }
+function blockById(id){ return (typeof REF!=='undefined' && REF.plan && (REF.plan.blocks||[]).find(b=>b.id===id)) || null; }   // Block aus dem automatischen Plan
 /* ---------- Trainingsorte: Freitext → Regeln ----------
    Leer = keine Auswirkung. Genannte Geräte = am Ort vorhanden (andere Geräte dann nicht).
    „kein/keine/ohne/nicht …“ schließt Geräte oder Bewegungen aus (z. B. „keine Sprünge oder Überkopf“). */
@@ -670,8 +690,7 @@ function locDefault(date){ const L=S.profile.locations||[]; const wd=weekdayOf(d
   const last=S.settings.lastLocId; if(last && L.some(l=>l.id===last)) return last; return L[0]?L[0].id:null; }
 function locById(id){ return S.profile.locations.find(l=>l.id===id)||null; }
 function sessionById(id){ return S.sessions.find(s=>s.id===id)||null; }
-function capText(b){ if(!b) return ''; const a=b.rpeCapMin, z=b.rpeCapMax; if(a==null&&z==null) return ''; if(a!=null&&z!=null&&a!==z) return 'RPE ≤ '+fmtNum(a)+'–'+fmtNum(z); return 'RPE ≤ '+fmtNum(z!=null?z:a); }
-function capMax(b){ return b ? (b.rpeCapMax!=null?b.rpeCapMax:b.rpeCapMin) : null; }
+function capMax(b){ return b ? plCap(b) : null; }
 
 /* Fehlende/unvollständige Angaben eines Testergebnisses – nichts wird ergänzt */
 function testGaps(t){
@@ -933,9 +952,7 @@ function statusBadge(s){ const ov = s.status==='geplant' && s.plannedDate && s.p
   if(ov) return badge('nicht erfasst','warn');
   return badge(STATUS_LABEL[s.status], s.status==='absolviert'?'ok':s.status==='teilweise'?'info':s.status==='ausgelassen'?'':''); }
 function srcBadge(o){ return o && o.source==='ausgangsdaten' ? badge('Ausgangsdaten','info') : ''; }
-function planCapText(){ if(typeof REF==='undefined' || !REF.plan) return ''; const pb=plCurrentBlock(todayISO()); if(!pb) return ''; const c=pb.rpe_cap; return 'RPE ≤ '+fmtNum(c[0])+(c.length>1&&c[1]!==c[0]?'–'+fmtNum(c[1]):''); }
-function capBadge(b, raw){ const pt=(!raw && b && b.status==='aktiv') ? planCapText() : ''; const t=pt||capText(b);
-  return t?'<span class="cap" title="'+(pt?'RPE-Obergrenze laut Plan':'RPE-Obergrenze dieses Blocks')+'">'+esc(t)+'</span>':''; }
+function capBadge(s){ const c=s&&s.planner?s.planner.cap:null; return c!=null?'<span class="cap" title="RPE-Obergrenze laut Plan">RPE ≤ '+fmtNum(c)+'</span>':''; }
 function toast(msg){ document.querySelectorAll('.toast').forEach(x=>x.remove()); const t=document.createElement('div'); t.className='toast'; t.setAttribute('role','status'); t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3200); }
 
 /* ---------- Dialog ---------- */
@@ -956,7 +973,6 @@ ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f
 
 /* ---------- Gerüst ---------- */
 function renderShell(){
-  const b=activeBlock();
   document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+' aria-label="'+t+'" title="'+t+'">'+(NAV_ICON[k]||'')+'<span class="sr-only">'+t+'</span></button>').join('');
   document.getElementById('topinfo').innerHTML = '<div class="sysbar"><button id="hsync" class="sync-btn" data-act="syncInfo" aria-label="Speicherstatus anzeigen">'+ghDot()+'</button></div>';
 }
@@ -1009,9 +1025,9 @@ document.addEventListener('input', e=>{
 /* ===== AOS – Einheit: Details, verschieben, auslassen ===== */
 ACT.openSession = el=>{
   const s=sessionById(el.dataset.id); if(!s) return;
-  const b=blockById(s.blockId); const loc=locById(s.location);
+  const loc=locById(s.location);
   let body='<p><strong>'+esc(s.name)+'</strong> · '+(s.plannedDate?WD_LONG[weekdayOf(s.plannedDate)]+', '+fmtDate(s.plannedDate):'ohne Termin')+' · '+statusBadge(s)+'</p>';
-  body+='<p class="small">'+(loc?'Ort: '+esc(loc.name)+' · ':'')+capBadge(b)+'</p>';
+  body+='<p class="small">'+(loc?'Ort: '+esc(loc.name)+' · ':'')+capBadge(s)+'</p>';
   if(s.skipReason) body+='<p class="small">Grund fürs Auslassen: '+esc(s.skipReason)+'</p>';
   if(s.moves && s.moves.length) body+='<p class="small muted">Verschoben: '+s.moves.map(m=>(m.from?fmtDate(m.from):'ohne Termin')+' → '+(m.to?fmtDate(m.to):'ohne Termin')).join('; ')+'</p>';
   body+= s.plan.length ? '<ul class="small">'+s.plan.map(e=>'<li>'+esc(exTitle(e))+' – '+esc(exPlanText(e)||'ohne Vorgabe')+'</li>').join('')+'</ul>' : '<p class="small muted">Keine Übungen hinterlegt.</p>';
@@ -1032,7 +1048,6 @@ ACT.moveSession = el=>{
   const s=sessionById(el.dataset.id); const to=val('mv-date');
   if(!to){ toast('Bitte ein Datum wählen.'); return; }
   const warn=[];
-  if(S.unavailable.includes(to)) warn.push('Der Tag ist als nicht verfügbar markiert.');
   const other=S.sessions.filter(x=>x.id!==s.id && x.plannedDate===to && x.status!=='ausgelassen');
   if(other.length) warn.push('An diesem Tag ist bereits „'+other.map(x=>x.name).join('“, „')+'“ eingetragen.');
   const wk=s.week||(s.plannedDate?mondayOf(s.plannedDate):null);
@@ -1129,10 +1144,9 @@ function lastPerf(e, excludeId){
 }
 function logForm(){
   const s=sessionById(ui.sessionId); const b=blockById(s.blockId); const dr=ui.draft; const cap=(s.planner&&s.planner.cap!=null)?s.planner.cap:capMax(b);
-  const day=b?dayById(b,s.dayId):null;
   let h='<div class="row no-print"><button data-act="logBack">← Zurück</button></div>';
   if(!s.log) h+='<div class="hunt-tag">Jagdmodus · Einheit läuft</div>';
-  h+='<h1>'+esc(s.name)+'</h1><div class="row">'+(s.planner?'<span class="cap">RPE ≤ '+fmtNum(cap)+'</span> <span class="small muted">'+esc((s.planner.phase||'')+' · Woche '+s.planner.week)+'</span>':capBadge(b))+' '+statusBadge(s)+'</div>';
+  h+='<h1>'+esc(s.name)+'</h1><div class="row">'+(s.planner?'<span class="cap">RPE ≤ '+fmtNum(cap)+'</span> <span class="small muted">'+esc((s.planner.phase||'')+' · Woche '+s.planner.week)+'</span>':capBadge(s))+' '+statusBadge(s)+'</div>';
   if(s.planner && !s.log) (s.planner.notes||[]).forEach(n=>{ h+='<div class="note small">'+esc(n)+'</div>'; });
   if(b && b.rules) h+='<p class="small muted">Blockregeln: '+esc(b.rules)+'</p>';
   h+=inp('lg-date','Datum',dr.date,'type="date" data-log="meta" data-f="date"');
@@ -1456,7 +1470,7 @@ CHG.importFile = el=>readBackup(el, (d,f)=>{
   ui.importData=d;
   const logged=d.sessions.filter(s=>s.log).length;
   openDlg('Alles ersetzen?','<p>Datei: <strong>'+esc(f.name)+'</strong><br>Stand: '+(d.meta&&d.meta.updatedAt?fmtDate(d.meta.updatedAt.slice(0,10)):'unbekannt')+'</p>'+
-    '<p class="small">'+d.blocks.length+' Block/Blöcke · '+d.sessions.length+' Einheiten ('+logged+' protokolliert) · '+d.tests.length+' Tests · '+d.bodyweight.length+' Körpergewichtsmessungen</p>'+
+    '<p class="small">'+d.sessions.length+' Einheiten ('+logged+' protokolliert) · '+d.tests.length+' Tests · '+d.bodyweight.length+' Körpergewichtsmessungen</p>'+
     '<div class="note warn"><strong>Achtung:</strong> Der Import ersetzt alle aktuell auf diesem Gerät gespeicherten AOS-Daten ('+S.sessions.length+' Einheiten, '+S.tests.length+' Tests). Wenn du Daten von zwei Geräten behalten willst, nutze stattdessen „Sicherung zusammenführen“.</div>',
     '<button data-act="closeDlg">Abbrechen</button><button data-act="exportJSON">Aktuelle Daten zuerst sichern</button><button class="danger" data-act="importOk">Daten ersetzen</button>');
 });
@@ -2058,8 +2072,7 @@ function plToSession(P){
     notes:[x.note].concat(x.reasons).filter(Boolean).join(' '),
     planner:{ dbId:x.dbId, slotId:x.slotId, method:x.method, role:x.role, fastCheck:x.method==='velocity', range:x.slot.range||null }
   }));
-  const appBlock=activeBlock();
-  return { id:uid('ses'), blockId:appBlock?appBlock.id:null, dayId:null, name:t.id+' – '+t.name, focus:t.goal||'', plannedDate:date, week:mondayOf(date),
+  return { id:uid('ses'), blockId:b.id, dayId:null, name:t.id+' – '+t.name, focus:t.goal||'', plannedDate:date, week:mondayOf(date),
     status:'geplant', location:'', plan, dayVersion:null, log:null, skipReason:'', moves:[], createdAt:new Date().toISOString(),
     planner:{ planVersion:REF.plan.version, blockId:b.id, phase:P.due.phase?P.due.phase.id:null, week:P.week, wave:P.due.wave, templateId:t.id, cap:P.cap,
       checkin:{ readiness:P.inp.readiness, sleep:P.inp.sleep, pain:P.inp.pain, regions:P.inp.regions, avail:P.inp.avail, grip:!!P.inp.grip, noEquip:P.inp.noEquip, loc:P.inp.loc||null, locName:(P.inp.loc&&locById(P.inp.loc)||{}).name||null },
@@ -2578,17 +2591,19 @@ function viewPlan(){
   const P=REF.plan, today=todayISO();
   h+='<div class="section">'+(cdBlock('cd-plan')||'<strong>Saison</strong>')+'<p class="small muted" style="margin-top:10px">Plan geladen '+(REF.at?ghTime(REF.at):'—')+' · <button class="link" data-act="plReload">neu laden</button> · Spieltage im <button class="link" data-act="go" data-view="profil">Profil → Kalender</button></p></div>';
   // Phasen
-  h+='<h2>Phasen bis zum ersten Spiel</h2><div class="section table-wrap"><table><tbody>'+P.phases.map(ph=>{
+  h+='<h2>Phasen</h2><div class="section ph-list">'+P.phases.map(ph=>{
     const cur=today>=ph.start && today<=ph.end; const w=Math.round((daysBetween(ph.start,ph.end)+1)/7);
     const pb=P.blocks.find(b=>b.phase===ph.id); const cap=pb?plCap(pb):(ph.rpe_cap||[]).slice(-1)[0];
     const sel=ui.planBlock ? ui.planBlock===(pb&&pb.id) : cur;
-    return '<tr'+(sel?' style="background:var(--accent-soft)"':'')+'><td>'+(pb?'<button class="link" data-act="plShowBlock" data-id="'+esc(pb.id)+'"><strong>'+esc(ph.name)+'</strong></button>':'<strong>'+esc(ph.name)+'</strong>')+(cur?' '+badge('aktuell','ok'):'')+'<br><span class="small muted">'+fmtDate(ph.start)+' – '+fmtDate(ph.end)+' · '+w+' Wochen'+(cap!=null?' · RPE ≤ '+fmtNum(cap):'')+'</span></td>'+
-      '<td>'+(pb?badge(pb.auto?'automatisch':'fester Plan', pb.auto?'info':'ok'):badge('offen','warn'))+'</td></tr>'; }).join('')+'</tbody></table></div><p class="small muted">Tipp auf eine Phase, um ihre Einheiten zu sehen. Phasen ohne festen Plan stellt AOS selbst zusammen – Übungen, Sätze und RPE nach Phase, deinen Werten und Zielen.</p>';
+    const nm=pb?'<button class="link" data-act="plShowBlock" data-id="'+esc(pb.id)+'"><strong>'+esc(ph.name)+'</strong></button>':'<strong>'+esc(ph.name)+'</strong>';
+    const tags=(cur?badge('aktuell','ok')+' ':'')+(pb?badge(pb.auto?'automatisch':'fester Plan', pb.auto?'info':'ok'):badge('offen','warn'));
+    return '<div class="ph-row'+(sel?' sel':'')+'"><div class="ph-top">'+nm+'<span class="ph-tags">'+tags+'</span></div>'+
+      '<div class="small muted ph-meta"><span>'+fmtDate(ph.start).slice(0,6)+' – '+fmtDate(ph.end).slice(0,6)+'</span><span>'+w+' Wochen</span>'+(cap!=null?'<span>RPE ≤ '+fmtNum(cap)+'</span>':'')+'</div></div>'; }).join('')+'</div><p class="small muted">Tipp auf eine Phase, um ihre Einheiten zu sehen. Alle Phasen ohne festen Plan stellt AOS selbst zusammen – Übungen, Sätze und RPE nach Phase, deinen Werten und Zielen.</p>';
   // Aktueller (oder nächster) Block
   const b=(ui.planBlock && P.blocks.find(x=>x.id===ui.planBlock)) || plBlockAt(today) || P.blocks.find(x=>x.start>today) || P.blocks[P.blocks.length-1];
   if(!b) return h;
-  h+='<h2 id="plan-block">'+esc(b.name)+'</h2><div class="section"><p class="small">'+fmtDate(b.start)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+' · '+b.weeks+' Wochen · RPE ≤ '+fmtNum(plCap(b))+
-    ' · max. '+((b.limits||{}).contacts_per_session||[])[1]+' Bodenkontakte/Einheit · '+((P.rules||{}).max_session_min||65)+' min</p>'+
+  h+='<h2 id="plan-block">'+esc(b.name)+'</h2><div class="section"><div class="small ph-meta" style="margin-bottom:10px"><span>'+fmtDate(b.start).slice(0,6)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+'</span><span>'+b.weeks+' Wochen</span><span>RPE ≤ '+fmtNum(plCap(b))+'</span>'+
+    '<span>max. '+((b.limits||{}).contacts_per_session||[])[1]+' Bodenkontakte</span><span>'+((P.rules||{}).max_session_min||65)+' min/Einheit</span></div>'+
     '';
   // Wochenraster
   const days=['MON','TUE','WED','THU','FRI','SAT','SUN'], dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
@@ -2809,7 +2824,7 @@ function viewTraining(){
   if(done.length) h+='<h2>Zuletzt</h2><div class="section">'+done.map(s=>'<p style="margin:6px 0"><button class="link" data-act="startLog" data-id="'+s.id+'">'+esc(s.name)+'</button> <span class="small muted">'+fmtDateShort(sessionDate(s))+(s.status==='teilweise'?' · teilweise':'')+'</span></p>').join('')+'</div>';
   return h;
 }
-ACT.logFree = ()=>{ const b=activeBlock(); const s={ id:uid('ses'), blockId:b?b.id:null, dayId:null, name:'Freie Einheit', focus:'', plannedDate:todayISO(), week:mondayOf(todayISO()), status:'geplant', location:'', plan:[], dayVersion:null, log:null, skipReason:'', moves:[], createdAt:new Date().toISOString() };
+ACT.logFree = ()=>{ const s={ id:uid('ses'), blockId:null, dayId:null, name:'Freie Einheit', focus:'', plannedDate:todayISO(), week:mondayOf(todayISO()), status:'geplant', location:'', plan:[], dayVersion:null, log:null, skipReason:'', moves:[], createdAt:new Date().toISOString() };
   S.sessions.push(s); save(); startLog(s.id); };
 
 /* ---------- Profil ---------- */
