@@ -56,7 +56,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 
 | # | Idee | Nutzen | Prio | Aufwand |
 |---|---|---|---|---|
-| U1 | **Wochenstreifen** in der Übersicht schon am Sonntag bzw. vor Blockbeginn für die kommende Woche zeigen (derzeit erscheint er erst, wenn die laufende Woche Einheiten hat) | Woche vorausplanen | P2 | S |
+| U1 | **Wochenstreifen** in der Übersicht schon am Sonntag bzw. vor Blockbeginn für die kommende Woche zeigen (derzeit erscheint er erst, wenn die laufende Woche Einheiten hat) | Woche vorausplanen | ✅ erledigt | S |
 | U2 | **Erinnerungen** (Training, Supplements, Gewicht) über Web-Push; auf dem iPhone ab iOS 16.4 für installierte Web-Apps möglich | Weniger vergessen | P3 | L |
 | U3 | **Datumsfeld in der Ernährung** durch eigene Anzeige ersetzen (Wochentag + Datum), damit es überall gleich aussieht | Einheitliches Bild | P3 | S |
 | U4 | Begriffe angleichen: „Saisonstart“ (Übersicht, Plan) und „Spiel“ (Profil → Kalender) | Klarheit | P3 | S |

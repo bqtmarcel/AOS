@@ -2322,7 +2322,14 @@ function ovToday(today){
 /* Woche als Streifen Mo–So aus dem Plan: ✓ erledigt · ○ gespeichert · ✗ nicht erfasst */
 function ovWeek(today){
   if(typeof REF==='undefined' || !REF.plan) return '';
-  const mon=mondayOf(today); const dn=['Mo','Di','Mi','Do','Fr','Sa','So']; let any=false;
+  const mon=mondayOf(today);
+  // Sonntag oder vor Blockbeginn: kommende Woche zeigen
+  const cur=ovWeekStrip(today, mon); const next=(weekdayOf(today)===0 || !cur) ? ovWeekStrip(today, addDays(mon,7)) : '';
+  if(next) return '<h2>Nächste Woche</h2>'+next;
+  return cur ? '<h2>Diese Woche</h2>'+cur : '';
+}
+function ovWeekStrip(today, mon){
+  const dn=['Mo','Di','Mi','Do','Fr','Sa','So']; let any=false;
   const cells=dn.map((d,i)=>{ const date=addDays(mon,i); const b=plBlockAt(date); let txt='', act='';
     const s=plSessions().find(x=>(sessionDate(x)===date) && x.status!=='ausgelassen');
     let done=false; if(s){ done=isDone(s); txt=s.planner.templateId; act=' data-act="startLog" data-id="'+s.id+'"'; any=true; }
@@ -2331,7 +2338,7 @@ function ovWeek(today){
     if(isFieldDay(date)){ const fl=fieldLog(date); txt=(txt?txt+'+':'')+(fl&&fl.status==='ausgefallen'?'F✗':'F'); any=true; }
     return '<div class="day'+(date===today?' today':'')+'"'+act+(act&&!s?'':'')+'><span class="wd">'+d+'</span><span class="dn">'+parseISO(date).getDate()+'</span>'+(done?'<span class="tp done claw-tp">'+CLAW+'<span class="sr-only">'+esc(txt)+' erledigt</span>'+(isFieldDay(date)?esc(txt.slice(txt.indexOf('+')))+'':'')+'</span>':'<span class="tp">'+esc(txt||'')+'</span>')+'</div>'; });
   if(!any) return '';
-  return '<h2>Diese Woche</h2><div class="weekstrip">'+cells.join('')+'</div><p class="small muted">Tipp auf einen Tag, um ihn zu ändern.</p>';
+  return '<div class="weekstrip">'+cells.join('')+'</div><p class="small muted">Tipp auf einen Tag, um ihn zu ändern.</p>';
 }
 ACT.hideInstall = ()=>{ S.settings.hideInstallHint=true; save(); render(); };
 
