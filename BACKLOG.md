@@ -49,7 +49,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | E1 | **Kalorienziel automatisch anpassen** nach Gewichtstrend (Spezifikation 4.4), mit Begründung | Weniger Nachrechnen | P2 | M |
 | E2 | **Barcode per Kamera** (Foto des Strichcodes) für Open Food Facts | Schnelleres Eintragen | P2 | M |
 | E3 | **Mahlzeit vom Vortag kopieren** mit einem Tipp | Weniger Tipparbeit | ✅ erledigt | S |
-| E4 | **Supplements**: Wochenübersicht abgehakt / vergessen | Regelmäßigkeit | P3 | S |
+| E4 | **Supplements**: Wochenübersicht abgehakt / vergessen | Regelmäßigkeit | ✅ erledigt | S |
 | E5 | **Meal-Prep-Plan** (Spezifikation 12) als eigene Ansicht: Mengen für die Woche, direkt in die Einkaufsliste | Planung am Wochenende | P2 | M |
 
 ## 4. Übersicht und Bedienung

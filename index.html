@@ -378,6 +378,7 @@ body:has(#rest-bar) main{padding-bottom:calc(190px + env(safe-area-inset-bottom)
 .lg{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 6px;vertical-align:-1px}.lg-gym{background:var(--sig)}.lg-field{background:#9aa0a8}
 .goal-row{padding:10px 0;border-bottom:1px solid var(--line)}.goal-row:last-of-type{border-bottom:0}
 .goal-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin:8px 0 4px}.goal-bar i{display:block;height:100%;background:var(--sig);border-radius:3px}
+table.supw td,table.supw th{text-align:center;padding:6px 2px}table.supw td:first-child,table.supw th:first-child{text-align:left}
 .last-perf{font-size:.8rem;color:var(--muted);margin:2px 0 8px}.last-perf strong{color:var(--text);font-weight:600}
 .pdet-b>.table-wrap:last-child,.pdet-b>details:last-child{margin-bottom:2px}
 .meal{padding-top:12px;padding-bottom:12px}
@@ -964,7 +965,7 @@ function renderShell(){
 }
 /* Tabellen mit 3+ Spalten werden am Handy als Liste untereinander dargestellt (kein Seitwärts-Scrollen) */
 function stackTables(root){
-  root.querySelectorAll('table').forEach(tb=>{ const th=[...tb.querySelectorAll('thead th')].map(x=>x.textContent.trim()); if(th.length<3 || tb.querySelector('td[data-act]')) return;   // Wochenraster mit antippbaren Tagen bleibt eine Tabelle
+  root.querySelectorAll('table').forEach(tb=>{ const th=[...tb.querySelectorAll('thead th')].map(x=>x.textContent.trim()); if(th.length<3 || tb.querySelector('td[data-act]') || tb.classList.contains('nostack')) return;   // Wochenraster mit antippbaren Tagen bleibt eine Tabelle
     tb.classList.add('stack');
     tb.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{ td.setAttribute('data-label', th[i]||'');
       const txt=td.textContent.trim(); if((txt==='—'||txt==='') && !td.querySelector('button,input,select,svg')) td.classList.add('empty-cell'); })); });
@@ -2065,6 +2066,11 @@ function viewNutrition(){
   const sup=(NUT().supplements||[]).filter(s=>s.active);
   if(sup.length) h+='<h2>Supplements</h2><div class="section sup-list">'+sup.map(s=>{ const on=!!(cfg.supp&&cfg.supp[s.id]); const nm=s.name.replace(/\s*\(.*\)\s*$/,'');
     return '<button class="shop-row'+(on?' on':'')+'" data-act="nutSupp" data-k="supp" data-v="'+esc(s.id)+'" aria-pressed="'+on+'"><span class="shop-box">'+(on?'✓':'')+'</span><span class="shop-n">'+esc(nm)+'</span><span class="shop-q">'+esc(s.dose)+'</span></button>'; }).join('')+'</div>';
+  if(sup.length){ const days=Array.from({length:7},(_,i)=>addDays(date,i-6)); const wd=['So','Mo','Di','Mi','Do','Fr','Sa'];
+    const taken=(d,id)=>{ const c=nutDayCfg(d); return !!(c.supp&&c.supp[id]); };
+    h+=pdet('n-supw','Supplements – letzte 7 Tage','',
+      '<div class="table-wrap"><table class="small supw nostack"><thead><tr><th></th>'+days.map(d=>'<th>'+wd[weekdayOf(d)]+'</th>').join('')+'</tr></thead><tbody>'+
+      sup.map(x=>'<tr><td>'+esc(x.name.replace(/\s*\(.*\)\s*$/,''))+'</td>'+days.map(d=>'<td>'+(taken(d,x.id)?'✓':'<span class="muted">·</span>')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>'); }
   h+='<div class="no-print" style="margin-top:16px"><button class="primary block" data-act="shopOpen">Einkaufsliste</button></div>';
   h+=nutTplSection();
   h+='<p class="small muted" style="margin-top:16px">Richtwerte aus Nährwerttabellen, Packungsangaben haben Vorrang.</p>';
