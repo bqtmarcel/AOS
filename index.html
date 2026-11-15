@@ -2496,13 +2496,18 @@ async function offQuery(q){
   let list;
   if(/^\d{8,14}$/.test(q)){ const r=await fetch(OFF_BASE+'/api/v2/product/'+q+'.json?fields='+OFF_FIELDS);
     if(r.status===404){ list=[]; } else { if(!r.ok) throw new Error('HTTP '+r.status); const j=await r.json(); list=j.product?[Object.assign({code:q},j.product)]:[]; } }
-  else { const r=await fetch(OFF_BASE+'/cgi/search.pl?action=process&json=1&search_simple=1&lc=de&page_size=100&search_terms='+encodeURIComponent(q)+'&fields='+OFF_FIELDS);
-    if(!r.ok) throw new Error(r.status===429?'zu viele Suchen – bitte eine Minute warten':'HTTP '+r.status); const j=await r.json(); list=j.products||[]; }
+  else { const get=async extra=>{ const r=await fetch(OFF_BASE+'/cgi/search.pl?action=process&json=1&search_simple=1&lc=de&page_size=100&search_terms='+encodeURIComponent(q)+extra+'&fields='+OFF_FIELDS);
+      if(!r.ok) throw new Error(r.status===429?'zu viele Suchen – bitte eine Minute warten':'HTTP '+r.status); const j=await r.json(); return j.products||[]; };
+    // Zuerst nur Produkte, die in Österreich verkauft werden; weltweit nur ergänzen, wenn das zu wenig ist (zählt als zweite Suche)
+    list=await get('&tagtype_0=countries&tag_contains_0=contains&tag_0=austria');
+    list.forEach(p=>{ p.countries_tags=Array.from(new Set([...(p.countries_tags||[]),'en:austria'])); });
+    if(list.length<8){ offTimes.push(Date.now()); const seen=new Set(list.map(p=>String(p.code)));
+      try{ (await get('')).forEach(p=>{ if(!seen.has(String(p.code))) list.push(p); }); }catch(e){ if(!list.length) throw e; } } }
   let out=list.map(offMap).filter(Boolean);
-  // Relevanz: Suchwörter im Produktnamen (alle > einige), dann Österreich, Deutschland/deutscher Name, sonst Reihenfolge von Open Food Facts
+  // Reihenfolge: Österreich immer zuerst, dann Suchwörter im Produktnamen (alle > einige), Deutschland/deutscher Name, sonst Reihenfolge von Open Food Facts
   if(!/^\d{8,14}$/.test(q)){ out.forEach((r,i)=>{ const m=txtMatch(r.name,q); r._m=m.hits; r._all=m.all?1:0; r._st=m.start; r._i=i; });
     if(out.some(r=>r._m>0)) out=out.filter(r=>r._m>0);
-    out.sort((a,b)=>(b._all-a._all)||(b._st-a._st)||(b.at-a.at)||((b.dach||b.de)-(a.dach||a.de))||(b._m-a._m)||(a._i-b._i)); }
+    out.sort((a,b)=>(b.at-a.at)||(b._all-a._all)||(b._st-a._st)||((b.dach||b.de)-(a.dach||a.de))||(b._m-a._m)||(a._i-b._i)); }
   offCache[q]=out; return out; }
 /* Automatische Online-Suche: 700 ms nach dem letzten Tastendruck, ab 3 Zeichen, max. 9 Suchen pro Minute (Limit 10) */
 let offTimer=null, offSeq=0; const offTimes=[];
