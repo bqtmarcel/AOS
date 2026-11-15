@@ -416,8 +416,10 @@ button.primary:active,nav.tabs button[aria-current="page"]:active{background:var
 .cd.is-live .cd-seg b{font-size:1.55rem}
 .tc-cd{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
 .cd-plan .cd-seg b{font-size:2.1rem}
-.cal-list{display:flex;flex-direction:column;margin-bottom:12px}
-.cal-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.cal-list{display:flex;flex-direction:column;margin-bottom:10px}
+.cal-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:.85rem}
+.cal-det[open]>summary{margin-bottom:8px}
+.cal-det:not([open]){padding-top:14px;padding-bottom:14px}.cal-det>summary{margin:0}
 .cal-row>div{flex:1;min-width:0}.cal-row.past{opacity:.5}
 .cal-d{display:block;font-size:.72rem;color:var(--muted);letter-spacing:.04em}
 .cal-k{font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;padding:3px 8px;border-radius:99px;border:1px solid var(--line2);color:var(--muted)}
@@ -2815,7 +2817,6 @@ function ovToday(today){
   h+='<div class="hero-title">'+esc(title)+'</div><div class="hero-sub">'+esc(sub)+'</div>';
   if(isFieldDay(today)){ const fc=fieldCfg(), fl=fieldLog(today);
     h+='<div class="tc-row tc-weight"><span class="tc-k">'+esc(fc.time||'Feld')+'</span><span>'+esc(fc.name||'Football-Training')+'<br><span class="small muted">'+(fl?esc(fieldSummary(fl)):'ca. '+(fc.duration_min||90)+' min')+'</span></span><button class="small'+(fl?' link':'')+'" data-act="fieldLog" data-d="'+today+'">'+(fl?'ändern':'Erfassen')+'</button></div>'; }
-  h+=ovWeightRow(today);
   const hints=[];
   if(T && T.entry) hints.push('Einstiegsphase: KH −'+NUT().entry.carb_minus_g+' g bis '+fmtDate(NUT().entry.until).slice(0,6));
   const mp=REF.nut && NUT().mealprep;
@@ -2911,12 +2912,14 @@ setInterval(()=>{ const els=document.querySelectorAll('.cd-live[data-t]'); if(!e
   if(done) render(); }, 1000);
 
 const CAL_KIND={ game:'Spiel', event:'Termin' };
-function calSection(){ const L=calSorted(); const td=todayISO();
-  let h='<div class="section"><p class="small muted">Spieltage mit Kickoff steuern den Countdown in der Übersicht und im Plan. Eine Woche vor jedem Spiel läuft er auf die Sekunde.</p>';
+function calSection(){ const L=calSorted(); const td=todayISO(); const c=cdNext(); const up=L.filter(e=>e.date>=td);
+  const sum=up.length ? (c&&L.some(e=>e.kind==='game')?'Spiel '+fmtDateShort(c.g.date).slice(3):up.length+' Termine') : 'leer';
+  let h='<details class="section cal-det" id="cal-det"'+(ui.calOpen?' open':'')+'><summary><strong>Kalender</strong> <span class="small muted">· '+esc(sum)+'</span></summary>';
   if(L.length) h+='<div class="cal-list">'+L.map(e=>'<div class="cal-row'+(e.date<td?' past':'')+'"><div><span class="cal-d">'+fmtDateShort(e.date)+(e.time?' · '+esc(e.time):'')+'</span><strong>'+esc(e.title||CAL_KIND[e.kind])+'</strong>'+(e.place?'<span class="small muted"> · '+esc(e.place)+'</span>':'')+'</div>'+
     '<span class="cal-k '+e.kind+'">'+CAL_KIND[e.kind]+'</span><button class="link" data-act="calEdit" data-id="'+e.id+'">ändern</button></div>').join('')+'</div>';
-  else h+='<p class="small">Noch keine Einträge. Bis dahin zählt der Countdown bis zum ersten Spiel laut Plan.</p>';
-  return h+'<button data-act="calNew">+ Termin oder Spiel</button></div>'; }
+  else h+='<p class="small muted">Spieltage mit Kickoff steuern den Countdown. Ohne Eintrag zählt er bis zum ersten Spiel laut Plan.</p>';
+  return h+'<button class="small" data-act="calNew">+ Termin oder Spiel</button></details>'; }
+document.addEventListener('toggle', e=>{ if(e.target && e.target.id==='cal-det') ui.calOpen=e.target.open; }, true);
 function calDlgOpen(){ const d=ui.calDraft;
   openDlg(d.id?'Eintrag ändern':'Neuer Eintrag',
     '<label>Art</label><div>'+Object.entries(CAL_KIND).map(([k,l])=>'<button class="chip" data-act="calKind" data-v="'+k+'" aria-pressed="'+(d.kind===k)+'">'+l+'</button>').join('')+'</div>'+
@@ -2960,7 +2963,7 @@ function viewProfile(){
   h+='<div class="section"><div class="fields">'+inp('p-name','Name',p.name)+inp('p-by','Geburtsjahr',p.birthYear,'inputmode="numeric" placeholder="z. B. 1993"')+'</div>'+
     '<div class="fields">'+inp('p-h','Größe (cm)',p.heightCm,'inputmode="numeric"')+inp('p-tw','Zielgewicht (kg, optional)',fmtNum(p.targetWeightKg),'inputmode="decimal"')+'</div>'+
     '<button class="primary" data-act="saveProfileSlim">Speichern</button></div>';
-  h+='<h2>Kalender</h2>'+calSection();
+  h+=calSection();
   h+='<h2>Trainingsorte</h2>'+locSection();
   h+=ghSection();
   const le=S.settings.lastExport;
