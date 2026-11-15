@@ -61,7 +61,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | U3 | **Datumsfeld in der Ernährung** durch eigene Anzeige ersetzen (Wochentag + Datum), damit es überall gleich aussieht | Einheitliches Bild | P3 | S |
 | U4 | Begriffe angleichen: „Saisonstart“ (Übersicht, Plan) und „Spiel“ (Profil → Kalender) | Klarheit | P3 | S |
 | U5 | **Laptop-Layout** mit zwei Spalten ab großer Breite (z. B. Ernährung: Mahlzeiten links, Abdeckung rechts) | Platz am Laptop nutzen | P3 | M |
-| U6 | **Sync-Status** verständlicher: Punkt im Kopf antippbar mit „zuletzt gespeichert um …“ | Vertrauen in die Speicherung | P2 | S |
+| U6 | **Sync-Status** verständlicher: Punkt im Kopf antippbar mit „zuletzt gespeichert um …“ | Vertrauen in die Speicherung | ✅ erledigt | S |
 
 ## 5. Technik und Wartung
 

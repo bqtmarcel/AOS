@@ -258,6 +258,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--sig)}
 
 .sysbar{display:flex;gap:10px;font-size:.66rem;letter-spacing:.04em;color:var(--muted);white-space:nowrap}
 .sysbar b{color:var(--text);font-weight:500}
+.sysbar .sync-btn{background:none!important;border:0!important;box-shadow:none!important;padding:10px;margin:-10px;min-height:0;min-width:0;cursor:pointer;color:inherit}
 .sysbar .sd.ok{color:var(--text)} .sysbar .sd.run{color:var(--text)} .sysbar .sd.err{color:var(--bad)} .sysbar .sd.off{color:var(--faint)}
 nav.tabs button{font-size:.72rem;letter-spacing:.02em}
 
@@ -955,7 +956,7 @@ ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f
 function renderShell(){
   const b=activeBlock();
   document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+' aria-label="'+t+'" title="'+t+'">'+(NAV_ICON[k]||'')+'<span class="sr-only">'+t+'</span></button>').join('');
-  document.getElementById('topinfo').innerHTML = '<div class="sysbar"><span id="hsync">'+ghDot()+'</span></div>';
+  document.getElementById('topinfo').innerHTML = '<div class="sysbar"><button id="hsync" class="sync-btn" data-act="syncInfo" aria-label="Speicherstatus anzeigen">'+ghDot()+'</button></div>';
 }
 /* Tabellen mit 3+ Spalten werden am Handy als Liste untereinander dargestellt (kein Seitwärts-Scrollen) */
 function stackTables(root){
@@ -2706,6 +2707,10 @@ ACT.ghSave = async ()=>{
   if(ok){ toast('Verbunden. Deine Daten sind jetzt im Datenrepo gespeichert.'); refLoad(true); }
   render();
 };
+ACT.syncInfo = ()=>{ if(!ghReady()){ toast('Nicht mit dem Datenrepo verbunden – Profil → Datenspeicherung.'); return; }
+  const st=gh.state; const last=gh.lastOk?'zuletzt gespeichert '+ghTime(gh.lastOk):'noch nie gespeichert';
+  const t={ ok:'Alles gespeichert'+(gh.lastOk?' · '+ghTime(gh.lastOk):''), laeuft:'Wird gerade gespeichert …', ausstehend:'Änderungen werden gleich gespeichert · '+last, offline:'Offline – wird gespeichert, sobald Netz da ist · '+last, fehler:'Speichern fehlgeschlagen – neuer Versuch läuft · '+last }[st]||last;
+  toast(t); if(['ausstehend','fehler','offline'].includes(st) && !gh.syncing) ghSync('manuell'); };
 ACT.ghSyncNow = async ()=>{ const ok=await ghSync('manuell'); if(ok){ toast('Abgeglichen.'); refLoad(true); } };
 ACT.ghForget = ()=>confirmDlg('Token entfernen?', 'AOS speichert auf diesem Gerät dann nur noch lokal, bis du wieder einen Token einträgst. Die Daten im Datenrepo bleiben unverändert.'+(gh.dirty?' <strong>Achtung: Es gibt noch nicht abgeglichene Änderungen.</strong>':''), 'Entfernen', ()=>{ gh.cfg.token=''; ghStore(); ghSetState('aus'); render(); }, true);
 
