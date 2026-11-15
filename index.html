@@ -415,7 +415,8 @@ button.primary:active,nav.tabs button[aria-current="page"]:active{background:var
 .shop-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none!important;border:0!important;border-bottom:1px solid var(--line)!important;border-radius:0!important;padding:9px 2px!important;min-height:44px;color:var(--text)!important;box-shadow:none!important;margin:0!important;font:inherit}
 .shop-row::before{display:none}.shop-box{width:20px;height:20px;border:1px solid var(--line2);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;flex-shrink:0}
 .shop-n{flex:1;font-weight:500}.shop-q{color:var(--muted);font-size:.82rem;text-align:right}
-.shop-row.on .shop-n,.shop-row.on .shop-q{text-decoration:line-through;opacity:.45}.shop-row.on .shop-box{background:var(--sig);border-color:var(--sig);color:#fff}
+.shop-row.on .shop-n,.shop-row.on .shop-q{text-decoration:line-through;opacity:.45}
+.sup-list{padding-top:6px;padding-bottom:6px}.sup-list .shop-row:last-child{border-bottom:0!important}.sup-list .shop-row.on .shop-n,.sup-list .shop-row.on .shop-q{text-decoration:none;opacity:.6}.shop-row.on .shop-box{background:var(--sig);border-color:var(--sig);color:#fff}
 .sv-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0}.sv-row+.sv-row{border-top:1px solid var(--line)}
 .sv-name{text-align:left;font-weight:600}
 .tc-kcal{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:.85rem;color:var(--muted)}
@@ -2525,8 +2526,9 @@ function viewNutrition(){
 
   // Supplements
   const sup=(NUT().supplements||[]).filter(s=>s.active);
-  if(sup.length) h+='<h2>Supplements</h2><div class="section">'+sup.map(s=>chipBtn('nutSupp','supp',s.id,(cfg.supp&&cfg.supp[s.id]?'☑ ':'☐ ')+s.name+' · '+s.dose,!!(cfg.supp&&cfg.supp[s.id]))).join('')+'</div>';
-  h+='<div class="row no-print" style="margin-top:16px"><button class="primary" data-act="shopOpen">Einkaufsliste</button></div>';
+  if(sup.length) h+='<h2>Supplements</h2><div class="section sup-list">'+sup.map(s=>{ const on=!!(cfg.supp&&cfg.supp[s.id]); const nm=s.name.replace(/\s*\(.*\)\s*$/,'');
+    return '<button class="shop-row'+(on?' on':'')+'" data-act="nutSupp" data-k="supp" data-v="'+esc(s.id)+'" aria-pressed="'+on+'"><span class="shop-box">'+(on?'✓':'')+'</span><span class="shop-n">'+esc(nm)+'</span><span class="shop-q">'+esc(s.dose)+'</span></button>'; }).join('')+'</div>';
+  h+='<div class="no-print" style="margin-top:16px"><button class="primary block" data-act="shopOpen">Einkaufsliste</button></div>';
   h+=nutTplSection();
   h+='<p class="small muted" style="margin-top:16px">Richtwerte aus Nährwerttabellen, Packungsangaben haben Vorrang.</p>';
   return h;
