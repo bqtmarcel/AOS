@@ -2703,7 +2703,7 @@ function viewPlan(){
     const wsub=(b.week_wave||{})[w]||'';
     if(wsub) h+='<tr class="wk-sub"><td></td><td colspan="7" class="muted">'+esc(wsub)+'</td></tr>';
   }
-  h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ offen · ✗ verpasst · Tag antippen zum Ändern</p>';
+  h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ offen · ✗ verpasst<br>Tag antippen zum Ändern</p>';
   if(plBlockAt(today)===b){ const wk=plWeek(b,today); const wp=plWeekPlan(b,wk); const m=Object.entries(wp.hosts).filter(([,l])=>l.some(x=>plMergeSlots(b,wk,plTemplate(b,x).slots).length));
     h+='<p class="small"><strong>Diese Woche: '+wp.count+' Einheit'+(wp.count===1?'':'en')+'.</strong> '+(m.length?m.map(([hst,l])=>'Kernübungen aus '+l.join(', ')+' → '+hst).join(' · '):'Alle Einheiten wie geplant.')+'</p>'; }
   h+='</div>';
