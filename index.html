@@ -1196,10 +1196,14 @@ ACT.delLogEx = el=>{ ui.draft.exercises.splice(+el.dataset.e,1); render(); };
 ACT.sollToIst = el=>{ const s=sessionById(ui.sessionId); const e=ui.draft.exercises[+el.dataset.e]; const pe=s.plan.find(p=>p.id===e.planExId); if(!pe) return;
   const r=repMin(pe.reps); e.sets.forEach(x=>{ if(x.reps==null && r!=null) x.reps=r; if(x.kg==null && pe.loadKg!=null) x.kg=pe.loadKg; }); render(); toast('Leere Felder mit der Vorgabe gefüllt – bitte bei Abweichungen korrigieren.'); };
 ACT.addLogEx = ()=>{
-  openDlg('Übung hinzufügen', inp('le-name','Übung *','','required')+inp('le-var','Variante (optional)','')+sel('le-met','Messart',[['kraft','Kraft (Wdh × Gewicht)'],['zeit','Zeit'],['distanz','Distanz'],['sprung','Sprung / Weite / Höhe']],'kraft'),
+  const known=[...new Set(((typeof REF!=='undefined'&&REF.ex&&REF.ex.exercises)||[]).map(x=>x.name_de).concat(loggedSessions().flatMap(s=>s.log.exercises.map(e=>e.name))))].sort((a,b)=>a.localeCompare(b,'de'));
+  openDlg('Übung hinzufügen', inp('le-name','Übung *','','required list="le-names" autocomplete="off"')+'<datalist id="le-names">'+known.map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>'+inp('le-var','Variante (optional)','')+sel('le-met','Messart',[['kraft','Kraft (Wdh × Gewicht)'],['zeit','Zeit'],['distanz','Distanz'],['sprung','Sprung / Weite / Höhe']],'kraft'),
     '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="addLogExOk">Hinzufügen</button>'); };
 ACT.addLogExOk = ()=>{ const n=val('le-name'); if(!n){ toast('Bitte einen Namen eingeben.'); return; }
-  ui.draft.exercises.push({planExId:null,name:n,variant:val('le-var'),metric:val('le-met'),sets:[emptySet()],note:''}); closeDlg(); render(); };
+  // Messart aus der Übungsdatenbank übernehmen, wenn die Übung dort steht und nichts anderes gewählt wurde
+  let met=val('le-met'); const db=((typeof REF!=='undefined'&&REF.ex&&REF.ex.exercises)||[]).find(x=>x.name_de===n);
+  if(db && met==='kraft' && db.pattern==='jump') met='sprung';
+  ui.draft.exercises.push({planExId:null,name:n,variant:val('le-var'),metric:met,sets:[emptySet()],note:''}); closeDlg(); render(); };
 ACT.saveLog = el=>{
   const s=sessionById(ui.sessionId); const dr=ui.draft;
   const bad=[]; dr.exercises.forEach(e=>e.sets.forEach((x,j)=>Object.keys(x).forEach(k=>{ if(Number.isNaN(x[k])) bad.push(e.name+' Satz '+(j+1)); })));
@@ -2553,7 +2557,7 @@ function viewTraining(){
   const saved=S.sessions.filter(s=>s.status==='geplant' && (s.plan||[]).length && s.plannedDate && s.plannedDate<today).sort(bySessionDate);
   if(saved.length){ h+='<h2>Nicht erfasst</h2><div class="section sv-list">'+saved.map(s=>{ const ov=s.plannedDate&&s.plannedDate<today; const id=(s.planner&&s.planner.templateId)||s.name;
       return '<div class="sv-row"><button class="link sv-name" data-act="openSession" data-id="'+s.id+'" title="'+esc(s.name)+'">'+esc(id)+' <span class="small muted">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+(ov?' · nicht erfasst':'')+'</span></button><button class="small primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button></div>'; }).join('')+'</div>'; }
-  h+='<p style="margin-top:16px"><button class="link small" data-act="logFree">+ Freie Einheit</button></p>';
+  h+='<div class="row" style="margin-top:16px"><button data-act="logFree">+ Freie Einheit</button></div>';
   const done=S.sessions.filter(s=>s.log && isDone(s)).sort((a,c)=>sessionDate(a)<sessionDate(c)?1:-1).slice(0,5);
   if(done.length) h+='<h2>Zuletzt</h2><div class="section">'+done.map(s=>'<p style="margin:6px 0"><button class="link" data-act="startLog" data-id="'+s.id+'">'+esc(s.name)+'</button> <span class="small muted">'+fmtDateShort(sessionDate(s))+(s.status==='teilweise'?' · teilweise':'')+'</span></p>').join('')+'</div>';
   return h;

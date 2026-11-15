@@ -30,7 +30,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | T6 | **Testwoche am Phasenende** (Spezifikation 3.8): Tests als eigene Einheit vorschlagen und Ergebnisse direkt in den Verlauf übernehmen | Tests nicht vergessen | ✅ erledigt | M |
 | T7 | **In-Season-Modus**: ab dem ersten Spiel 1–2 Einheiten pro Woche, Abstand zum Spieltag beachten (offene Punkte 5 und 8 der Spezifikation) | Planung über die Vorbereitung hinaus | P2 | L |
 | T8 | **Templates für P2–P5** im Datenrepo anlegen; der Plan zeigt dort derzeit „noch keine Templates“ | Plan über Block 1 hinaus | P1 | M (Planung mit Claude) |
-| T9 | „+ Freie Einheit“ als richtigen Button gestalten und Übungen aus der Übungsdatenbank auswählbar machen | Einheitliche Bedienung | P3 | M |
+| T9 | „+ Freie Einheit“ als richtigen Button gestalten und Übungen aus der Übungsdatenbank auswählbar machen | Einheitliche Bedienung | ✅ erledigt | M |
 
 ## 2. Verlauf und Auswertung
 
