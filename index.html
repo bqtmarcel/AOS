@@ -2668,7 +2668,7 @@ function viewPlan(){
     return h+'<div class="note">'+(REF.loading?'Plan wird geladen …':(REF.error||'Plan noch nicht geladen.'))+' <button class="link" data-act="plReload">Neu laden</button></div>';
   }
   const P=REF.plan, today=todayISO();
-  h+='<div class="section">'+(cdBlock('cd-plan')||'<strong>Saison</strong>')+'<p class="small muted" style="margin-top:10px">Plan geladen '+(REF.at?ghTime(REF.at):'—')+' · <button class="link" data-act="plReload">neu laden</button> · Spieltage im <button class="link" data-act="go" data-view="profil">Profil → Kalender</button></p></div>';
+  h+='<div class="section">'+(cdBlock('cd-plan')||'<strong>Saison</strong>')+'</div>';
   // Phasen
   h+='<h2>Phasen</h2><div class="section ph-list">'+P.phases.map(ph=>{
     const cur=today>=ph.start && today<=ph.end; const w=Math.round((daysBetween(ph.start,ph.end)+1)/7);
@@ -3160,6 +3160,7 @@ function ghSection(){
   return pdet('gh','Datenspeicherung', ghReady()?(gh.cfg.repo):'nicht verbunden', '<span id="gh-sec"></span>'+
     '<p class="small">AOS speichert deine Trainings-, Ernährungs- und Körperdaten in deinem <strong>privaten</strong> Repo <code>'+esc(c.owner+'/'+c.repo)+'</code>. Jede Änderung wird nach wenigen Sekunden abgeglichen; ohne Netz wird gepuffert und später nachgeholt. iPhone und Laptop arbeiten so mit demselben Stand.</p>'+
     '<p id="gh-status" class="small" aria-live="polite">'+ghStatusText()+'</p>'+
+    (ghReady()?'<p class="small muted">Plan & Datenbanken geladen '+(REF.at?ghTime(REF.at):'—')+' · <button class="link" data-act="plReload">neu laden</button></p>':'')+
     '<div class="fields">'+inp('gh-owner','GitHub-Konto',c.owner)+inp('gh-repo','Datenrepo',c.repo)+'</div>'+
     '<div class="fields">'+inp('gh-branch','Branch',c.branch)+inp('gh-path','Datei',c.path)+'</div>'+
     inp('gh-token','Zugriffsschlüssel (Fine-grained Token)','','type="password" autocomplete="off" spellcheck="false" placeholder="'+(c.token?'gespeichert – leer lassen, um ihn zu behalten':'github_pat_…')+'"')+
