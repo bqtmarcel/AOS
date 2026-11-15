@@ -399,6 +399,10 @@ button.primary:active,nav.tabs button[aria-current="page"]:active{background:var
 .sysbar .sd{font-size:.9rem;line-height:1}
 .sysbar .sd.run{animation:sdp 1s ease-in-out infinite}@keyframes sdp{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.sysbar .sd.run{animation:none}}
+/* Vereinslogo als Hintergrund (Red Tigers, mit Erlaubnis des Vereins) */
+body::before{content:'';position:fixed;z-index:-1;pointer-events:none;right:-22vw;bottom:9vh;width:min(110vw,760px);aspect-ratio:593/445;background:url('img/tiger.png?v=1') center/contain no-repeat;opacity:.09;filter:saturate(.85)}
+@media (min-width:900px){body::before{right:-6vw;bottom:6vh;opacity:.07}}
+@media print{body::before{display:none}}
 /* Countdown & Kalender */
 .pdet:not([open]){padding-top:14px;padding-bottom:14px}.pdet[open]>summary{margin-bottom:10px}.pdet>summary{margin:0}
 .pdet .loc-card{margin:10px 0}
