@@ -2,6 +2,8 @@
 
 Sammlung möglicher Verbesserungen und Weiterentwicklungen. Dieses Repo ist öffentlich, deshalb stehen hier **keine persönlichen Werte** (Lasten, Körperdaten, Pläne). Fachliche Details stehen in den Spezifikationen in `AOS_DATA/docs`.
 
+Status: ✅ erledigt · 🟡 teilweise · ⏸ wartet (Grund in der Spalte)
+
 Priorität: **P1** = bald und mit großem Nutzen · **P2** = sinnvoll · **P3** = später oder nur eine Idee
 Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ein Tag
 
@@ -28,8 +30,8 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | T4 | **Aufwärmsätze** automatisch zur Arbeitslast vorschlagen | Strength-Coach-Verhalten | ✅ erledigt | M |
 | T5 | **Deload-Signale** sichtbar machen (Spezifikation 3.7): mehrere schlechte Tagesformen, RPE über Cap, Beschwerden → Hinweis und automatische Entlastung | Überlastung früh erkennen | ✅ erledigt | M |
 | T6 | **Testwoche am Phasenende** (Spezifikation 3.8): Tests als eigene Einheit vorschlagen und Ergebnisse direkt in den Verlauf übernehmen | Tests nicht vergessen | ✅ erledigt | M |
-| T7 | **In-Season-Modus**: ab dem ersten Spiel 1–2 Einheiten pro Woche, Abstand zum Spieltag beachten (offene Punkte 5 und 8 der Spezifikation) | Planung über die Vorbereitung hinaus | P2 | L |
-| T8 | **Templates für P2–P5** im Datenrepo anlegen; der Plan zeigt dort derzeit „noch keine Templates“ | Plan über Block 1 hinaus | P1 | M (Planung mit Claude) |
+| T7 | **In-Season-Modus**: ab dem ersten Spiel 1–2 Einheiten pro Woche, Abstand zum Spieltag beachten (offene Punkte 5 und 8 der Spezifikation) | Planung über die Vorbereitung hinaus | ⏸ braucht deine Entscheidung (offene Punkte 5 und 8 der Spezifikation) | L |
+| T8 | **Templates für P2–P5** im Datenrepo anlegen; der Plan zeigt dort derzeit „noch keine Templates“ | Plan über Block 1 hinaus | ⏸ braucht Planung mit dir (Inhalte der Phasen P2–P5) | M (Planung mit Claude) |
 | T9 | „+ Freie Einheit“ als richtigen Button gestalten und Übungen aus der Übungsdatenbank auswählbar machen | Einheitliche Bedienung | ✅ erledigt | M |
 
 ## 2. Verlauf und Auswertung
@@ -46,18 +48,18 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 
 | # | Idee | Nutzen | Prio | Aufwand |
 |---|---|---|---|---|
-| E1 | **Kalorienziel automatisch anpassen** nach Gewichtstrend (Spezifikation 4.4), mit Begründung | Weniger Nachrechnen | P2 | M |
-| E2 | **Barcode per Kamera** (Foto des Strichcodes) für Open Food Facts | Schnelleres Eintragen | P2 | M |
+| E1 | **Kalorienziel automatisch anpassen** nach Gewichtstrend (Spezifikation 4.4), mit Begründung | Weniger Nachrechnen | ⏸ braucht deine Bestätigung von Spezifikation 4.4 und den Gewichtskorridor in nutrition.json | M |
+| E2 | **Barcode per Kamera** (Foto des Strichcodes) für Open Food Facts | Schnelleres Eintragen | ⏸ technisch blockiert: Safari am iPhone liest keine Strichcodes selbst; eine Zusatzbibliothek müsste mitgeliefert werden | M |
 | E3 | **Mahlzeit vom Vortag kopieren** mit einem Tipp | Weniger Tipparbeit | ✅ erledigt | S |
 | E4 | **Supplements**: Wochenübersicht abgehakt / vergessen | Regelmäßigkeit | ✅ erledigt | S |
-| E5 | **Meal-Prep-Plan** (Spezifikation 12) als eigene Ansicht: Mengen für die Woche, direkt in die Einkaufsliste | Planung am Wochenende | P2 | M |
+| E5 | **Meal-Prep-Plan** (Spezifikation 12) als eigene Ansicht: Mengen für die Woche, direkt in die Einkaufsliste | Planung am Wochenende | ⏸ braucht deine Antwort zu offenem Punkt 7 (Mittagessen pro Woche, Gefrierschrank) | M |
 
 ## 4. Übersicht und Bedienung
 
 | # | Idee | Nutzen | Prio | Aufwand |
 |---|---|---|---|---|
 | U1 | **Wochenstreifen** in der Übersicht schon am Sonntag bzw. vor Blockbeginn für die kommende Woche zeigen (derzeit erscheint er erst, wenn die laufende Woche Einheiten hat) | Woche vorausplanen | ✅ erledigt | S |
-| U2 | **Erinnerungen** (Training, Supplements, Gewicht) über Web-Push; auf dem iPhone ab iOS 16.4 für installierte Web-Apps möglich | Weniger vergessen | P3 | L |
+| U2 | **Erinnerungen** (Training, Supplements, Gewicht) über Web-Push; auf dem iPhone ab iOS 16.4 für installierte Web-Apps möglich | Weniger vergessen | ⏸ nicht ohne Server möglich: echte Erinnerungen bei geschlossener App brauchen einen Push-Dienst | L |
 | U3 | **Datumsfeld in der Ernährung** durch eigene Anzeige ersetzen (Wochentag + Datum), damit es überall gleich aussieht | Einheitliches Bild | ✅ erledigt | S |
 | U4 | Begriffe angleichen: „Saisonstart“ (Übersicht, Plan) und „Spiel“ (Profil → Kalender) | Klarheit | ✅ erledigt | S |
 | U5 | **Laptop-Layout** mit zwei Spalten ab großer Breite (z. B. Ernährung: Mahlzeiten links, Abdeckung rechts) | Platz am Laptop nutzen | ✅ erledigt | M |
@@ -69,8 +71,8 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 |---|---|---|---|---|
 | W1 | **CSS zusammenführen**: Die Gestaltung besteht aus mehreren übereinanderliegenden Schichten (Grundlayout, Design, Variante B, Red Tigers, Chrome Glass) mit vielen Überschreibungen und `!important`. Eine Schicht mit klaren Variablen | Änderungen am Design werden einfacher und sicherer | 🟡 teilweise (15.11.: 44 vollständig überschriebene Regeln entfernt, Aussehen per Bildvergleich unverändert; die Schichten selbst bestehen noch) | M |
 | W2 | **Automatischer Klicktest** (Playwright) als GitHub Action: alle Ansichten in iPhone- und Laptop-Breite öffnen, jeden Button einmal antippen, Fehler melden – mit neutralen Testdaten | Fehler vor dem Ausrollen finden | ✅ erledigt | M |
-| W3 | **Altfelder im Datenmodell prüfen** (z. B. `blocks`, `unavailable`, `suggestionDecisions` aus der alten Planverwaltung): was wird noch gebraucht, was kann per `migrate()` entfernt werden | Kleinere Datei, weniger Verwirrung | P2 | M |
-| W4 | **`index.html` aufteilen** (z. B. `css/`, `js/kern.js`, `js/training.js` …), weiterhin ohne Build-Schritt | Übersichtlicher bei weiterem Wachstum | P3 | M |
+| W3 | **Altfelder im Datenmodell prüfen** (z. B. `blocks`, `unavailable`, `suggestionDecisions` aus der alten Planverwaltung): was wird noch gebraucht, was kann per `migrate()` entfernt werden | Kleinere Datei, weniger Verwirrung | ⏸ geprüft: alte Blöcke, nicht verfügbare Tage und Positionsverlauf werden kaum noch genutzt; Löschen ändert deine Daten – nur nach deinem OK | M |
+| W4 | **`index.html` aufteilen** (z. B. `css/`, `js/kern.js`, `js/training.js` …), weiterhin ohne Build-Schritt | Übersichtlicher bei weiterem Wachstum | ⏸ zurückgestellt: kein sichtbarer Nutzen, erhöht das Risiko beim Zwischenspeichern; sinnvoll erst bei deutlich mehr Code | M |
 | W5 | **Cache-Version automatisch** aus dem Inhalt von `index.html` erzeugen (GitHub Action), damit das Erhöhen in `sw.js` nicht vergessen wird | Weniger Handarbeit | ✅ erledigt | S |
 | W6 | **Token-Ablauf**: rechtzeitig vor Ablauf des GitHub-Tokens warnen | Kein plötzlicher Ausfall der Speicherung | ✅ erledigt | S |
 | W7 | **Barrierefreiheit** prüfen (Kontraste der grauen Texte, Fokus-Rahmen, Beschriftungen der Icon-Buttons) | Bessere Lesbarkeit im Gym-Licht | ✅ erledigt | S |
