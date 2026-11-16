@@ -13,7 +13,7 @@ Ausgabeordner unverändert (die App behält dann den alten Stand) – der Lauf m
 Ausgabe je Quelle: <quelle>.json.gz  {"src","updated","fields",[...],"items":[[...], ...]}  (Werte pro 100 g bzw. 100 ml)
 sowie index.json mit Anzahl, Stand und Prüfsumme je Quelle.
 """
-import csv, gzip, hashlib, html, io, json, os, re, sys, tempfile, time, urllib.request, zipfile
+import csv, gzip, hashlib, html, io, json, os, re, sys, tempfile, time, urllib.parse, urllib.request, zipfile
 from datetime import datetime, timezone
 
 UA = {'User-Agent': 'AOS-Athlete-Operating-System/1.0 (github.com/bqtmarcel/AOS; weekly food data build)'}
@@ -158,14 +158,51 @@ BLS_SPEC = {'must': [r'bezeichnung|lebensmittel|name', r'kcal|ENERCC'],
                      'K': [r'^CHO\b', r'kohlenhydrate,? verf', r'^kohlenhydrat'],
                      'F': [r'^FAT\b', r'^fett\b', r'^fett,? ?gesamt', r'^fett']}}
 
+BLS_DOI = 'https://doi.org/10.25826/Data20251217-134202-0'
+BROWSER = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'de-AT,de;q=0.9'}
+
+def fetch_page(url):
+    req = urllib.request.Request(url, headers=BROWSER)
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return r.geturl(), r.read().decode('utf-8', 'replace')
+
+def bls_candidates():
+    """Download-Adressen in sinnvoller Reihenfolge: Link auf blsdb.de (mit Token), Datenpaket bei OpenAgrar (DOI), direkte Adresse."""
+    out = []
+    try:
+        base, page = fetch_page(BLS_PAGE)
+        links = [html.unescape(m) for m in re.findall(r'''["']([^"'\s]*?BLS[^"'\s]*?\.(?:zip|xlsx)(?:\?[^"'\s]*)?)["']''', page, re.I)]
+        tok = re.search(r'token=([A-Z0-9-]{10,})', page)
+        if tok: links.append('/assets/uploads/BLS_4_0_2025_DE.zip?token=' + tok.group(1))
+        out += [urllib.parse.urljoin(base, l) for l in links]
+        log(f'  blsdb.de: {len(links)} Link(s) gefunden')
+    except Exception as e:
+        log('  blsdb.de nicht lesbar:', e)
+    try:
+        base, page = fetch_page(BLS_DOI)
+        links = [html.unescape(m) for m in re.findall(r'''["']([^"'\s]*?MCRFileNodeServlet[^"'\s]*?\.(?:zip|xlsx))["']''', page, re.I)]
+        out += [urllib.parse.urljoin(base, l) for l in links]
+        log(f'  OpenAgrar: {len(links)} Datei(en) gefunden')
+    except Exception as e:
+        log('  OpenAgrar nicht lesbar:', e)
+    out.append('https://blsdb.de/assets/uploads/BLS_4_0_2025_DE.zip')
+    good = [u for u in out if not re.search(r'Components|Dokumentation|_EN\.', u, re.I)]
+    good.sort(key=lambda u: 0 if re.search(r'Daten|BLS_4_\d_\d{4}_DE', u, re.I) else 1)
+    return list(dict.fromkeys(good))
+
 def build_bls(out, meta, path=None):
     if path is None:
-        page = fetch(BLS_PAGE, timeout=60).decode('utf-8', 'replace')
-        links = [html.unescape(m) for m in re.findall(r'''href=["']([^"']+?\.(?:zip|xlsx)[^"']*)["']''', page, re.I)]
-        links = [l if l.startswith('http') else 'https://blsdb.de' + ('' if l.startswith('/') else '/') + l for l in links]
-        data = [l for l in links if re.search(r'Daten|BLS_4_\d_\d{4}_DE', l, re.I) and not re.search(r'Components|Dokumentation', l, re.I)]
-        if not data: raise RuntimeError('Download-Link auf blsdb.de nicht gefunden (' + str(len(links)) + ' Links)')
-        log('BLS: lade', data[0].split('?')[0]); blob = fetch(data[0], timeout=600)
+        blob = None
+        for url in bls_candidates():
+            try:
+                req = urllib.request.Request(url, headers=BROWSER)
+                with urllib.request.urlopen(req, timeout=600) as r: b = r.read()
+                if b[:2] == b'PK': blob = b; log('BLS: geladen von', url.split('?')[0], f'({len(b) / 1e6:.1f} MB)'); break
+                log('  keine ZIP/Excel-Datei:', url.split('?')[0])
+            except Exception as e:
+                log('  fehlgeschlagen:', url.split('?')[0], e)
+        if blob is None: raise RuntimeError('BLS-Download nicht möglich (blsdb.de und OpenAgrar)')
     else:
         blob = open(path, 'rb').read()
     if blob[:2] == b'PK' and not path_is_xlsx(blob):
