@@ -306,6 +306,8 @@ main table:not(.stack) td{overflow-wrap:anywhere}
 .off-item .off-n{font-weight:600;font-size:.88rem}
 .off-item .off-m{font-size:.72rem;color:var(--muted)}
 .off-item.picked{border-color:var(--sig)}
+.off-item.off-inc{opacity:.6}
+.off-at.off-st{background:transparent;color:var(--sig);box-shadow:inset 0 0 0 1px var(--sig)}
 .off-item.picked .off-n::after{content:' ✓';color:var(--sig)}
 /* Menge wählen */
 .sel-panel{border:1px solid var(--sig);border-radius:16px;padding:12px 14px;margin:6px 0 12px;background:var(--surface2)}
@@ -2445,7 +2447,7 @@ ACT.nutPick = el=>{ ui.nutSlot=el.dataset.s;
 function txtNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss'); }
 function txtMatch(name,q){ const nw=txtNorm(name).split(/[^a-z0-9]+/).filter(Boolean); const qw=txtNorm(q).split(/[^a-z0-9]+/).filter(w=>w.length>=2);
   if(!qw.length){ const t=txtNorm(q).trim(); return { hits:0, all:!!t && txtNorm(name).includes(t), start:0 }; }
-  const hit=w=>nw.some(n=>n.startsWith(w) || (w.length>=4 && n.includes(w)) || (n.length>=4 && w.length-n.length<=1 && w.startsWith(n)));
+  const joined=nw.join(''); const hit=w=>nw.some(n=>n.startsWith(w) || (w.length>=4 && n.includes(w)) || (n.length>=4 && w.length-n.length<=1 && w.startsWith(n))) || (w.length>=6 && joined.includes(w));
   const hits=qw.filter(hit).length; const start=nw.length && (nw[0].startsWith(qw[0])||(nw[0].length>=4&&qw[0].startsWith(nw[0])))?1:0;
   return { hits, all:hits===qw.length, start }; }
 function nutPickList(q){
@@ -2487,38 +2489,83 @@ ACT.nutAddSel = ()=>{ const f=nutFood(ui.nutSel); if(!f) return;
 /* ---------- Open Food Facts: Markenprodukte online suchen ----------
    Gesendet wird nur der Suchbegriff bzw. Barcode – keine persönlichen Daten. Suche nur auf Knopfdruck (Limit 10 Suchen/Minute). */
 const OFF_BASE='https://world.openfoodfacts.org';
-const OFF_FIELDS='code,product_name,product_name_de,generic_name_de,brands,nutriments,serving_quantity,quantity,countries_tags';
+const OFF_FIELDS='code,product_name,product_name_de,generic_name_de,brands,stores,nutriments,serving_quantity,quantity,countries_tags';
 const offCache={};
-function offMap(p){ const n=p.nutriments||{}; const g=k=>{ const v=n[k+'_100g']; return v==null||v===''?null:Math.round(Number(v)*10)/10; };
+/* Österreich-Fokus: Handelsketten und ihre Eigenmarken. Steht eine Kette im Suchbegriff („Billa Speckstangerl“), wird sie nicht
+   mitgesucht (viele Produkte haben die Kette nicht als Marke eingetragen), sondern ihre Produkte kommen in der Liste nach oben. */
+const OFF_STORES={
+  billa:['billa','clever','billa bio','billa corso','billa regional','billa immer gut','ja natürlich','ja! natürlich','vegavita','da komm ich her','merkur'],
+  spar:['spar','s-budget','s budget','spar natur pur','spar premium','spar vital','spar veggie','spar free from','spar enjoy','interspar','eurospar'],
+  hofer:['hofer','zurück zum ursprung','milsani','bio natura','backbox','lyttos','golden bridge','choceur','rio d\'oro','cucina nobile','gourmet','farmer'],
+  lidl:['lidl','milbona','pilos','crownfield','vemondo','chef select','sondey','fin carré','freeway','solevita','deluxe','alpenfest','gut bio'],
+  penny:['penny','clever','ja natürlich','ja! natürlich'],
+  mpreis:['mpreis','m-preis','m preis'],
+  unimarkt:['unimarkt'], adeg:['adeg','ja natürlich']
+};
+const OFF_STORE_ALIAS={ billa:'billa', billaplus:'billa', merkur:'billa', spar:'spar', interspar:'spar', eurospar:'spar', hofer:'hofer', aldi:'hofer', lidl:'lidl', penny:'penny', mpreis:'mpreis', unimarkt:'unimarkt', adeg:'adeg' };
+/* Österreichische Begriffe → deutsche Entsprechung (auch am Wortende: Speckstangerl → Speckstange) */
+const OFF_AT_DE=[['stangerl','stange'],['semmel','brötchen'],['weckerl','brötchen'],['kipferl','hörnchen'],['topfen','quark'],['paradeiser','tomate'],['erdäpfel','kartoffel'],['erdapfel','kartoffel'],
+  ['schlagobers','schlagsahne'],['obers','sahne'],['sauerrahm','saure sahne'],['faschiertes','hackfleisch'],['faschierte','hackfleisch'],['karfiol','blumenkohl'],['marillen','aprikosen'],['marille','aprikose'],
+  ['kren','meerrettich'],['fisolen','grüne bohnen'],['kukuruz','mais'],['ribisel','johannisbeere'],['eierschwammerl','pfifferlinge'],['schwammerl','pilze'],['hendl','hähnchen'],['powidl','pflaumenmus'],
+  ['zwetschken','pflaumen'],['zwetschke','pflaume'],['melanzani','aubergine'],['germ','hefe'],['jogurt','joghurt'],['vogerlsalat','feldsalat'],['häuptlsalat','kopfsalat'],['kohlsprossen','rosenkohl'],
+  ['grammeln','grieben'],['extrawurst','fleischwurst'],['leberkäs','fleischkäse'],['palatschinken','pfannkuchen'],['krapfen','berliner'],['nockerl','spätzle'],['karotten','möhren']];
+/* Häufige Wortanfänge, um zusammengeschriebene Produktnamen zu trennen (Speckstangerl → Speck Stangerl) */
+const OFF_PREFIX=['speck','käse','kaese','schinken','kürbis','kuerbis','kürbiskern','mohn','sesam','vollkorn','dinkel','roggen','weizen','topfen','butter','schoko','nuss','nougat','apfel','marillen','bio','milch','joghurt',
+  'rind','hendl','huhn','hühner','puten','schwein','kalb','kartoffel','erdäpfel','pizza','salami','wurst','frucht','gemüse','protein','hafer','reis','mais','zwiebel','knoblauch','kräuter','pikant','laugen','salz','zimt','vanille','erdbeer','himbeer','beeren'];
+const OFF_BAKERY=/stangerl|semmel|weckerl|kipferl|geb[aä]ck|brot|plunder|croissant|krapfen|flesserl|strudel|backstation|leberk[aä]s/i;
+function offSplitQuery(q){
+  const words=q.trim().split(/\s+/).filter(Boolean); const stores=[]; const rest=[];
+  words.forEach(w=>{ const k=txtNorm(w).replace(/[^a-z]/g,''); if(OFF_STORE_ALIAS[k]) stores.push(OFF_STORE_ALIAS[k]); else rest.push(w); });
+  return { terms:rest.join(' ')||q.trim(), stores:Array.from(new Set(stores)) }; }
+/* Suchvarianten: Original, österreichisch → deutsch, zusammengeschriebene Wörter getrennt */
+function offVariants(terms){
+  const out=[terms]; const add=v=>{ v=v.trim(); if(v && !out.some(x=>txtNorm(x)===txtNorm(v))) out.push(v); };
+  const words=terms.split(/\s+/);
+  add(words.map(w=>{ const lw=w.toLowerCase(); for(const [at,de] of OFF_AT_DE){ if(lw===at) return de; if(lw.length>at.length+2 && lw.endsWith(at)) return lw.slice(0,-at.length)+de; } return w; }).join(' '));
+  add(words.map(w=>{ const lw=w.toLowerCase(); const p=OFF_PREFIX.filter(x=>lw.startsWith(x) && lw.length-x.length>=4).sort((a,b)=>b.length-a.length)[0]; return p?p+' '+lw.slice(p.length):w; }).join(' '));
+  return out.slice(0,3); }
+function offStoreHit(p, stores){ if(!stores.length) return 0; const hay=txtNorm((p.brands||'')+','+(Array.isArray(p.stores)?p.stores.join(','):(p.stores||'')));
+  return stores.some(s=>(OFF_STORES[s]||[s]).some(b=>hay.includes(txtNorm(b))))?1:0; }
+function offMap(p){ const n=p.nutriments||{}; const g=k=>{ const v=n[k+'_100g']; return v==null||v===''||Number.isNaN(Number(v))?null:Math.round(Number(v)*10)/10; };
   let kcal=g('energy-kcal'); if(kcal==null && n['energy_100g']!=null) kcal=Math.round(Number(n['energy_100g'])/4.184);
-  const P=g('proteins'), K=g('carbohydrates'), F=g('fat'); if([kcal,P,K,F].some(v=>v==null||Number.isNaN(v))) return null;
+  const P=g('proteins'), K=g('carbohydrates'), F=g('fat');
   const name=(p.product_name_de||p.product_name||p.generic_name_de||'').trim(); if(!name) return null;
+  const incomplete=[kcal,P,K,F].some(v=>v==null);
   const brand=(p.brands||'').split(',')[0].trim();
   const per=/\d\s*(ml|cl|l)\b/i.test(p.quantity||'')?'100 ml':'100 g';
-  const main = kcal>0 && P*4/kcal>=0.3 ? 'P' : (F*9>K*4 ? 'F' : 'K');
+  const main = incomplete ? 'K' : (kcal>0 && P*4/kcal>=0.3 ? 'P' : (F*9>K*4 ? 'F' : 'K'));
   const qn=parseFloat(String(p.quantity||'').replace(',','.')); const sv=p.serving_quantity?Number(p.serving_quantity):null;
   const piece = sv && qn && Math.abs(qn-sv)<0.5 ? Math.round(sv) : null;   // Einzelpackung (z. B. Riegel): 1 Stück = Packung
-  return { code:String(p.code||''), name:(brand&&!name.toLowerCase().includes(brand.toLowerCase())?name+' ('+brand+')':name), kcal:Math.round(kcal), P, K, F, per,
+  return { code:String(p.code||''), name:(brand&&!name.toLowerCase().includes(brand.toLowerCase())?name+' ('+brand+')':name), kcal:kcal==null?null:Math.round(kcal), P, K, F, per, incomplete,
     portion:p.serving_quantity?Math.round(Number(p.serving_quantity)):null, piece, main, qty:p.quantity||'', at:(p.countries_tags||[]).includes('en:austria'),
-    dach:(p.countries_tags||[]).some(c=>c==='en:austria'||c==='en:germany'), de:!!(p.product_name_de||'').trim() }; }
+    dach:(p.countries_tags||[]).some(c=>c==='en:austria'||c==='en:germany'), de:!!(p.product_name_de||'').trim(), store:p._store||0 }; }
+/* Zusätzliche Anfragen (Varianten, weltweit) nur, solange das Limit von Open Food Facts nicht erreicht ist */
+function offBudget(){ const t=Date.now(); while(offTimes.length && t-offTimes[0]>60000) offTimes.shift(); if(offTimes.length>=9) return false; offTimes.push(t); return true; }
 async function offQuery(q){
   q=q.trim(); if(offCache[q]) return offCache[q];
-  let list;
+  let list, meta={ variants:[], stores:[] };
   if(/^\d{8,14}$/.test(q)){ const r=await fetch(OFF_BASE+'/api/v2/product/'+q+'.json?fields='+OFF_FIELDS);
     if(r.status===404){ list=[]; } else { if(!r.ok) throw new Error('HTTP '+r.status); const j=await r.json(); list=j.product?[Object.assign({code:q},j.product)]:[]; } }
-  else { const get=async extra=>{ const r=await fetch(OFF_BASE+'/cgi/search.pl?action=process&json=1&search_simple=1&lc=de&page_size=100&search_terms='+encodeURIComponent(q)+extra+'&fields='+OFF_FIELDS);
+  else { const get=async (terms,extra)=>{ const r=await fetch(OFF_BASE+'/cgi/search.pl?action=process&json=1&search_simple=1&lc=de&page_size=100&search_terms='+encodeURIComponent(terms)+extra+'&fields='+OFF_FIELDS);
       if(!r.ok) throw new Error(r.status===429?'zu viele Suchen – bitte eine Minute warten':'HTTP '+r.status); const j=await r.json(); return j.products||[]; };
-    // Zuerst nur Produkte, die in Österreich verkauft werden; weltweit nur ergänzen, wenn das zu wenig ist (zählt als zweite Suche)
-    list=await get('&tagtype_0=countries&tag_contains_0=contains&tag_0=austria');
-    list.forEach(p=>{ p.countries_tags=Array.from(new Set([...(p.countries_tags||[]),'en:austria'])); });
-    if(list.length<8){ offTimes.push(Date.now()); const seen=new Set(list.map(p=>String(p.code)));
-      try{ (await get('')).forEach(p=>{ if(!seen.has(String(p.code))) list.push(p); }); }catch(e){ if(!list.length) throw e; } } }
+    const AT='&tagtype_0=countries&tag_contains_0=contains&tag_0=austria';
+    const sq=offSplitQuery(q); const vars=offVariants(sq.terms); meta={ variants:vars, stores:sq.stores };
+    list=[]; const seen=new Set(); const push=(arr,at)=>arr.forEach(p=>{ const c=String(p.code||p.product_name||Math.random()); if(seen.has(c)) return; seen.add(c);
+      if(at) p.countries_tags=Array.from(new Set([...(p.countries_tags||[]),'en:austria'])); list.push(p); });
+    const good=()=>list.map(offMap).filter(r=>r && !r.incomplete && vars.some(v=>txtMatch(r.name,v).all)).length;
+    // 1. In Österreich verkaufte Produkte – Original, dann Varianten (nur wenn nötig)
+    push(await get(vars[0], AT), true);
+    for(let i=1;i<vars.length && good()<5;i++){ if(!offBudget()) break; try{ push(await get(vars[i], AT), true); }catch(e){} }
+    // 2. Weltweit ergänzen, wenn das zu wenig ist
+    for(let i=0;i<vars.length && good()<5;i++){ if(!offBudget()) break; try{ push(await get(vars[i], ''), false); }catch(e){ if(!list.length) throw e; } }
+    list.forEach(p=>{ p._store=offStoreHit(p, sq.stores); }); }
   let out=list.map(offMap).filter(Boolean);
-  // Reihenfolge: Österreich immer zuerst, dann Suchwörter im Produktnamen (alle > einige), Deutschland/deutscher Name, sonst Reihenfolge von Open Food Facts
-  if(!/^\d{8,14}$/.test(q)){ out.forEach((r,i)=>{ const m=txtMatch(r.name,q); r._m=m.hits; r._all=m.all?1:0; r._st=m.start; r._i=i; });
+  // Reihenfolge: vollständige Nährwerte, Österreich, gewählte Handelskette, Suchwörter im Namen (alle > einige), Deutschland/deutscher Name, sonst Open Food Facts
+  if(!/^\d{8,14}$/.test(q)){ const vars=meta.variants.length?meta.variants:[q];
+    out.forEach((r,i)=>{ const m=vars.map(v=>txtMatch(r.name,v)).sort((a,b)=>(b.all-a.all)||(b.hits-a.hits)||(b.start-a.start))[0]; r._m=m.hits; r._all=m.all?1:0; r._st=m.start; r._i=i; });
     if(out.some(r=>r._m>0)) out=out.filter(r=>r._m>0);
-    out.sort((a,b)=>(b.at-a.at)||(b._all-a._all)||(b._st-a._st)||((b.dach||b.de)-(a.dach||a.de))||(b._m-a._m)||(a._i-b._i)); }
-  offCache[q]=out; return out; }
+    out.sort((a,b)=>(a.incomplete-b.incomplete)||(b.at-a.at)||(b.store-a.store)||(b._all-a._all)||(b._st-a._st)||((b.dach||b.de)-(a.dach||a.de))||(b._m-a._m)||(a._i-b._i)); }
+  out.meta=meta; offCache[q]=out; return out; }
 /* Automatische Online-Suche: 700 ms nach dem letzten Tastendruck, ab 3 Zeichen, max. 9 Suchen pro Minute (Limit 10) */
 let offTimer=null, offSeq=0; const offTimes=[];
 function offAuto(q,mode,now){ clearTimeout(offTimer); q=(q||'').trim();
@@ -2533,17 +2580,21 @@ async function offRun(q,mode){
     offTimes.push(t); }
   box.innerHTML='<p class="small muted">Suche online nach „'+esc(q)+'“ …</p>';
   try{ const res=await offQuery(q); if(my!==offSeq || !document.getElementById('off-res')) return; ui.offRes=res; ui.offMode=mode;
-    if(!res.length){ box.innerHTML='<p class="small muted">Online nichts mit vollständigen Nährwerten gefunden.</p>'; return; }
-    box.innerHTML='<div class="off-list">'+res.slice(0,15).map((r,i)=>'<button class="off-item" data-act="offPick" data-mode="'+mode+'" data-i="'+i+'"><span class="off-n">'+(r.at?'<span class="off-at">AT</span>':'')+esc(r.name)+'</span><span class="off-m">'+r.kcal+' kcal · P '+fmtNum(r.P)+' · KH '+fmtNum(r.K)+' · F '+fmtNum(r.F)+' / '+r.per+(r.qty?' · '+esc(r.qty):'')+'</span></button>').join('')+'</div><p class="small muted" style="margin-top:6px">Daten von Open Food Facts (von Nutzern gepflegt) – Werte mit der Packung vergleichen.</p>';
+    const meta=res.meta||{}; const tried=(meta.variants||[]).length>1?' Gesucht auch als: '+meta.variants.slice(1).map(v=>'„'+esc(v)+'“').join(', ')+'.':'';
+    const bake=OFF_BAKERY.test(q)?' Frisches Gebäck aus der Backstation hat meist keinen Barcode und fehlt deshalb oft. Nährwerte im Onlineshop des Händlers nachsehen und als eigenes Lebensmittel anlegen.':'';
+    if(!res.length){ box.innerHTML='<p class="small muted">Online nichts gefunden.'+tried+bake+'</p>'; return; }
+    const full=res.filter(r=>!r.incomplete).length;
+    box.innerHTML=(!full?'<p class="small muted">Nur Treffer mit unvollständigen Nährwerten.'+bake+'</p>':'')+'<div class="off-list">'+res.slice(0,20).map((r,i)=>'<button class="off-item'+(r.incomplete?' off-inc':'')+'" data-act="offPick" data-mode="'+mode+'" data-i="'+i+'"><span class="off-n">'+(r.at?'<span class="off-at">AT</span>':'')+(r.store?'<span class="off-at off-st">'+esc((meta.stores||[])[0]||'').toUpperCase()+'</span>':'')+esc(r.name)+'</span><span class="off-m">'+(r.incomplete?'Nährwerte unvollständig'+(r.kcal!=null?' · '+r.kcal+' kcal':''):r.kcal+' kcal · P '+fmtNum(r.P)+' · KH '+fmtNum(r.K)+' · F '+fmtNum(r.F)+' / '+r.per)+(r.qty?' · '+esc(r.qty):'')+'</span></button>').join('')+'</div><p class="small muted" style="margin-top:6px">Daten von Open Food Facts (von Nutzern gepflegt) – Werte mit der Packung vergleichen.'+(full?tried:'')+'</p>';
   }catch(e){ if(my===offSeq) box.innerHTML='<p class="small" style="color:var(--bad)">Online-Suche fehlgeschlagen: '+esc(e.message||String(e))+'</p>'; } }
 function offExcluded(name){ const ex=(NUT().exclusions||[]).map(x=>x.split(' ')[0].toLowerCase()); return ex.some(x=>x.length>3 && name.toLowerCase().includes(x)); }
 document.addEventListener('keydown', e=>{ const t=e.target; if(e.key!=='Enter' || !t) return;
   if(t.id==='fd-n'){ e.preventDefault(); ACT.nutAddSel(); return; }
   if(t.id==='off-q' || t.id==='fd-q'){ e.preventDefault(); offAuto(t.value, t.id==='off-q'?'fill':'add', true); } });
 ACT.offPick = el=>{ const r=(ui.offRes||[])[+el.dataset.i]; if(!r) return;
+  if(r.incomplete && el.dataset.mode!=='fill'){ toast('Nährwerte unvollständig – über „Eigenes Lebensmittel“ mit den Werten von der Packung anlegen.'); return; }
   if(el.dataset.mode==='fill'){ ui.offPicked=r; const set=(id,v)=>{ const x=document.getElementById(id); if(x) x.value=v==null?'':String(v).replace('.',','); };
     set('no-name',r.name); set('no-kcal',r.kcal); set('no-p',r.P); set('no-k',r.K); set('no-f',r.F); set('no-por',r.portion); set('no-pc',r.piece); set('no-per',r.per); set('no-main',r.main);
-    const n=document.getElementById('no-name'); if(n) n.scrollIntoView({block:'center'}); toast('Werte übernommen – prüfen und speichern.'); return; }
+    const n=document.getElementById('no-name'); if(n) n.scrollIntoView({block:'center'}); toast(r.incomplete?'Name übernommen – fehlende Nährwerte von der Packung ergänzen.':'Werte übernommen – prüfen und speichern.'); return; }
   if(offExcluded(r.name)){ toast('Steht auf deiner Liste der Lebensmittel, die du nicht isst.'); return; }
   let own=(S.nutrition.items||[]).find(i=>i.custom && r.code && i.off_code===r.code);
   if(!own){ own={ id:uid('own'), custom:true, name:r.name, category:'eigene', per:r.per, kcal:r.kcal, protein_g:r.P, carbs_g:r.K, fat_g:r.F, fiber_g:null,
