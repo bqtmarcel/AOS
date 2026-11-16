@@ -307,6 +307,13 @@ main table:not(.stack) td{overflow-wrap:anywhere}
 .off-item .off-m{font-size:.72rem;color:var(--muted)}
 .off-item.picked{border-color:var(--sig)}
 .off-item.off-inc{opacity:.6}
+.rc-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.rc-row .rc-n{flex:1 1 100%;min-width:0;font-size:.88rem;overflow-wrap:anywhere}
+.rc-row input{flex:none;width:96px;text-align:right}
+.rc-row .rc-u{flex:none;font-size:.8rem;color:var(--muted)}
+.rc-row .rc-k{flex:1;text-align:right;white-space:nowrap}
+.rc-row button{flex:none}
+.rc-sum{display:grid;gap:4px;padding:12px;border-radius:14px;background:rgba(255,255,255,.05);margin:8px 0}
 .off-at.off-st{background:transparent;color:var(--sig);box-shadow:inset 0 0 0 1px var(--sig)}
 .off-item.picked .off-n::after{content:' ✓';color:var(--sig)}
 /* Menge wählen */
@@ -2438,10 +2445,10 @@ CHG.nutU = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; const 
   save(); render(); };
 CHG.nutG = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; const it=m.items[+el.dataset.j]; const v=num(el.value);
   if(v==null || v<0){ toast('Bitte eine Zahl eingeben.'); render(); return; } it.g=qtyToG(v,itemUnit(it),nutFood(it.food)); it.fixed=true; nutRecalc(el.dataset.s); save(); render(); };
-ACT.nutPick = el=>{ ui.nutSlot=el.dataset.s;
+ACT.nutPick = el=>{ ui.nutSlot=el.dataset.s; ui.rcpReturn=false;
   const slot=nutMealPlan(nutTargets(nutDate())).find(x=>x.slot.id===el.dataset.s);
   openDlg('Lebensmittel – '+(slot?slot.slot.name:''), inp('fd-q','Suchen','','autocomplete="off" placeholder="z. B. Ei, Skyr, Huhn oder Barcode"')+'<div id="fd-amt"></div><div id="fd-list">'+nutPickList('')+'</div>'+
-    '<div class="off-box"><div class="eyebrow">Online · Open Food Facts</div><div id="off-res"><p class="small muted">Markenprodukte erscheinen hier automatisch ab 3 Zeichen (Name oder Barcode).</p></div></div><p class="small" style="margin-top:10px"><button class="link" data-act="nutOwn">Nährwerte selbst eintragen</button></p>', '<button data-act="closeDlg">Fertig</button>');
+    '<div class="off-box"><div class="eyebrow">Online · Open Food Facts</div><div id="off-res"><p class="small muted">Markenprodukte erscheinen hier automatisch ab 3 Zeichen (Name oder Barcode).</p></div></div><p class="small" style="margin-top:10px"><button class="link" data-act="rcpStart">Selbstgekocht? Rezept berechnen</button> · <button class="link" data-act="nutOwn">Nährwerte selbst eintragen</button></p>', '<button data-act="closeDlg">Fertig</button>');
   ui.nutSel=null; };
 /* Textsuche: jedes Suchwort muss ein Wort im Namen treffen (Wortanfang, Teilwort ab 4 Zeichen, kleine Tippfehler am Wortende wie „Bleue“) */
 function txtNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss'); }
@@ -2474,7 +2481,7 @@ function nutSelPanel(){ const f=ui.nutSel && nutFood(ui.nutSel); if(!f) return '
   return '<div class="sel-panel"><div class="sel-name">'+esc(f.name)+'</div>'+
     '<div class="sel-row"><input id="fd-n" inputmode="decimal" autocomplete="off" aria-label="Menge" placeholder="auto">'+
     '<div class="seg">'+us.map(([k,l])=>'<button class="chip" data-act="nutSelU" data-u="'+k+'" aria-pressed="'+(k===u)+'">'+esc(k==='stk'?l+(f.piece_g?' ('+f.piece_g+(/ml/.test(f.per)?' ml':' g')+')':''):l)+'</button>').join('')+'</div></div>'+
-    '<div class="sel-row"><span class="small muted" style="flex:1">Leer lassen = AOS berechnet die Menge passend zum Ziel.</span><button class="small" data-act="nutSelX">Abbrechen</button><button class="primary small" data-act="nutAddSel">Hinzufügen</button></div></div>'; }
+    (f.recipe?'<p class="small" style="margin:4px 0"><button class="link" data-act="rcpEdit" data-f="'+esc(f.id)+'">Rezept bearbeiten</button></p>':'')+'<div class="sel-row"><span class="small muted" style="flex:1">Leer lassen = AOS berechnet die Menge passend zum Ziel.</span><button class="small" data-act="nutSelX">Abbrechen</button><button class="primary small" data-act="nutAddSel">Hinzufügen</button></div></div>'; }
 function nutSelShow(){ const box=document.getElementById('fd-amt'); if(!box) return; box.innerHTML=nutSelPanel(); const i=document.getElementById('fd-n'); if(i){ box.scrollIntoView({block:'nearest'}); i.focus(); } }
 ACT.nutSel = el=>{ ui.nutSel=el.dataset.f; ui.nutSelU=null; nutSelShow(); };
 ACT.nutSelU = el=>{ const v=val('fd-n'); ui.nutSelU=el.dataset.u; nutSelShow(); const i=document.getElementById('fd-n'); if(i) i.value=v||''; };
@@ -2629,7 +2636,85 @@ ACT.nutOwnOk = ()=>{ const n=val('no-name'), kc=num(val('no-kcal')), p=num(val('
     default_portion_g:num(val('no-por')), portion_label:'', main_block:val('no-main'), grams_per_block:{}, tags:[], source:src?'Open Food Facts (Barcode '+src.code+')':'Packung (eigene Angabe)', off_code:src?src.code:undefined, active:true, createdAt:new Date().toISOString() });
   const pc=num(val('no-pc')); if(pc && pc>0){ const it=S.nutrition.items[S.nutrition.items.length-1]; it.piece_g=pc; it.piece_label='Stück'; }
   ui.offPicked=null;
+  if(ui.rcpReturn && ui.rcp){ ui.rcpReturn=false; ui.rcp.items.push({ food:S.nutrition.items[S.nutrition.items.length-1].id, g:null }); save(); rcpOpen(); toast('Zutat angelegt – Menge eintragen.'); return; }
   save(); closeDlg(); render(); toast('Lebensmittel angelegt.'); };
+
+/* ---------- Rezeptrechner: Zutaten + Gewicht fertig gekocht → Nährwerte pro 100 g und pro Portion ----------
+   Das Ergebnis ist ein eigenes Lebensmittel (Kategorie „Gerichte“) mit der Zutatenliste in recipe, damit es später änderbar bleibt. */
+function rcpNew(){ return { id:null, name:'', items:[], cooked:null, portions:null }; }
+function rcpUnit(f){ return isPortion(f) ? 'Port.' : (/ml/.test((f&&f.per)||'') ? 'ml' : 'g'); }
+function rcpCalc(r){
+  const items=r.items.filter(i=>i.g!=null && i.g>0 && nutFood(i.food));
+  const tot=sumMac(items); const raw=items.filter(i=>!isPortion(nutFood(i.food))).reduce((a,i)=>a+i.g,0);
+  const hasPort=items.some(i=>isPortion(nutFood(i.food)));
+  const W=r.cooked&&r.cooked>0 ? r.cooked : (hasPort?null:raw);
+  const per100=W ? { kcal:tot.kcal/W*100, P:tot.P/W*100, K:tot.K/W*100, F:tot.F/W*100 } : null;
+  const portG=W && r.portions>0 ? W/r.portions : null;
+  return { tot, raw, W, per100, portG, n:items.length, hasPort }; }
+function rcpSummary(){ const r=ui.rcp; const c=rcpCalc(r); const m=x=>Math.round(x.kcal)+' kcal · P '+fmtNum(Math.round(x.P*10)/10)+' · KH '+fmtNum(Math.round(x.K*10)/10)+' · F '+fmtNum(Math.round(x.F*10)/10);
+  if(!c.n) return '<p class="small muted">Noch keine Zutaten mit Menge.</p>';
+  let h='<div class="rc-sum"><div class="small muted">Ganzer Topf · '+m(c.tot)+'</div>';
+  if(!c.per100) return h+'<p class="small" style="color:var(--bad)">Bitte das Gewicht fertig gekocht eintragen (Zutaten in Portionen haben kein Gewicht).</p></div>';
+  h+='<div><strong>Pro 100 g:</strong> '+m(c.per100)+'</div>';
+  if(c.portG){ const k=c.portG/100; h+='<div><strong>Pro Portion ('+fmtNum(Math.round(c.portG))+' g):</strong> '+m({ kcal:c.per100.kcal*k, P:c.per100.P*k, K:c.per100.K*k, F:c.per100.F*k })+'</div>'; }
+  if(!r.cooked) h+='<p class="small muted" style="margin:6px 0 0">Gerechnet mit dem Rohgewicht ('+fmtNum(Math.round(c.raw))+' g). Beim Kochen verdampft Wasser bzw. Reis und Nudeln nehmen welches auf – für genaue Werte den fertigen Inhalt abwiegen.</p>';
+  return h+'</div>'; }
+function rcpRows(){ const r=ui.rcp;
+  if(!r.items.length) return '<p class="small muted">Füge unten die Zutaten mit der Menge hinzu, die in den Topf kommt (roh bzw. wie gekauft).</p>';
+  return r.items.map((it,i)=>{ const f=nutFood(it.food); if(!f) return ''; const k=it.g!=null?Math.round(itemMac(it).kcal):null;
+    return '<div class="rc-row"><span class="rc-n">'+esc(f.name)+'</span><input id="rc-g-'+i+'" data-i="'+i+'" inputmode="decimal" autocomplete="off" aria-label="Menge '+esc(f.name)+'" value="'+(it.g==null?'':fmtNum(it.g))+'" placeholder="Menge">'+
+      '<span class="rc-u">'+rcpUnit(f)+'</span><span class="rc-k small muted" id="rc-k-'+i+'">'+(k!=null?k+' kcal':'')+'</span><button class="small" data-act="rcpDel" data-i="'+i+'" aria-label="Zutat entfernen">✕</button></div>'; }).join(''); }
+function rcpPickList(q){ q=(q||'').trim(); if(q.length<2) return '<p class="small muted">Zutat suchen, z. B. Risottoreis, Parmesan, Butter.</p>';
+  const l=nutFoods(false).filter(f=>txtMatch(f.name,q).all && f.id!==ui.rcp.id).sort((a,b)=>txtMatch(b.name,q).start-txtMatch(a.name,q).start || a.name.localeCompare(b.name,'de')).slice(0,30);
+  return (l.length?l.map(f=>'<button class="chip" data-act="rcpAdd" data-f="'+esc(f.id)+'">'+esc(f.name)+'</button>').join(''):'<p class="small muted">Nicht in deinen Lebensmitteln.</p>')+
+    '<p class="small" style="margin-top:6px"><button class="link" data-act="rcpOwn">Zutat fehlt? Selbst eintragen oder bei Open Food Facts suchen</button></p>'; }
+function rcpOpen(){ const r=ui.rcp;
+  openDlg(r.id?'Rezept bearbeiten':'Rezept berechnen',
+    inp('rc-name','Name des Gerichts',r.name,'autocomplete="off" placeholder="z. B. Pilzrisotto (selbstgemacht)"')+
+    '<div class="eyebrow" style="margin-top:12px">Zutaten</div><div id="rc-rows">'+rcpRows()+'</div>'+
+    inp('rc-q','Zutat hinzufügen','','autocomplete="off" placeholder="suchen …"')+'<div id="rc-list">'+rcpPickList('')+'</div>'+
+    '<div class="fields" style="margin-top:12px">'+inp('rc-cooked','Fertig gekocht (g)',r.cooked==null?'':fmtNum(r.cooked),'inputmode="decimal" placeholder="Inhalt abwiegen"')+inp('rc-por','Portionen',r.portions==null?'':fmtNum(r.portions),'inputmode="decimal" placeholder="z. B. 4"')+'</div>'+
+    '<p class="small muted" style="margin-top:0">Tipp: Leeren Topf vorher wiegen, dann Topf mit Inhalt – die Differenz ist das Gewicht fertig gekocht.</p>'+
+    '<div id="rc-sum">'+rcpSummary()+'</div>'+
+    (r.id?'<p class="small"><button class="link" data-act="rcpRemove" style="color:var(--bad)">Rezept ausblenden</button></p>':''),
+    '<button data-act="closeDlg">Abbrechen</button><button class="primary" data-act="rcpSave">Speichern</button>'); }
+function rcpRefresh(rows){ const s=document.getElementById('rc-sum'); if(s) s.innerHTML=rcpSummary();
+  if(rows){ const b=document.getElementById('rc-rows'); if(b) b.innerHTML=rcpRows(); } }
+document.addEventListener('input', e=>{ const t=e.target; if(!t || !t.id || !ui.rcp || !t.id.startsWith('rc-')) return;
+  if(t.id==='rc-q'){ const l=document.getElementById('rc-list'); if(l) l.innerHTML=rcpPickList(t.value); return; }
+  if(t.id==='rc-name'){ ui.rcp.name=t.value; return; }
+  const v=t.value.trim()===''?null:num(t.value);
+  if(t.id==='rc-cooked'){ ui.rcp.cooked=v!=null&&v>0?v:null; rcpRefresh(); return; }
+  if(t.id==='rc-por'){ ui.rcp.portions=v!=null&&v>0?v:null; rcpRefresh(); return; }
+  if(t.id.startsWith('rc-g-')){ const i=+t.dataset.i, it=ui.rcp.items[i]; if(!it) return; it.g=v!=null&&v>0?v:null;
+    const k=document.getElementById('rc-k-'+i); if(k) k.textContent=it.g!=null?Math.round(itemMac(it).kcal)+' kcal':''; rcpRefresh(); } });
+ACT.rcpStart = ()=>{ ui.rcpReturn=false; if(!ui.rcp || ui.rcp.id) ui.rcp=rcpNew(); rcpOpen(); };
+ACT.rcpEdit = el=>{ const f=(S.nutrition.items||[]).find(i=>i.id===el.dataset.f && i.recipe); if(!f) return;
+  ui.rcp={ id:f.id, name:f.name, items:clone(f.recipe.items||[]), cooked:f.recipe.cooked||null, portions:f.recipe.portions||null }; rcpOpen(); };
+ACT.rcpAdd = el=>{ ui.rcp.items.push({ food:el.dataset.f, g:null }); const q=document.getElementById('rc-q'); if(q) q.value='';
+  const l=document.getElementById('rc-list'); if(l) l.innerHTML=rcpPickList(''); rcpRefresh(true);
+  const i=document.getElementById('rc-g-'+(ui.rcp.items.length-1)); if(i) i.focus(); };
+ACT.rcpDel = el=>{ ui.rcp.items.splice(+el.dataset.i,1); rcpRefresh(true); };
+ACT.rcpOwn = ()=>{ ui.rcpReturn=true; ACT.nutOwn(); };
+ACT.rcpRemove = ()=>{ const f=(S.nutrition.items||[]).find(i=>i.id===ui.rcp.id); if(!f) return;
+  confirmDlg('Rezept ausblenden?', '„'+esc(f.name)+'“ erscheint nicht mehr in der Suche. Bereits eingetragene Mahlzeiten behalten ihre Werte.', 'Ausblenden', ()=>{ f.active=false; ui.rcp=null; save(); render(); toast('Rezept ausgeblendet.'); }, true); };
+ACT.rcpSave = ()=>{ const r=ui.rcp; const n=(val('rc-name')||'').trim(); r.name=n;
+  if(!n){ toast('Bitte einen Namen eingeben.'); return; }
+  if(offExcluded(n)){ toast('Steht auf deiner Liste der Lebensmittel, die du nicht isst.'); return; }
+  const c=rcpCalc(r); if(!c.n){ toast('Bitte mindestens eine Zutat mit Menge eintragen.'); return; }
+  if(!c.per100){ toast('Bitte das Gewicht fertig gekocht eintragen.'); return; }
+  const p=c.per100, rd=x=>Math.round(x*10)/10;
+  const main = p.kcal>0 && p.P*4/p.kcal>=0.3 ? 'P' : (p.F*9>p.K*4 ? 'F' : 'K');
+  const vals={ name:n, category:'gericht', per:'100 g', kcal:Math.round(p.kcal), protein_g:rd(p.P), carbs_g:rd(p.K), fat_g:rd(p.F), fiber_g:null,
+    default_portion_g:c.portG?Math.round(c.portG):null, portion_label:c.portG?'1 Portion':'', main_block:main, source:'Rezept (selbst berechnet)',
+    recipe:{ items:r.items.filter(i=>i.g!=null&&i.g>0).map(i=>({ food:i.food, g:i.g })), cooked:r.cooked||null, portions:r.portions||null, rawG:Math.round(c.raw) } };
+  if(c.portG){ vals.piece_g=Math.round(c.portG); vals.piece_label='Portion'; } else { vals.piece_g=undefined; vals.piece_label=undefined; }
+  let f=r.id && (S.nutrition.items||[]).find(i=>i.id===r.id);
+  if(f){ Object.assign(f, vals, { updatedAt:new Date().toISOString() }); if(!c.portG){ delete f.piece_g; delete f.piece_label; } }
+  else { f=Object.assign({ id:uid('rcp'), custom:true, grams_per_block:{}, tags:[], active:true, createdAt:new Date().toISOString() }, vals); if(!c.portG){ delete f.piece_g; delete f.piece_label; } S.nutrition.items.push(f); }
+  ui.rcp=null; save(); toast('Rezept gespeichert: '+f.kcal+' kcal pro 100 g.');
+  if(ui.nutSlot && nutMealPlan(nutTargets(nutDate())).some(x=>x.slot.id===ui.nutSlot)){ ACT.nutPick({ dataset:{ s:ui.nutSlot } }); ui.nutSel=f.id; ui.nutSelU=null; nutSelShow(); }
+  else { closeDlg(); render(); } };
 
 /* ---------- Gespeicherte Mahlzeiten (Vorlagen) ---------- */
 function nutTpls(){ return S.nutrition.templates||[]; }

@@ -55,6 +55,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | E3 | **Mahlzeit vom Vortag kopieren** mit einem Tipp | Weniger Tipparbeit | ✅ erledigt | S |
 | E4 | **Supplements**: Wochenübersicht abgehakt / vergessen | Regelmäßigkeit | ✅ erledigt | S |
 | E6 | **Online-Suche mit Österreich-Fokus**: Handelskette im Suchbegriff (Billa, Spar, Hofer …) hebt deren Eigenmarken hervor, österreichische Begriffe werden zusätzlich auf Deutsch gesucht (Topfen → Quark), zusammengeschriebene Namen auch getrennt (Speckstangerl → Speck Stangerl), Treffer mit unvollständigen Nährwerten erscheinen ausgegraut | Mehr heimische Produkte finden | ✅ erledigt (16.11.) | M |
+| E7 | **Rezeptrechner** für Selbstgekochtes: Zutaten mit Menge, Gewicht fertig gekocht und Portionen → Nährwerte pro 100 g und pro Portion; gespeichert als eigenes Gericht, jederzeit änderbar | Genaues Tracking ohne Schätzen | ✅ erledigt (16.11.) | M |
 | E5 | **Meal-Prep-Plan** (Spezifikation 12) als eigene Ansicht: Mengen für die Woche, direkt in die Einkaufsliste | Planung am Wochenende | ⏸ braucht deine Antwort zu offenem Punkt 7 (Mittagessen pro Woche, Gefrierschrank) | M |
 
 ## 4. Übersicht und Bedienung
