@@ -2,6 +2,8 @@
 
 Sammlung möglicher Verbesserungen und Weiterentwicklungen. Dieses Repo ist öffentlich, deshalb stehen hier **keine persönlichen Werte** (Lasten, Körperdaten, Pläne). Fachliche Details stehen in den Spezifikationen in `AOS_DATA/docs`.
 
+Der große Ausbau (Mehrbenutzer, Positionsgruppen, Coach-Übersicht, Ranglisten) steht mit allen Tasks in [`ROADMAP.md`](ROADMAP.md).
+
 Status: ✅ erledigt · 🟡 teilweise · ⏸ wartet (Grund in der Spalte)
 
 Priorität: **P1** = bald und mit großem Nutzen · **P2** = sinnvoll · **P3** = später oder nur eine Idee
