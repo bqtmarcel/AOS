@@ -2523,7 +2523,8 @@ function offVariants(terms){
   const words=terms.split(/\s+/);
   add(words.map(w=>{ const lw=w.toLowerCase(); for(const [at,de] of OFF_AT_DE){ if(lw===at) return de; if(lw.length>at.length+2 && lw.endsWith(at)) return lw.slice(0,-at.length)+de; } return w; }).join(' '));
   add(words.map(w=>{ const lw=w.toLowerCase(); const p=OFF_PREFIX.filter(x=>lw.startsWith(x) && lw.length-x.length>=4).sort((a,b)=>b.length-a.length)[0]; return p?p+' '+lw.slice(p.length):w; }).join(' '));
-  return out.slice(0,3); }
+  if(words.length>=3) words.forEach((w,i)=>{ if(i>0) add(words.filter((_,j)=>j!==i).join(' ')); });   // ohne einzelne Wörter (nicht ohne das erste – oft die Marke)
+  return out.slice(0,5); }
 function offStoreHit(p, stores){ if(!stores.length) return 0; const hay=txtNorm((p.brands||'')+','+(Array.isArray(p.stores)?p.stores.join(','):(p.stores||'')));
   return stores.some(s=>(OFF_STORES[s]||[s]).some(b=>hay.includes(txtNorm(b))))?1:0; }
 function offMap(p){ const n=p.nutriments||{}; const g=k=>{ const v=n[k+'_100g']; return v==null||v===''||Number.isNaN(Number(v))?null:Math.round(Number(v)*10)/10; };
@@ -2548,23 +2549,34 @@ async function offQuery(q){
     if(r.status===404){ list=[]; } else { if(!r.ok) throw new Error('HTTP '+r.status); const j=await r.json(); list=j.product?[Object.assign({code:q},j.product)]:[]; } }
   else { const get=async (terms,extra)=>{ const r=await fetch(OFF_BASE+'/cgi/search.pl?action=process&json=1&search_simple=1&lc=de&page_size=100&search_terms='+encodeURIComponent(terms)+extra+'&fields='+OFF_FIELDS);
       if(!r.ok) throw new Error(r.status===429?'zu viele Suchen – bitte eine Minute warten':'HTTP '+r.status); const j=await r.json(); return j.products||[]; };
+    let extra=0; const more=()=>++extra<=4 && offBudget();   // höchstens 5 Anfragen pro Suche
     const AT='&tagtype_0=countries&tag_contains_0=contains&tag_0=austria';
     const sq=offSplitQuery(q); const vars=offVariants(sq.terms); meta={ variants:vars, stores:sq.stores };
     list=[]; const seen=new Set(); const push=(arr,at)=>arr.forEach(p=>{ const c=String(p.code||p.product_name||Math.random()); if(seen.has(c)) return; seen.add(c);
       if(at) p.countries_tags=Array.from(new Set([...(p.countries_tags||[]),'en:austria'])); list.push(p); });
     const good=()=>list.map(offMap).filter(r=>r && !r.incomplete && vars.some(v=>txtMatch(r.name,v).all)).length;
-    // 1. In Österreich verkaufte Produkte – Original, dann Varianten (nur wenn nötig)
+    // 1. In Österreich verkaufte Produkte – Original
     push(await get(vars[0], AT), true);
-    for(let i=1;i<vars.length && good()<5;i++){ if(!offBudget()) break; try{ push(await get(vars[i], AT), true); }catch(e){} }
-    // 2. Weltweit ergänzen, wenn das zu wenig ist
-    for(let i=0;i<vars.length && good()<5;i++){ if(!offBudget()) break; try{ push(await get(vars[i], ''), false); }catch(e){ if(!list.length) throw e; } }
+    // 2. Erstes Wort als Marke: alle Produkte dieser Marke in Österreich (z. B. „NÖM Kakao laktosefrei“), gefiltert wird unten nach den übrigen Wörtern
+    const w0=sq.terms.split(/\s+/), brand=slug(txtNorm(w0[0]));
+    if(w0.length>=2 && brand.length>=2 && good()<5 && more()){ try{ const r=await fetch(OFF_BASE+'/api/v2/search?brands_tags='+encodeURIComponent(brand)+'&countries_tags=en:austria&page_size=200&fields='+OFF_FIELDS);
+      if(r.ok){ const j=await r.json(); push(j.products||[], true); } }catch(e){} }
+    // 3. Varianten (österreichisch → deutsch, getrennt geschrieben, einzelne Wörter weggelassen)
+    for(let i=1;i<vars.length && good()<5;i++){ if(!more()) break; try{ push(await get(vars[i], AT), true); }catch(e){} }
+    // 4. Weltweit ergänzen, wenn das zu wenig ist (nur Original und erste Variante)
+    for(let i=0;i<Math.min(2,vars.length) && good()<5;i++){ if(!more()) break; try{ push(await get(vars[i], ''), false); }catch(e){ if(!list.length) throw e; } }
     list.forEach(p=>{ p._store=offStoreHit(p, sq.stores); }); }
   let out=list.map(offMap).filter(Boolean);
   // Reihenfolge: vollständige Nährwerte, Österreich, gewählte Handelskette, Suchwörter im Namen (alle > einige), Deutschland/deutscher Name, sonst Open Food Facts
   if(!/^\d{8,14}$/.test(q)){ const vars=meta.variants.length?meta.variants:[q];
-    out.forEach((r,i)=>{ const m=vars.map(v=>txtMatch(r.name,v)).sort((a,b)=>(b.all-a.all)||(b.hits-a.hits)||(b.start-a.start))[0]; r._m=m.hits; r._all=m.all?1:0; r._st=m.start; r._i=i; });
-    if(out.some(r=>r._m>0)) out=out.filter(r=>r._m>0);
-    out.sort((a,b)=>(a.incomplete-b.incomplete)||(b.at-a.at)||(b.store-a.store)||(b._all-a._all)||(b._st-a._st)||((b.dach||b.de)-(a.dach||a.de))||(b._m-a._m)||(a._i-b._i)); }
+    const n0=vars[0].split(/\s+/).length, full=vars.filter(v=>v.split(/\s+/).length>=n0);   // Varianten mit weggelassenen Wörtern zählen nur für die Auswahl, nicht für die Reihenfolge
+    out.forEach((r,i)=>{ const m=full.map(v=>txtMatch(r.name,v)).sort((a,b)=>(b.all-a.all)||(b.hits-a.hits)||(b.start-a.start))[0]; r._m=m.hits; r._all=m.all?1:0; r._st=m.start; r._i=i;
+      r._any=vars.some(v=>txtMatch(r.name,v).all)?1:0; });
+    // Nur Treffer, die mindestens ein Suchwort außer der Marke enthalten (bei Markensuche kommen sonst alle Produkte der Marke)
+    const w0=txtNorm(vars[0].split(/\s+/)[0]); const rest=vars[0].split(/\s+/).slice(1).join(' ');
+    const hasRest=r=>!rest || txtMatch(r.name.replace(/\([^)]*\)\s*$/,''), rest).hits>0 || !txtNorm(r.name).includes(w0);
+    if(out.some(r=>r._m>0)) out=out.filter(r=>r._m>0 && hasRest(r));
+    out.sort((a,b)=>(a.incomplete-b.incomplete)||(b.at-a.at)||(b.store-a.store)||(b._all-a._all)||(b._m-a._m)||(b._any-a._any)||(b._st-a._st)||((b.dach||b.de)-(a.dach||a.de))||(b._m-a._m)||(a._i-b._i)); }
   out.meta=meta; offCache[q]=out; return out; }
 /* Automatische Online-Suche: 700 ms nach dem letzten Tastendruck, ab 3 Zeichen, max. 9 Suchen pro Minute (Limit 10) */
 let offTimer=null, offSeq=0; const offTimes=[];
