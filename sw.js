@@ -1,6 +1,6 @@
 /* AOS Service Worker – speichert nur die App-Dateien für den Offline-Start.
    Trainingsdaten laufen nicht über den Service Worker (Anfragen an api.github.com werden nicht zwischengespeichert). */
-const CACHE = 'aos-cc3fa44262c5';
+const CACHE = 'aos-d3e3555b23e3';
 const FILES = ['./', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './img/tiger.png?v=1', './img/t.png?v=1'];
 
 self.addEventListener('install', e => {
@@ -25,4 +25,29 @@ self.addEventListener('fetch', e => {
     return;
   }
   e.respondWith(caches.match(req).then(r => r || fetch(req)));
+});
+
+/* Erinnerungen: Push-Nachrichten aus der GitHub Action im Datenrepo anzeigen.
+   Inhalt: { title, body, tag, url } – url ist relativ zur App (z. B. "#training"). */
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'AOS', {
+    body: d.body || '',
+    tag: d.tag || 'aos',
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    data: { url: d.url || '' }
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const target = new URL(self.registration.scope + ((e.notification.data && e.notification.data.url) || '')).href;
+  e.waitUntil((async () => {
+    const list = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of list) {
+      if (c.url.startsWith(self.registration.scope)) { await c.focus(); if ('navigate' in c) { try { await c.navigate(target); } catch (err) {} } return; }
+    }
+    if (clients.openWindow) await clients.openWindow(target);
+  })());
 });

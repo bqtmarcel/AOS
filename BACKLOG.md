@@ -65,6 +65,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | U4 | Begriffe angleichen: „Saisonstart“ (Übersicht, Plan) und „Spiel“ (Profil → Kalender) | Klarheit | ✅ erledigt | S |
 | U5 | **Laptop-Layout** mit zwei Spalten ab großer Breite (z. B. Ernährung: Mahlzeiten links, Abdeckung rechts) | Platz am Laptop nutzen | ✅ erledigt | M |
 | U6 | **Sync-Status** verständlicher: Punkt im Kopf antippbar mit „zuletzt gespeichert um …“ | Vertrauen in die Speicherung | ✅ erledigt | S |
+| U7 | **Push-Erinnerungen** (Einheit des Tages, Readiness-Check, Protokoll offen) mit eigener Uhrzeit pro Erinnerung; Versand per GitHub Action im Datenrepo | Training nicht vergessen, ohne andere App | ✅ erledigt (16.11.) | M |
 
 ## 5. Technik und Wartung
 

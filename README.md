@@ -21,6 +21,11 @@ Die App startet mit einem leeren, neutralen Stand und lädt alles Persönliche a
 - Eine ungültige oder kaputte Datei im Datenrepo wird nie überschrieben.
 - Zugriff über einen **Fine-grained Personal Access Token**, der nur `AOS_DATA` mit „Contents: Read and write“ darf. Der Token wird pro Gerät in der App eingetragen (Profil → Datenspeicherung), bleibt nur auf dem Gerät, steht in keiner Sicherung und wird nur an `api.github.com` gesendet (per Content-Security-Policy erzwungen).
 
+## Erinnerungen (Push)
+
+Profil → Erinnerungen: pro Gerät aktivieren (iPhone: nur als Home-Bildschirm-App, ab iOS 16.4), Uhrzeiten für „Einheit des Tages“, „Readiness-Check“ und „Protokoll offen“ wählen.
+Die App legt das Push-Abo und eine Vorschau der nächsten Trainingstage im privaten Datenrepo ab; den Versand übernimmt dort eine stündliche GitHub Action. In diesem Repo steht nur der öffentliche Push-Schlüssel (`PUSH_VAPID_PUBLIC`), der Service Worker (`sw.js`) zeigt die Nachrichten an.
+
 ## Entwicklung
 
 Einzelne Datei `index.html` ohne Build-Schritt. Bei Änderungen an `index.html` die Cache-Version in `sw.js` erhöhen (`./tools/bump-cache.sh`), sonst sehen installierte Apps die neue Version nicht.

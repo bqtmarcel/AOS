@@ -552,6 +552,7 @@ function seedData(){
     goals: [], tests: [], bodyweight: [], blocks: [], sessions: [],
     unavailable: [], suggestionDecisions: {}, calendar: [],
     nutrition: defaultNutrition(),
+    push: pushDefaults(), pushAgenda: { from:'', days:[] },
     settings: { seededAt: now }
   };
 }
@@ -579,6 +580,7 @@ function load(){
 }
 function save(silent){
   S.meta.updatedAt = new Date().toISOString();
+  pushAgendaUpdate();
   const changed = syncTrack();
   if(changed && typeof ghOnLocalChange==='function') ghOnLocalChange();
   if(!storageOK) return false;
@@ -591,6 +593,8 @@ function migrate(d){
   d.fieldLogs = Array.isArray(d.fieldLogs) ? d.fieldLogs : [];
   d.calendar = Array.isArray(d.calendar) ? d.calendar : [];   // Kalender: Spieltage (Kickoff) und wichtige Termine   // Feldtraining (Football, Team): ein Eintrag pro Tag
   d.suggestionDecisions = d.suggestionDecisions || {};
+  d.push = pushNormalize(d.push);   // Erinnerungen (Push): Einstellungen und Push-Abos der Geräte
+  if(!d.pushAgenda || !Array.isArray(d.pushAgenda.days)) d.pushAgenda = { from:'', days:[] };   // vorberechnete Trainingstage für den Versand
   if(!d.nutrition || !Array.isArray(d.nutrition.items)) d.nutrition = defaultNutrition();
   const n=d.nutrition; n.combos=n.combos||[]; n.meals=n.meals||[]; n.templates=Array.isArray(n.templates)?n.templates:[]; n.dayOverrides=n.dayOverrides||{}; n.constraints=n.constraints||''; n.guides=n.guides||defaultNutrition().guides;
   Object.keys(n.dayOverrides).forEach(k=>{ if(typeof n.dayOverrides[k]!=='object' || n.dayOverrides[k]===null) n.dayOverrides[k]={}; });   // alte Tagesarten (Text) → neues Format
@@ -764,6 +768,8 @@ function syncRecords(d){
   const m=new Map();
   SYNC_ARRAYS.forEach(([c,,get])=>(get(d)||[]).forEach(r=>m.set(c+':'+r.id, r)));
   m.set('profile:_', d.profile);
+  if(d.push) m.set('push:_', d.push);
+  if(d.pushAgenda) m.set('pushag:_', d.pushAgenda);
   const n=d.nutrition; m.set('nutset:_', {guides:n.guides, guidesSource:n.guidesSource||'', constraints:n.constraints||''});
   (d.unavailable||[]).forEach(x=>m.set('unavail:'+x, true));
   Object.entries(d.suggestionDecisions||{}).forEach(([k,v])=>m.set('decision:'+k, v));
@@ -773,6 +779,8 @@ function syncRecords(d){
 function applyRecords(d, m){
   SYNC_ARRAYS.forEach(([c,,,set])=>set(d, [...m].filter(([k])=>k.startsWith(c+':')).map(([,v])=>v)));
   if(m.has('profile:_')) d.profile=m.get('profile:_');
+  if(m.has('push:_')) d.push=pushNormalize(m.get('push:_'));
+  if(m.has('pushag:_')) d.pushAgenda=m.get('pushag:_');
   if(m.has('nutset:_')){ const x=m.get('nutset:_'); d.nutrition.guides=x.guides; d.nutrition.guidesSource=x.guidesSource; d.nutrition.constraints=x.constraints; }
   d.unavailable=[...m.keys()].filter(k=>k.startsWith('unavail:')).map(k=>k.slice(8)).sort();
   d.suggestionDecisions=Object.fromEntries([...m].filter(([k])=>k.startsWith('decision:')).map(([k,v])=>[k.slice(9),v]));
@@ -1528,6 +1536,7 @@ const REF = { plan:null, ex:null, exMap:{}, nut:null, food:null, recipes:null, a
 function refSet(plan, ex, at, more){ REF.plan=plan; REF.ex=ex; REF.at=at; REF.exMap={}; ((ex&&ex.exercises)||[]).forEach(e=>{ REF.exMap[e.id]=e; });
   try{ apGenerate(REF.plan); }catch(e){ console.warn('Automatische Blockplanung fehlgeschlagen', e); }
   try{ plDropStale(); }catch(e){}
+  if(typeof S!=='undefined' && S && pushAgendaUpdate()) save(true);
   if(more){ REF.nut=more.nut||null; REF.food=more.food||null; REF.recipes=more.recipes||null; } }
 /* Gespeicherte, noch nicht begonnene Einheiten eines Blocks, den es im Plan nicht mehr gibt (z. B. fester Block → automatisch), verwerfen */
 function plDropStale(){ if(typeof S==='undefined' || !S || !REF.plan || !(REF.plan.blocks||[]).length) return;
@@ -2904,6 +2913,78 @@ function viewTraining(){
 ACT.logFree = ()=>{ const s={ id:uid('ses'), blockId:null, dayId:null, name:'Freie Einheit', focus:'', plannedDate:todayISO(), week:mondayOf(todayISO()), status:'geplant', location:'', plan:[], dayVersion:null, log:null, skipReason:'', moves:[], createdAt:new Date().toISOString() };
   S.sessions.push(s); save(); startLog(s.id); };
 
+/* ===== AOS – Erinnerungen (Push-Nachrichten) =====
+   Die App speichert pro Gerät ein Push-Abo und die gewünschten Uhrzeiten (Datensatz push:_) sowie eine Vorschau der
+   nächsten 14 Trainingstage (pushag:_) im privaten Datenrepo. Den Versand übernimmt eine GitHub Action im Datenrepo
+   (stündlich). Hier im öffentlichen Repo steht nur der öffentliche Schlüssel – keine persönlichen Daten. */
+const PUSH_VAPID_PUBLIC = 'BPlHvhAeamNzrx1GJtImXUPzbfasjiRbnpDA21YcGmLnEwb708MXIHsxb0_RpdWdBaKTxzcNj87MjPevpP5f9is';
+const PUSH_KINDS = [
+  ['morning','Einheit des Tages','Morgens: welche Einheit heute dran ist'],
+  ['readiness','Readiness-Check','Erinnerung, die Tagesform einzutragen (nur wenn noch offen)'],
+  ['evening','Protokoll offen','Abends, wenn die heutige Einheit noch nicht eingetragen ist']
+];
+const PUSH_HOURS = [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22];
+function pushDefaults(){ return { subs:[], on:{ morning:true, readiness:true, evening:true }, hours:{ morning:7, readiness:16, evening:20 } }; }
+function pushNormalize(p){ const d=pushDefaults(); p=(p&&typeof p==='object')?p:{};
+  return { subs:Array.isArray(p.subs)?p.subs.filter(x=>x&&x.endpoint&&x.keys):[], on:Object.assign(d.on, p.on||{}), hours:Object.assign(d.hours, p.hours||{}) }; }
+/* Vorschau: welche Einheit an den nächsten 14 Tagen laut Plan fällig ist (nur Name, Hauptübungen, Dauer) */
+function pushAgenda(){
+  if(typeof REF==='undefined' || !REF.plan) return null;
+  const today=todayISO(), days=[];
+  for(let i=0;i<14;i++){ const d=addDays(today,i); const due=plDue(d);
+    if(!due.block || !due.tpl || due.offday) continue;
+    const t=plTemplate(due.block, due.tpl)||{};
+    const main=(t.slots||[]).filter(x=>x.role==='main' && (!x.dose || x.dose[due.week])).map(x=>{ const id=(x.candidates||[])[0]; const e=REF.exMap[id]||{}; return e.name_de||e.name||id; }).filter(Boolean);
+    days.push({ date:d, tpl:due.tpl, name:t.name||'', min:t.time_min||null, main }); }
+  return { from:today, days };
+}
+/* true, wenn sich die Vorschau geändert hat (ohne selbst zu speichern) */
+function pushAgendaUpdate(){
+  if(typeof S==='undefined' || !S) return false;
+  let a=null; try{ a=pushAgenda(); }catch(e){ console.warn('Erinnerungs-Vorschau fehlgeschlagen', e); }
+  if(!a || fp(a)===fp(S.pushAgenda)) return false;
+  S.pushAgenda=a; return true;
+}
+function pushSupported(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function pushIsIOS(){ return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+function pushMine(){ const id=S.sync&&S.sync.deviceId; return (S.push.subs||[]).find(x=>x.id===id) || null; }
+function pushActiveHere(){ return !!pushMine() && pushSupported() && Notification.permission==='granted'; }
+function pushKey(){ const s=PUSH_VAPID_PUBLIC.replace(/-/g,'+').replace(/_/g,'/'); const b=atob(s+'='.repeat((4-s.length%4)%4)); return Uint8Array.from(b, c=>c.charCodeAt(0)); }
+function pushSection(){
+  const P=S.push, here=pushActiveHere(), n=(P.subs||[]).length;
+  let b='';
+  if(!pushSupported()) b+='<div class="note">'+(pushIsIOS()&&!isStandalone()?'<strong>Erst zum Home-Bildschirm hinzufügen.</strong> Am iPhone gehen Push-Nachrichten nur, wenn AOS über Safari → Teilen → „Zum Home-Bildschirm“ installiert ist und von dort geöffnet wird (ab iOS 16.4).':'Dieser Browser unterstützt keine Push-Nachrichten.')+'</div>';
+  else if(!ghReady()) b+='<div class="note">Erst die Datenspeicherung verbinden – die Erinnerungen werden über dein Datenrepo verschickt.</div>';
+  else if(here) b+='<p class="small">Auf diesem Gerät <strong>aktiv</strong>.'+(n>1?' Insgesamt '+n+' Geräte.':'')+' <button class="link" data-act="pushOff">Auf diesem Gerät ausschalten</button></p>';
+  else b+=(Notification.permission==='denied'?'<div class="note warn">Mitteilungen für AOS sind in den Einstellungen blockiert. iPhone: Einstellungen → Mitteilungen → AOS → Mitteilungen erlauben.</div>':'')+
+    '<p><button class="primary" data-act="pushOn">Erinnerungen auf diesem Gerät aktivieren</button></p>';
+  b+=PUSH_KINDS.map(([k,l,d])=>'<div class="row" style="flex-wrap:nowrap;align-items:flex-end;gap:10px"><div style="flex:1;min-width:0"><label>'+esc(l)+'</label><div class="small muted">'+esc(d)+'</div><div>'+
+    chipBtn('pushTog',k,'1','An',!!P.on[k])+chipBtn('pushTog',k,'0','Aus',!P.on[k])+'</div></div>'+
+    '<div style="width:110px">'+sel('push-h-'+k,'Uhrzeit',PUSH_HOURS.map(h=>[h,pad(h)+':00']),P.hours[k],'data-chg="pushHour" data-k="'+k+'"'+(P.on[k]?'':' disabled'))+'</div></div>').join('');
+  b+='<p class="small muted">Nur an Trainingstagen laut Plan. Der Versand läuft stündlich über eine GitHub Action im Datenrepo und kann ein paar Minuten später ankommen. Nach dem Aktivieren kommt innerhalb einer Stunde eine Bestätigung.</p>';
+  return pdet('push','Erinnerungen', here?'aktiv':(n?n+' Gerät'+(n>1?'e':''):'aus'), b);
+}
+ACT.pushOn = async ()=>{
+  if(!pushSupported()){ toast('Push-Nachrichten werden hier nicht unterstützt.'); return; }
+  let perm='default'; try{ perm=await Notification.requestPermission(); }catch(e){}
+  if(perm!=='granted'){ toast('Mitteilungen wurden nicht erlaubt.'); render(); return; }
+  try{
+    const reg=await Promise.race([navigator.serviceWorker.ready, new Promise((_,rej)=>setTimeout(()=>rej(new Error('Service Worker nicht bereit')),8000))]);
+    let sub=await reg.pushManager.getSubscription();
+    if(sub && sub.options && sub.options.applicationServerKey){ const k=new Uint8Array(sub.options.applicationServerKey), mine=pushKey(); if(k.length!==mine.length || k.some((v,i)=>v!==mine[i])){ await sub.unsubscribe(); sub=null; } }
+    if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:pushKey() });
+    const j=sub.toJSON(); const id=S.sync.deviceId;
+    const rec={ id, endpoint:j.endpoint, keys:j.keys, device:pushIsIOS()?'iPhone':'Browser', at:new Date().toISOString() };
+    S.push.subs=(S.push.subs||[]).filter(x=>x.id!==id && x.endpoint!==j.endpoint).concat([rec]);
+    save(); render(); toast('Erinnerungen aktiv. Die Bestätigung kommt innerhalb einer Stunde.');
+  }catch(e){ console.warn(e); toast('Aktivieren fehlgeschlagen: '+(e.message||e)); }
+};
+ACT.pushOff = async ()=>{
+  try{ const reg=await navigator.serviceWorker.getRegistration(); const sub=reg&&await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); }catch(e){}
+  const id=S.sync&&S.sync.deviceId; S.push.subs=(S.push.subs||[]).filter(x=>x.id!==id); save(); render(); toast('Erinnerungen auf diesem Gerät aus.'); };
+ACT.pushTog = el=>{ S.push.on[el.dataset.k]=el.dataset.v==='1'; save(); render(); };
+CHG.pushHour = el=>{ const h=Number(el.value); if(PUSH_HOURS.includes(h)){ S.push.hours[el.dataset.k]=h; save(); render(); } };
+
 /* ---------- Profil ---------- */
 function pdet(k, title, sub, body){ const open=!!(ui.profOpen||{})[k];
   return '<details class="section pdet" id="pd-'+esc(k)+'" data-pk="'+esc(k)+'"'+(open?' open':'')+'><summary><strong>'+esc(title)+'</strong>'+(sub?' <span class="small muted">· '+esc(sub)+'</span>':'')+'</summary><div class="pdet-b">'+body+'</div></details>'; }
@@ -2916,6 +2997,7 @@ function viewProfile(){
     '<button class="primary" data-act="saveProfileSlim">Speichern</button>');
   h+=calSection();
   h+=pdet('loc','Trainingsorte',(S.profile.locations||[]).length+' Orte',locSection());
+  h+=pushSection();
   h+=ghSection();
   const le=S.settings.lastExport;
   h+=pdet('backup','Sicherung',le?'zuletzt '+fmtDate(le.slice(0,10)):'',''+
