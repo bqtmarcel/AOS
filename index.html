@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AOS">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src https://api.github.com https://world.openfoodfacts.org; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src https://api.github.com https://world.openfoodfacts.org https://raw.githubusercontent.com; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>AOS – Athlete Operating System</title>
 <style>
@@ -2448,8 +2448,8 @@ CHG.nutG = el=>{ const m=nutMeal(nutDate(), el.dataset.s); if(!m) return; const 
 ACT.nutPick = el=>{ ui.nutSlot=el.dataset.s; ui.rcpReturn=false;
   const slot=nutMealPlan(nutTargets(nutDate())).find(x=>x.slot.id===el.dataset.s);
   openDlg('Lebensmittel – '+(slot?slot.slot.name:''), inp('fd-q','Suchen','','autocomplete="off" placeholder="z. B. Ei, Skyr, Huhn oder Barcode"')+'<div id="fd-amt"></div><div id="fd-list">'+nutPickList('')+'</div>'+
-    '<div class="off-box"><div class="eyebrow">Online · Open Food Facts</div><div id="off-res"><p class="small muted">Markenprodukte erscheinen hier automatisch ab 3 Zeichen (Name oder Barcode).</p></div></div><p class="small" style="margin-top:10px"><button class="link" data-act="rcpStart">Selbstgekocht? Rezept berechnen</button> · <button class="link" data-act="nutOwn">Nährwerte selbst eintragen</button></p>', '<button data-act="closeDlg">Fertig</button>');
-  ui.nutSel=null; };
+    '<div class="off-box"><div class="eyebrow">Online · Open Food Facts</div><div id="off-res"><p class="small muted">Markenprodukte erscheinen hier automatisch ab 3 Zeichen (Name oder Barcode).</p></div></div><p class="small" style="margin-top:10px"><button class="link" data-act="rcpStart">Selbstgekocht? Rezept berechnen</button> · <button class="link" data-act="nutOwn">Nährwerte selbst eintragen</button></p>'+fdbStatusLine(), '<button data-act="closeDlg">Fertig</button>');
+  ui.nutSel=null; fdbEnsure().then(()=>fdbUpdate()); };
 /* Textsuche: jedes Suchwort muss ein Wort im Namen treffen (Wortanfang, Teilwort ab 4 Zeichen, kleine Tippfehler am Wortende wie „Bleue“) */
 function txtNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss'); }
 function txtMatch(name,q){ const nw=txtNorm(name).split(/[^a-z0-9]+/).filter(Boolean); const qw=txtNorm(q).split(/[^a-z0-9]+/).filter(w=>w.length>=2);
@@ -2457,7 +2457,8 @@ function txtMatch(name,q){ const nw=txtNorm(name).split(/[^a-z0-9]+/).filter(Boo
   const joined=nw.join(''); const hit=w=>nw.some(n=>n.startsWith(w) || (w.length>=4 && n.includes(w)) || (n.length>=4 && w.length-n.length<=1 && w.startsWith(n))) || (w.length>=6 && joined.includes(w));
   const hits=qw.filter(hit).length; const start=nw.length && (nw[0].startsWith(qw[0])||(nw[0].length>=4&&qw[0].startsWith(nw[0])))?1:0;
   return { hits, all:hits===qw.length, start }; }
-function nutPickList(q){
+function nutPickList(q){ return nutPickOwn(q)+fdbSection(q,'add'); }
+function nutPickOwn(q){
   const slot=(NUT().meal_plans[nutTargets(nutDate()).time]||[]).find(s=>s.id===ui.nutSlot)||{};
   const pre=(slot.tags||[]).includes('pre');
   const ql=q.trim().toLowerCase();
@@ -2469,11 +2470,13 @@ function nutPickList(q){
   l=l.filter(f=>f.category!=='kantine' || slot.lunch);
   const score=f=>(f.user_rating||0)*2+(f.tags.includes('favorit')?5:0)+(pre&&(f.tags.includes('pre')||f.tags.includes('fettarm_ballaststoffarm'))?8:0);
   l.sort((a,b)=>txtMatch(b.name,ql).start-txtMatch(a.name,ql).start || score(b)-score(a) || a.name.localeCompare(b.name,'de'));
-  if(!l.length) return '<p class="small muted">In deinen Lebensmitteln nichts gefunden – Treffer von Open Food Facts siehe unten.</p>';
+  if(!l.length) return '<p class="small muted">In deinen eigenen Lebensmitteln nichts gefunden.</p>';
   return l.slice(0,40).map(f=>'<button class="chip" data-act="nutSel" data-f="'+esc(f.id)+'">'+esc(f.name)+(f.tags.includes('favorit')?' ★':'')+(pre&&f.tags.includes('pre')?' · vor Training':'')+'</button>').join('');
 }
 document.addEventListener('input', e=>{ const t=e.target; if(!t) return;
-  if(t.id==='fd-q'){ const el=document.getElementById('fd-list'); if(el) el.innerHTML=nutPickList(t.value); offAuto(t.value,'add'); }
+  if(t.id==='fd-q'){ const el=document.getElementById('fd-list'); ui.dbCount=0; if(el) el.innerHTML=nutPickList(t.value);
+    if(FDB.ready && ui.dbCount>=5 && !/^\d{8,14}$/.test(t.value.trim())){ clearTimeout(offTimer); offSeq++; const box=document.getElementById('off-res'); if(box) box.innerHTML='<button class="small" data-act="offNow">Auch online bei Open Food Facts suchen</button>'; }
+    else offAuto(t.value,'add'); }
   if(t.id==='off-q') offAuto(t.value,'fill'); });
 /* Menge wählen: Tipp auf ein Lebensmittel öffnet oben Menge + Einheit (leer = AOS berechnet) */
 function nutSelPanel(){ const f=ui.nutSel && nutFood(ui.nutSel); if(!f) return '';
@@ -2605,7 +2608,7 @@ async function offRun(q,mode){
     const full=res.filter(r=>!r.incomplete).length;
     box.innerHTML=(!full?'<p class="small muted">Nur Treffer mit unvollständigen Nährwerten.'+bake+'</p>':'')+'<div class="off-list">'+res.slice(0,20).map((r,i)=>'<button class="off-item'+(r.incomplete?' off-inc':'')+'" data-act="offPick" data-mode="'+mode+'" data-i="'+i+'"><span class="off-n">'+(r.at?'<span class="off-at">AT</span>':'')+(r.store?'<span class="off-at off-st">'+esc((meta.stores||[])[0]||'').toUpperCase()+'</span>':'')+esc(r.name)+'</span><span class="off-m">'+(r.incomplete?'Nährwerte unvollständig'+(r.kcal!=null?' · '+r.kcal+' kcal':''):r.kcal+' kcal · P '+fmtNum(r.P)+' · KH '+fmtNum(r.K)+' · F '+fmtNum(r.F)+' / '+r.per)+(r.qty?' · '+esc(r.qty):'')+'</span></button>').join('')+'</div><p class="small muted" style="margin-top:6px">Daten von Open Food Facts (von Nutzern gepflegt) – Werte mit der Packung vergleichen.'+(full?tried:'')+'</p>';
   }catch(e){ if(my===offSeq) box.innerHTML='<p class="small" style="color:var(--bad)">Online-Suche fehlgeschlagen: '+esc(e.message||String(e))+'</p>'; } }
-function offExcluded(name){ const ex=(NUT().exclusions||[]).map(x=>x.split(' ')[0].toLowerCase()); return ex.some(x=>x.length>3 && name.toLowerCase().includes(x)); }
+function offExcluded(name){ const ex=(((typeof NUT==="function"&&NUT())||{}).exclusions||[]).map(x=>x.split(' ')[0].toLowerCase()); return ex.some(x=>x.length>3 && name.toLowerCase().includes(x)); }
 document.addEventListener('keydown', e=>{ const t=e.target; if(e.key!=='Enter' || !t) return;
   if(t.id==='fd-n'){ e.preventDefault(); ACT.nutAddSel(); return; }
   if(t.id==='off-q' || t.id==='fd-q'){ e.preventDefault(); offAuto(t.value, t.id==='off-q'?'fill':'add', true); } });
@@ -2639,6 +2642,124 @@ ACT.nutOwnOk = ()=>{ const n=val('no-name'), kc=num(val('no-kcal')), p=num(val('
   if(ui.rcpReturn && ui.rcp){ ui.rcpReturn=false; ui.rcp.items.push({ food:S.nutrition.items[S.nutrition.items.length-1].id, g:null }); save(); rcpOpen(); toast('Zutat angelegt – Menge eintragen.'); return; }
   save(); closeDlg(); render(); toast('Lebensmittel angelegt.'); };
 
+/* ===== AOS – Lebensmitteldatenbanken (lokal auf dem Gerät) =====
+   Eine GitHub Action bereitet jede Woche drei freie Datenbanken auf und legt sie auf dem Branch „lebensmittel“ dieses
+   Repos ab: Open Food Facts (Produkte aus Österreich und Deutschland), Bundeslebensmittelschlüssel 4.0 (BLS) und die
+   Schweizer Nährwertdatenbank. AOS lädt neue Stände im Hintergrund, speichert sie im Gerät (IndexedDB) und sucht lokal –
+   sofort, offline und ohne Limit. Wird ein Treffer verwendet, kopiert AOS ihn in die eigenen Lebensmittel: eingetragene
+   Werte hängen damit nie vom nächsten Datenbank-Stand ab. */
+const FDB_BASE='https://raw.githubusercontent.com/bqtmarcel/AOS/lebensmittel/';
+const FDB_SRC={ off:'Open Food Facts', bls:'BLS 4.0', ch:'Schweiz' };
+const FDB_CHAIN={ b:'billa', s:'spar', h:'hofer', l:'lidl', p:'penny', m:'mpreis', u:'unimarkt', a:'adeg', d:'dm' };
+const FDB={ ready:false, loading:null, rows:[], norm:[], meta:null, status:'', updating:false };
+function fdbIdb(){ return new Promise((res,rej)=>{ if(!('indexedDB' in window)){ rej(new Error('kein IndexedDB')); return; }
+  const r=indexedDB.open('aos-fdb',1); r.onupgradeneeded=()=>r.result.createObjectStore('files'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function fdbGet(k){ const db=await fdbIdb(); return new Promise((res,rej)=>{ const q=db.transaction('files').objectStore('files').get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
+async function fdbPut(k,v){ const db=await fdbIdb(); return new Promise((res,rej)=>{ const t=db.transaction('files','readwrite'); t.objectStore('files').put(v,k); t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); }); }
+/* Gespeicherte Datenbanken in den Speicher laden und Suchindex aufbauen */
+function fdbEnsure(){
+  if(FDB.ready) return Promise.resolve(true);
+  if(FDB.loading) return FDB.loading;
+  FDB.loading=(async()=>{ try{
+    FDB.meta=await fdbGet('meta')||null; const rows=[], norm=[];
+    for(const src of ['bls','ch','off']){ const f=await fdbGet(src); if(!f||!f.text) continue; let d; try{ d=JSON.parse(f.text); }catch(e){ continue; }
+      const F=d.fields||[]; const ix=k=>F.indexOf(k);
+      const iN=ix('name'), iB=ix('brand'), iK=ix('kcal'), iP=ix('P'), iC=ix('K'), iF=ix('F'), iQ=ix('qty'), iA=ix('at'), iH=ix('chain'), iO=ix('portion'), iCo=ix('code');
+      (d.items||[]).forEach(x=>{ const r={ src, code:String(x[iCo]), name:x[iN], brand:iB>=0?x[iB]||'':'', kcal:x[iK], P:x[iP], K:x[iC], F:x[iF], qty:iQ>=0?x[iQ]||'':'', at:iA>=0?x[iA]:0, chain:iH>=0?x[iH]||'':'', portion:iO>=0?x[iO]||0:0 };
+        rows.push(r); norm.push(' '+txtNorm(r.name+' '+r.brand).replace(/[^a-z0-9]+/g,' ').trim()+' '); }); }
+    FDB.rows=rows; FDB.norm=norm; FDB.ready=rows.length>0; FDB.status=rows.length?'':'leer';
+    return FDB.ready;
+  }catch(e){ console.warn('Lebensmitteldatenbanken nicht lesbar', e); FDB.status='fehler'; return false; } finally{ FDB.loading=null; } })();
+  return FDB.loading; }
+/* Neue Stände holen (höchstens alle 12 Std. prüfen, nur geänderte Dateien laden) */
+async function fdbUpdate(force){
+  if(FDB.updating || navigator.onLine===false || typeof DecompressionStream==='undefined') return false;
+  FDB.updating=true;
+  try{
+    const meta=FDB.meta||await fdbGet('meta')||{};
+    if(!force && meta.checkedAt && Date.now()-new Date(meta.checkedAt).getTime()<12*3600*1000) return false;
+    const r=await fetch(FDB_BASE+'index.json', { cache:'no-store' }); if(!r.ok) throw new Error('HTTP '+r.status);
+    const idx=await r.json(); let changed=false; meta.files=meta.files||{};
+    for(const [src,info] of Object.entries(idx.sources||{})){
+      if(!FDB_SRC[src] || (meta.files[src]&&meta.files[src].sha===info.sha)) continue;
+      FDB.status='lädt'; fdbStatusShow();
+      const res=await fetch(FDB_BASE+info.file, { cache:'no-store' }); if(!res.ok) continue;
+      const text=await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text();
+      JSON.parse(text);   // nur gültige Dateien speichern
+      await fdbPut(src, { text, sha:info.sha, at:new Date().toISOString() });
+      meta.files[src]={ sha:info.sha, count:info.count, updated:info.updated }; changed=true; }
+    meta.checkedAt=new Date().toISOString(); meta.updated=idx.updated; await fdbPut('meta', meta); FDB.meta=meta;
+    if(changed){ FDB.ready=false; await fdbEnsure(); fdbRefreshLists(); }
+    FDB.status=''; fdbStatusShow(); return changed;
+  }catch(e){ console.warn('Lebensmitteldatenbanken: Aktualisierung fehlgeschlagen', e); FDB.status=FDB.ready?'':'fehler'; fdbStatusShow(); return false; }
+  finally{ FDB.updating=false; } }
+function fdbStatusText(){ const m=FDB.meta||{}; const fs=m.files||{}; const n=Object.values(fs).reduce((a,f)=>a+(f.count||0),0);
+  if(FDB.status==='lädt') return 'Lebensmitteldatenbanken werden geladen …';
+  if(!n) return typeof DecompressionStream==='undefined' ? 'Lebensmitteldatenbanken brauchen iOS 16.4 oder neuer.' : (navigator.onLine===false?'Lebensmitteldatenbanken: beim nächsten Mal mit Internet laden.':'Lebensmitteldatenbanken werden beim ersten Öffnen geladen …');
+  return 'Datenbanken: '+n.toLocaleString('de-AT')+' Einträge'+(m.updated?' · Stand '+fmtDate(m.updated.slice(0,10)):''); }
+function fdbStatusShow(){ document.querySelectorAll('.fdb-status').forEach(el=>{ el.textContent=fdbStatusText(); }); }
+function fdbStatusLine(){ return '<p class="small muted" style="margin-top:8px"><span class="fdb-status">'+esc(fdbStatusText())+'</span> · <button class="link" data-act="fdbReload">aktualisieren</button><br>Quellen: Open Food Facts (ODbL) · Max Rubner-Institut, BLS 4.0 (CC BY 4.0) · Schweizer Nährwertdatenbank (BLV)</p>'; }
+ACT.fdbReload = async ()=>{ toast('Prüfe auf neue Datenbank-Stände …'); const ch=await fdbUpdate(true); toast(ch?'Lebensmitteldatenbanken aktualisiert.':(FDB.status==='fehler'?'Aktualisierung fehlgeschlagen.':'Schon aktuell.')); };
+/* Lokale Suche: alle Suchwörter müssen vorkommen (kurze nur am Wortanfang); Varianten wie bei der Online-Suche */
+function fdbSearch(q, limit){
+  if(!FDB.ready) return [];
+  const sq=offSplitQuery(q), vars=offVariants(sq.terms);
+  const toks=v=>txtNorm(v).split(/[^a-z0-9]+/).filter(w=>w.length>=2);
+  const has=(s,t)=>t.length<=3 ? s.includes(' '+t) : (s.includes(t) || s.replace(/ /g,'').includes(t));
+  const n0=toks(vars[0]).length, full=vars.filter(v=>toks(v).length>=n0), part=vars.filter(v=>toks(v).length<n0);
+  const run=(vs,penalty)=>{ const T=vs.map(toks).filter(t=>t.length); const out=[];
+    for(let i=0;i<FDB.norm.length && out.length<3000;i++){ const s=FDB.norm[i]; if(T.some(ts=>ts.every(t=>has(s,t)))) out.push(i); }
+    return out.map(i=>({ i, pen:penalty })); };
+  let hits=run(full,0); if(hits.length<5) hits=hits.concat(run(part,25).filter(h=>!hits.some(x=>x.i===h.i)));
+  const q0=toks(vars[0]);
+  const chainSel=sq.stores.map(s=>Object.keys(FDB_CHAIN).find(k=>FDB_CHAIN[k]===s)).filter(Boolean);
+  const score=h=>{ const r=FDB.rows[h.i], s=FDB.norm[h.i]; const words=s.trim().split(' ').length; let sc=-h.pen;
+    if(q0.length && s.startsWith(' '+q0[0])) sc+=15;
+    sc+=Math.max(0, 12-words);                                     // kurze, passende Namen zuerst
+    if(r.src==='off'){ if(r.at) sc+=14; if(chainSel.length && chainSel.some(c=>r.chain.includes(c))) sc+=20; else if(chainSel.length && offStoreHit({ brands:r.brand }, sq.stores)) sc+=16; }
+    else sc+= r.src==='bls' ? 10 : 8;                              // Grundlebensmittel und Gerichte: verlässliche Richtwerte
+    if(q0.some(t=>txtNorm(r.brand).includes(t))) sc+=8;
+    return sc; };
+  hits.forEach(h=>{ h.s=score(h); }); hits.sort((a,b)=>b.s-a.s);
+  return hits.slice(0, limit||40).map(h=>fdbResult(FDB.rows[h.i], chainSel)).filter(r=>!offExcluded(r.name)); }
+function fdbResult(r, chainSel){
+  const name=r.brand && !txtNorm(r.name).includes(txtNorm(r.brand)) ? r.name+' ('+r.brand+')' : r.name;
+  const per=/\d\s*(ml|cl|l)\b/i.test(r.qty||'')?'100 ml':'100 g';
+  const main = r.kcal>0 && r.P*4/r.kcal>=0.3 ? 'P' : (r.F*9>r.K*4 ? 'F' : 'K');
+  const qn=parseFloat(String(r.qty||'').replace(',','.')); const piece = r.portion && qn && Math.abs(qn-r.portion)<0.5 ? r.portion : null;
+  return { key:r.src+':'+r.code, src:r.src, code:r.code, name, kcal:r.kcal, P:r.P, K:r.K, F:r.F, per, portion:r.portion||null, piece, main, qty:r.qty, at:!!r.at,
+    store:(chainSel||[]).some(c=>(r.chain||'').includes(c)) ? FDB_CHAIN[(chainSel||[]).find(c=>(r.chain||'').includes(c))] : '' }; }
+function fdbSection(q, mode){
+  q=(q||'').trim(); if(q.length<2 || /^\d{8,14}$/.test(q) && !FDB.ready) return '';
+  if(!FDB.ready){ if(!FDB.loading && FDB.status!=='leer') fdbEnsure().then(ok=>{ if(ok) fdbRefreshLists(); else fdbUpdate(true); });
+    return '<p class="small muted"><span class="fdb-status">'+esc(fdbStatusText())+'</span></p>'; }
+  const res=/^\d{8,14}$/.test(q) ? FDB.rows.filter(r=>r.code===q).map(r=>fdbResult(r)) : fdbSearch(q, 40);
+  (ui.dbRes=ui.dbRes||{})[mode]=res; ui.dbCount=res.length;
+  if(!res.length) return '<div class="eyebrow" style="margin:10px 0 4px">Datenbanken</div><p class="small muted">Nichts gefunden.</p>';
+  return '<div class="eyebrow" style="margin:10px 0 4px">Datenbanken</div><div class="off-list">'+res.map((r,i)=>'<button class="off-item" data-act="dbPick" data-mode="'+mode+'" data-i="'+i+'"><span class="off-n">'+
+    (r.at?'<span class="off-at">AT</span>':'')+(r.store?'<span class="off-at off-st">'+esc(r.store.toUpperCase())+'</span>':'')+(r.src!=='off'?'<span class="off-at off-st">'+esc(FDB_SRC[r.src])+'</span>':'')+esc(r.name)+'</span>'+
+    '<span class="off-m">'+r.kcal+' kcal · P '+fmtNum(r.P)+' · KH '+fmtNum(r.K)+' · F '+fmtNum(r.F)+' / '+r.per+(r.qty?' · '+esc(r.qty):'')+'</span></button>').join('')+'</div>'; }
+function fdbRefreshLists(){ const a=document.getElementById('fd-list'), b=document.getElementById('rc-list');
+  if(a){ const q=document.getElementById('fd-q'); a.innerHTML=nutPickList(q?q.value:''); }
+  if(b){ const q=document.getElementById('rc-q'); b.innerHTML=rcpPickList(q?q.value:''); } }
+/* Treffer → eigenes Lebensmittel (Kopie der Werte; bei erneuter Auswahl wird die vorhandene Kopie verwendet) */
+function extToOwn(r){
+  let own=(S.nutrition.items||[]).find(i=>i.custom && (i.ext===r.key || (r.src==='off' && r.code && i.off_code===r.code)));
+  if(own){ if(own.active===false){ own.active=true; } return own; }
+  const src={ off:'Open Food Facts (Barcode '+r.code+')', bls:'Bundeslebensmittelschlüssel 4.0, Max Rubner-Institut (Code '+r.code+')', ch:'Schweizer Nährwertdatenbank, BLV (ID '+r.code+')' }[r.src];
+  own={ id:uid('own'), custom:true, name:r.name, category:'eigene', per:r.per, kcal:r.kcal, protein_g:r.P, carbs_g:r.K, fat_g:r.F, fiber_g:null,
+    default_portion_g:r.portion, portion_label:'', main_block:r.main, grams_per_block:{}, tags:[], source:src, ext:r.key, active:true, createdAt:new Date().toISOString() };
+  if(r.src==='off') own.off_code=r.code;
+  if(r.piece){ own.piece_g=r.piece; own.piece_label='Stück'; }
+  S.nutrition.items.push(own); return own; }
+ACT.dbPick = el=>{ const mode=el.dataset.mode; const r=((ui.dbRes||{})[mode]||[])[+el.dataset.i]; if(!r) return;
+  if(offExcluded(r.name)){ toast('Steht auf deiner Liste der Lebensmittel, die du nicht isst.'); return; }
+  const own=extToOwn(r); save();
+  if(mode==='rcp' && ui.rcp){ ui.rcp.items.push({ food:own.id, g:null }); const q=document.getElementById('rc-q'); if(q) q.value='';
+    const l=document.getElementById('rc-list'); if(l) l.innerHTML=rcpPickList(''); rcpRefresh(true); const i=document.getElementById('rc-g-'+(ui.rcp.items.length-1)); if(i) i.focus(); return; }
+  ui.nutSel=own.id; ui.nutSelU=null; nutSelShow(); el.classList.add('picked'); };
+ACT.offNow = ()=>{ const q=document.getElementById('fd-q'); if(q && q.value.trim()) offAuto(q.value,'add',true); };
+
 /* ---------- Rezeptrechner: Zutaten + Gewicht fertig gekocht → Nährwerte pro 100 g und pro Portion ----------
    Das Ergebnis ist ein eigenes Lebensmittel (Kategorie „Gerichte“) mit der Zutatenliste in recipe, damit es später änderbar bleibt. */
 function rcpNew(){ return { id:null, name:'', items:[], cooked:null, portions:null }; }
@@ -2666,7 +2787,7 @@ function rcpRows(){ const r=ui.rcp;
       '<span class="rc-u">'+rcpUnit(f)+'</span><span class="rc-k small muted" id="rc-k-'+i+'">'+(k!=null?k+' kcal':'')+'</span><button class="small" data-act="rcpDel" data-i="'+i+'" aria-label="Zutat entfernen">✕</button></div>'; }).join(''); }
 function rcpPickList(q){ q=(q||'').trim(); if(q.length<2) return '<p class="small muted">Zutat suchen, z. B. Risottoreis, Parmesan, Butter.</p>';
   const l=nutFoods(false).filter(f=>txtMatch(f.name,q).all && f.id!==ui.rcp.id).sort((a,b)=>txtMatch(b.name,q).start-txtMatch(a.name,q).start || a.name.localeCompare(b.name,'de')).slice(0,30);
-  return (l.length?l.map(f=>'<button class="chip" data-act="rcpAdd" data-f="'+esc(f.id)+'">'+esc(f.name)+'</button>').join(''):'<p class="small muted">Nicht in deinen Lebensmitteln.</p>')+
+  return (l.length?l.map(f=>'<button class="chip" data-act="rcpAdd" data-f="'+esc(f.id)+'">'+esc(f.name)+'</button>').join(''):'<p class="small muted">Nicht in deinen eigenen Lebensmitteln.</p>')+fdbSection(q,'rcp')+
     '<p class="small" style="margin-top:6px"><button class="link" data-act="rcpOwn">Zutat fehlt? Selbst eintragen oder bei Open Food Facts suchen</button></p>'; }
 function rcpOpen(){ const r=ui.rcp;
   openDlg(r.id?'Rezept bearbeiten':'Rezept berechnen',
@@ -3440,6 +3561,7 @@ function aosApplyUpdate(){
   const h=location.hash.slice(1); if(VIEWS.some(v=>v[0]===h)) ui.view=h;
   render();
   if(ghReady()){ ghSync('start'); refLoad(); }
+  setTimeout(()=>{ fdbUpdate().catch(()=>{}); }, 4000);
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') && document.querySelector('link[rel=manifest]')){
     const hadController = !!navigator.serviceWorker.controller;

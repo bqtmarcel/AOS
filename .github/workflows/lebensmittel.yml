@@ -1,0 +1,55 @@
+name: Lebensmitteldatenbanken
+
+# Lädt jede Woche in der Nacht auf Sonntag (ca. 3 Uhr Wiener Zeit) die freien Lebensmitteldatenbanken neu,
+# bereitet sie für AOS auf und legt sie auf dem Branch „lebensmittel“ ab. Der Branch wird jedes Mal komplett
+# ersetzt (ein einziger Commit) – alte Datenstände bleiben nicht im Repo liegen.
+# Schlägt eine Quelle fehl, bleibt deren letzter Stand erhalten. Was du in AOS schon übernommen hast,
+# ist ohnehin in deinen eigenen Daten gespeichert und hängt nicht von diesem Branch ab.
+on:
+  schedule:
+    - cron: '13 2 * * 0'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['tools/lebensmittel/**', '.github/workflows/lebensmittel.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lebensmittel
+  cancel-in-progress: false
+
+jobs:
+  aufbereiten:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: openpyxl installieren
+        run: pip install openpyxl
+      - name: Letzten Stand holen (Rückfall bei Fehlern)
+        run: |
+          mkdir -p out
+          if git ls-remote --exit-code --heads origin lebensmittel >/dev/null; then
+            git fetch -q --depth=1 origin lebensmittel
+            git archive FETCH_HEAD | tar -x -C out
+          fi
+          ls -la out
+      - name: Datenbanken laden und aufbereiten
+        run: python tools/lebensmittel/build.py out
+      - name: Auf Branch „lebensmittel“ ablegen (ersetzt den alten Stand)
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp tools/lebensmittel/BRANCH_README.md out/README.md
+          cd out
+          git init -q
+          git checkout -q -b lebensmittel
+          git add -A
+          git -c user.name="AOS Lebensmittel" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Lebensmitteldatenbanken $(date -u +%Y-%m-%d)"
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" lebensmittel
+          cat index.json

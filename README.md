@@ -21,6 +21,19 @@ Die App startet mit einem leeren, neutralen Stand und lädt alles Persönliche a
 - Eine ungültige oder kaputte Datei im Datenrepo wird nie überschrieben.
 - Zugriff über einen **Fine-grained Personal Access Token**, der nur `AOS_DATA` mit „Contents: Read and write“ darf. Der Token wird pro Gerät in der App eingetragen (Profil → Datenspeicherung), bleibt nur auf dem Gerät, steht in keiner Sicherung und wird nur an `api.github.com` gesendet (per Content-Security-Policy erzwungen).
 
+## Lebensmitteldatenbanken
+
+Die GitHub Action `.github/workflows/lebensmittel.yml` lädt jede Woche (Nacht auf Sonntag) drei freie Datenbanken, bereitet sie mit `tools/lebensmittel/build.py` auf und legt sie auf dem Branch **`lebensmittel`** ab. Der Branch wird jedes Mal komplett ersetzt, alte Stände bleiben nicht liegen. Schlägt eine Quelle fehl, bleibt ihr letzter Stand.
+
+| Quelle | Inhalt | Lizenz |
+|---|---|---|
+| Open Food Facts | Markenprodukte aus Österreich (AT zuerst) und Deutschland | ODbL |
+| Bundeslebensmittelschlüssel 4.0 (Max Rubner-Institut) | rund 7.000 Grundlebensmittel und Gerichte | CC BY 4.0 |
+| Schweizer Nährwertdatenbank (BLV) | Grundlebensmittel | frei, mit Quellenangabe |
+
+Eine offene österreichische Nährwertdatenbank gibt es nicht; der Österreich-Bezug kommt aus Open Food Facts (Verkaufsland, Handelsketten).
+Die App lädt neue Stände im Hintergrund (höchstens alle 12 Stunden prüfen, nur geänderte Dateien), speichert sie im Gerät (IndexedDB) und sucht lokal. Ein verwendeter Treffer wird als eigenes Lebensmittel kopiert – eingetragene Werte gehen bei einem neuen Datenbank-Stand nicht verloren.
+
 ## Erinnerungen (Push)
 
 Profil → Erinnerungen: pro Gerät aktivieren (iPhone: nur als Home-Bildschirm-App, ab iOS 16.4), Uhrzeiten für „Einheit des Tages“, „Readiness-Check“ und „Protokoll offen“ wählen.
