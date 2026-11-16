@@ -17,11 +17,11 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 
 | # | Zeitraum | Meilenstein | Ergebnis | Stand |
 |---|---|---|---|---|
-| **0** | 17.–22.11.2026 | Vorbereitung | Entscheidungen und Zugänge da | 0 / 6 |
+| **0** | 17.–22.11.2026 | Vorbereitung | Zugänge da | 1 / 2 |
 | **M1** | 23.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 0 / 12 |
 | **M2** | 07.–13.12.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 0 / 6 |
 | **M3** | 14.–27.12.2026 | Positionsgruppen | Planung für alle Positionen | 0 / 9 |
-| **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 0 / 11 |
+| **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 0 / 12 |
 | **Start** | ab 11.01.2027 | Teamstart | alle eingeladenen Spieler | 0 / 2 |
 | **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 0 / 5 |
 | **M6** | 25.01.–07.02.2027 | Ranglisten mit DOTS | erste Ranglisten nach der Testwoche Anfang Februar | 0 / 6 |
@@ -34,12 +34,8 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 
 ## 0 · Vorbereitung (17.–22.11.2026)
 
-- [ ] **0.1** Anleitung für die Supabase-Einrichtung schreiben (Konto, Projekt, Region, welche Werte Claude braucht)
-- [ ] **0.2** 👤 Supabase-Konto anlegen, Projekt in Region **EU (Frankfurt)** erstellen, Projekt-URL und öffentlichen Schlüssel an Claude geben
-- [ ] **0.3** 👤 Vorstand informieren und klären, wer für den Datenschutz verantwortlich ist (Verein oder Admin privat)
-- [ ] **0.4** 👤 Festlegen, wer die Coach-Rolle bekommt
-- [ ] **0.5** 👤 Zielgruppe klären: nur Kampfmannschaft (18+)? Jugend oder Damen später?
-- [ ] **0.6** 👤 3–5 Pilot-Athleten aus verschiedenen Positionsgruppen auswählen (z. B. O-Liner, DB, LB)
+- [x] **0.1** Anleitung für die Supabase-Einrichtung schreiben: [`docs/SUPABASE_EINRICHTUNG.md`](docs/SUPABASE_EINRICHTUNG.md) ✅ 16.11.2026
+- [ ] **0.2** 👤 Supabase einrichten nach der Anleitung (Konto, Projekt in Frankfurt, Login-Einstellungen, GitHub-Secrets), Projekt-URL und Publishable key an Claude geben
 
 ## M1 · Neue Basis (23.11.–06.12.2026)
 
@@ -50,7 +46,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 - [ ] **M1.5** Teamdaten (Saisonstart, Phasenkalender, Feldtraining, Spiele) aus `team_season` statt aus der Plandatei lesen
 - [ ] **M1.6** Einmaliges Migrationsskript `tools/`: bestehende Daten aus `AOS_DATA` nach Supabase (Daten selbst nie in diesem Repo)
 - [ ] **M1.7** Klicktest erweitern: nachgebaute Datenbank statt Datenrepo, Login, Abgleich, „Coach kann nichts ändern“
-- [ ] **M1.8** Wöchentlicher Export der Datenbank als Backup nach `AOS_DATA` (GitHub Action)
+- [ ] **M1.8** Wöchentlicher Export der Datenbank als Backup nach `AOS_DATA` (GitHub Action); hält das Free-Projekt zugleich aktiv (Pause nach 7 Tagen ohne Nutzung)
 - [ ] **M1.9** Speicherung über GitHub-Token entfernen (inkl. Ablaufwarnung W6)
 - [ ] **M1.10** Umstellung am Wochenende 05./06.12. durchführen
 - [ ] **M1.11** Prüfung: alle Einheiten, Tests und Verläufe vollständig; geplante Einheit für Mo 07.12. vor und nach der Umstellung identisch; Coach-Testkonto kann nichts ändern
@@ -90,6 +86,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 - [ ] **M4.9** 👤 Pilot ab ca. 04.01.: Pilot-Athleten einladen, eine Woche trainieren lassen, Rückmeldungen sammeln
 - [ ] **M4.10** Rückmeldungen aus dem Pilot umsetzen
 - [ ] **M4.11** Prüfung: Onboarding ohne Hilfe geschafft, niemand sieht fremde Daten, Pläne passen zu Position und Ausstattung
+- [ ] **M4.12** 👤 Eigenen E-Mail-Versand einrichten (SMTP-Anbieter, Anleitung von Claude), **vor M4.9**: Der eingebaute Versand von Supabase erreicht nur Mitglieder der Supabase-Organisation, max. 2 Mails pro Stunde
 
 ## Teamstart (ab 11.01.2027)
 
