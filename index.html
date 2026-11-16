@@ -2684,7 +2684,8 @@ async function fdbUpdate(force){
       if(!FDB_SRC[src] || (meta.files[src]&&meta.files[src].sha===info.sha)) continue;
       FDB.status='lädt'; fdbStatusShow();
       const res=await fetch(FDB_BASE+info.file, { cache:'no-store' }); if(!res.ok) continue;
-      const text=await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text();
+      const buf=new Uint8Array(await res.arrayBuffer());   // gepackt (1f 8b) oder vom Server schon entpackt
+      const text=buf[0]===0x1f&&buf[1]===0x8b ? await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(buf);
       JSON.parse(text);   // nur gültige Dateien speichern
       await fdbPut(src, { text, sha:info.sha, at:new Date().toISOString() });
       meta.files[src]={ sha:info.sha, count:info.count, updated:info.updated }; changed=true; }
@@ -2714,14 +2715,17 @@ function fdbSearch(q, limit){
   const q0=toks(vars[0]);
   const chainSel=sq.stores.map(s=>Object.keys(FDB_CHAIN).find(k=>FDB_CHAIN[k]===s)).filter(Boolean);
   const score=h=>{ const r=FDB.rows[h.i], s=FDB.norm[h.i]; const words=s.trim().split(' ').length; let sc=-h.pen;
-    if(q0.length && s.startsWith(' '+q0[0])) sc+=15;
+    if(full.some(v=>{ const t=toks(v); return t.length && s.startsWith(' '+t[0]); })) sc+=15;
+    sc+=6*Math.max(0,...full.map(v=>toks(v).filter(t=>s.includes(' '+t+' ')).length));   // ganze Wörter vor Wortteilen (Quark vor Vanillequark)
     sc+=Math.max(0, 12-words);                                     // kurze, passende Namen zuerst
     if(r.src==='off'){ if(r.at) sc+=14; if(chainSel.length && chainSel.some(c=>r.chain.includes(c))) sc+=20; else if(chainSel.length && offStoreHit({ brands:r.brand }, sq.stores)) sc+=16; }
     else sc+= r.src==='bls' ? 10 : 8;                              // Grundlebensmittel und Gerichte: verlässliche Richtwerte
     if(q0.some(t=>txtNorm(r.brand).includes(t))) sc+=8;
     return sc; };
   hits.forEach(h=>{ h.s=score(h); }); hits.sort((a,b)=>b.s-a.s);
-  return hits.slice(0, limit||40).map(h=>fdbResult(FDB.rows[h.i], chainSel)).filter(r=>!offExcluded(r.name)); }
+  // Grundlebensmittel und Gerichte (BLS, Schweiz) als eigene Gruppe vor den Markenprodukten
+  const gen=hits.filter(h=>FDB.rows[h.i].src!=='off').slice(0,12), prod=hits.filter(h=>FDB.rows[h.i].src==='off').slice(0, limit||40);
+  return gen.concat(prod).map(h=>fdbResult(FDB.rows[h.i], chainSel)).filter(r=>!offExcluded(r.name)); }
 function fdbResult(r, chainSel){
   const name=r.brand && !txtNorm(r.name).includes(txtNorm(r.brand)) ? r.name+' ('+r.brand+')' : r.name;
   const per=/\d\s*(ml|cl|l)\b/i.test(r.qty||'')?'100 ml':'100 g';
@@ -2736,9 +2740,11 @@ function fdbSection(q, mode){
   const res=/^\d{8,14}$/.test(q) ? FDB.rows.filter(r=>r.code===q).map(r=>fdbResult(r)) : fdbSearch(q, 40);
   (ui.dbRes=ui.dbRes||{})[mode]=res; ui.dbCount=res.length;
   if(!res.length) return '<div class="eyebrow" style="margin:10px 0 4px">Datenbanken</div><p class="small muted">Nichts gefunden.</p>';
-  return '<div class="eyebrow" style="margin:10px 0 4px">Datenbanken</div><div class="off-list">'+res.map((r,i)=>'<button class="off-item" data-act="dbPick" data-mode="'+mode+'" data-i="'+i+'"><span class="off-n">'+
+  const item=(r,i)=>'<button class="off-item" data-act="dbPick" data-mode="'+mode+'" data-i="'+i+'"><span class="off-n">'+
     (r.at?'<span class="off-at">AT</span>':'')+(r.store?'<span class="off-at off-st">'+esc(r.store.toUpperCase())+'</span>':'')+(r.src!=='off'?'<span class="off-at off-st">'+esc(FDB_SRC[r.src])+'</span>':'')+esc(r.name)+'</span>'+
-    '<span class="off-m">'+r.kcal+' kcal · P '+fmtNum(r.P)+' · KH '+fmtNum(r.K)+' · F '+fmtNum(r.F)+' / '+r.per+(r.qty?' · '+esc(r.qty):'')+'</span></button>').join('')+'</div>'; }
+    '<span class="off-m">'+r.kcal+' kcal · P '+fmtNum(r.P)+' · KH '+fmtNum(r.K)+' · F '+fmtNum(r.F)+' / '+r.per+(r.qty?' · '+esc(r.qty):'')+'</span></button>';
+  const grp=(title,f)=>{ const L=res.map((r,i)=>[r,i]).filter(([r])=>f(r)); return L.length?'<div class="eyebrow" style="margin:10px 0 4px">'+title+'</div><div class="off-list">'+L.map(([r,i])=>item(r,i)).join('')+'</div>':''; };
+  return grp('Grundlebensmittel & Gerichte', r=>r.src!=='off')+grp('Markenprodukte', r=>r.src==='off'); }
 function fdbRefreshLists(){ const a=document.getElementById('fd-list'), b=document.getElementById('rc-list');
   if(a){ const q=document.getElementById('fd-q'); a.innerHTML=nutPickList(q?q.value:''); }
   if(b){ const q=document.getElementById('rc-q'); b.innerHTML=rcpPickList(q?q.value:''); } }
