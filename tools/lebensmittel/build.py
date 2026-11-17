@@ -67,6 +67,38 @@ def write_source(out, src, fields, items, meta):
 OFF_URL = 'https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz'
 CHAINS = [('b', ('billa', 'merkur')), ('s', ('spar', 'interspar', 'eurospar')), ('h', ('hofer', 'aldi')),
           ('l', ('lidl',)), ('p', ('penny',)), ('m', ('mpreis', 'm-preis')), ('u', ('unimarkt',)), ('a', ('adeg',)), ('d', ('dm',))]
+# Eigenmarken der Ketten (exakter Markenname, normalisiert). Nur eindeutige Marken – allgemeine Wörter wie „Gourmet“ fehlen bewusst.
+OWN_BRANDS = {
+    'b': ['billa', 'billa bio', 'billa corso', 'billa regional', 'billa immer gut', 'billa plus', 'merkur', 'vegavita', 'da komm ich her',
+          'clever', 'ja natürlich'],
+    'p': ['penny', 'clever', 'ja natürlich'],
+    'a': ['adeg', 'ja natürlich'],
+    's': ['spar', 's-budget', 's budget', 'sbudget', 'spar natur pur', 'spar naturpur', 'spar premium', 'spar vital', 'spar veggie',
+          'spar free from', 'spar enjoy', 'spar feine küche', 'interspar', 'eurospar', 'despar', 'tann'],
+    'h': ['hofer', 'aldi', 'aldi süd', 'aldi nord', 'zurück zum ursprung', 'milsani', 'milfina', 'happy harvest', 'natur aktiv', 'lyttos',
+          'golden bridge', 'choceur', "rio d'oro", 'cucina nobile', 'moser roth', 'backbox'],
+    'l': ['lidl', 'milbona', 'pilos', 'crownfield', 'vemondo', 'chef select', 'sondey', 'fin carré', 'freeway', 'solevita', 'alpenfest',
+          'wiesentaler', 'combino', 'kania', 'vitasia', 'baresa', 'freshona', 'alesto', 'favorina', 'snack day', 'trattoria alfredo',
+          'nixe', 'dulano', 'linessa', 'italiamo', 'bellarom', 'mcennedy', 'deluxe'],
+    'm': ['mpreis', 'm-preis', 'm preis'],
+    'u': ['unimarkt'],
+    'd': ['dm', 'dmbio', 'dm bio'],
+}
+def brand_norm(s):
+    s = s.lower().replace('!', '').replace('*', '').replace('’', "'").strip(' .')
+    return re.sub(r'\s+', ' ', s)
+BRAND_CHAIN = {}
+for _ch, _names in OWN_BRANDS.items():
+    for _n in _names:
+        BRAND_CHAIN.setdefault(brand_norm(_n), set()).add(_ch)
+
+def chains_for(stores_txt, brands_txt):
+    """Kettenkürzel aus „stores“ (Kettenname) und „brands“ (Kettenname oder Eigenmarke)."""
+    txt = (stores_txt + ',' + brands_txt).lower()
+    found = {ch for ch, keys in CHAINS if any(re.search(r'(^|[^a-z])' + re.escape(kk) + r'([^a-z]|$)', txt) for kk in keys)}
+    for b in brands_txt.split(','):
+        found |= BRAND_CHAIN.get(brand_norm(b), set())
+    return ''.join(sorted(found))
 
 def build_off(out, meta, path=None):
     if path is None:
@@ -99,8 +131,7 @@ def build_off(out, meta, path=None):
             if not plausible(k, p, c, f): continue
             seen.add(code)
             brand = g(row, 'brands').split(',')[0].strip()[:40]
-            stores = (g(row, 'stores') + ',' + g(row, 'brands')).lower()
-            chain = ''.join(sorted({ch for ch, keys in CHAINS if any(re.search(r'(^|[^a-z])' + re.escape(kk) + r'([^a-z]|$)', stores) for kk in keys)}))
+            chain = chains_for(g(row, 'stores'), g(row, 'brands'))
             qty = g(row, 'quantity').strip()[:20]
             sq = num(g(row, 'serving_quantity'))
             items.append([code, name[:90], brand, round(k), r1(p), r1(c), r1(f), qty, 1 if at else 0, chain, round(sq) if sq and 0 < sq < 2000 else 0])

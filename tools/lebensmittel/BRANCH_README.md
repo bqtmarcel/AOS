@@ -10,4 +10,4 @@ der Branch wird bei jedem Lauf komplett ersetzt.
 | `ch.json.gz` | Grundlebensmittel | Schweizer Nährwertdatenbank, Bundesamt für Lebensmittelsicherheit und Veterinärwesen BLV – naehrwertdaten.ch |
 | `index.json` | Stand, Anzahl und Prüfsumme je Datei | – |
 
-Alle Werte pro 100 g bzw. 100 ml, gerundet. Die Daten wurden für AOS gekürzt (nur Energie und Makronährstoffe).
+Alle Werte pro 100 g bzw. 100 ml, gerundet. Spalte `chain` in `off.json.gz`: Handelskette (b Billa, p Penny, a ADEG, s Spar, h Hofer, l Lidl, m MPreis, u Unimarkt, d dm), erkannt über Kettenname oder eindeutige Eigenmarke. Die Daten wurden für AOS gekürzt (nur Energie und Makronährstoffe).
