@@ -1885,8 +1885,10 @@ function plDue(date){
   const sched=(ov&&ov.schedule)||b.week_schedule||{};
   const skipped=(ov&&ov.skipped)||[];
   const mine=plSessions().filter(s=>s.planner.blockId===b.id);
-  r.doneToday=mine.find(s=>isDone(s) && sessionDate(s)===date) || null;
-  r.plannedToday=mine.find(s=>s.status==='geplant' && s.plannedDate===date) || null;
+  // Von Claude/außerhalb des Planers angelegte Einheiten mit Übungen (ohne planner) zählen für den Tag mit
+  const extra=S.sessions.filter(s=>!s.planner && (s.plan||[]).length);
+  r.doneToday=mine.find(s=>isDone(s) && sessionDate(s)===date) || extra.find(s=>s.log && isDone(s) && sessionDate(s)===date) || null;
+  r.plannedToday=extra.find(s=>s.status==='geplant' && s.plannedDate===date) || mine.find(s=>s.status==='geplant' && s.plannedDate===date) || null;
   const done=mine.filter(s=>isDone(s) && s.planner.week===r.week).map(s=>s.planner.templateId);
   r.remaining=(b.session_order||[]).filter(t=>!skipped.includes(t) && !done.includes(t));
   const sc=plScheduledAt(b,date); const scheduled=sc.tpl; r.changed=sc.changed;
@@ -3177,6 +3179,8 @@ function viewTraining(){
   if(ui.sessionId && sessionById(ui.sessionId)) return logForm();
   const today=todayISO();
   let h='<h1>Training</h1>'+plSection()+fieldCard((ui.pl&&ui.pl.date)||today);
+  const ready=S.sessions.filter(s=>s.status==='geplant' && !s.planner && (s.plan||[]).length && s.plannedDate===today);
+  if(ready.length) h='<h1>Training</h1><h2>Heute angelegt</h2><div class="section sv-list">'+ready.map(s=>'<div class="sv-row"><button class="link sv-name" data-act="openSession" data-id="'+s.id+'" title="'+esc(s.name)+'">'+esc(s.name)+'</button><button class="small primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button></div>').join('')+'</div>'+fieldCard(today);
   const saved=S.sessions.filter(s=>s.status==='geplant' && (s.plan||[]).length && s.plannedDate && s.plannedDate<today).sort(bySessionDate);
   if(saved.length){ h+='<h2>Nicht erfasst</h2><div class="section sv-list">'+saved.map(s=>{ const ov=s.plannedDate&&s.plannedDate<today; const id=(s.planner&&s.planner.templateId)||s.name;
       return '<div class="sv-row"><button class="link sv-name" data-act="openSession" data-id="'+s.id+'" title="'+esc(s.name)+'">'+esc(id)+' <span class="small muted">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+(ov?' · nicht erfasst':'')+'</span></button><button class="small primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button></div>'; }).join('')+'</div>'; }
