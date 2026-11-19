@@ -1899,13 +1899,6 @@ function fmtSec(t){ return Math.floor(t/60)+':'+String(Math.round(t%60)).padStar
 /* Hinweise, wenn zu kurze Pausen den RPE im Folgesatz hochtreiben */
 function restWarnings(){ let v; try{ v=learn(); }catch(e){ return []; }
   return Object.entries(v.rest).filter(([,r])=>r.warn).map(([role,r])=>'Pausen bei '+(ROLE_REST_LABEL[role]||role)+' meist zu kurz (Ø '+fmtSec(r.rs)+' statt '+fmtSec(r.plan)+'): Der nächste Satz liegt dann im Schnitt '+fmtNum(Math.round(r.dShort*10)/10)+' RPE höher'+(r.nOk>=3?' als nach voller Pause (+'+fmtNum(Math.round(r.dOk*10)/10)+')':'')+'. Nimm dir die volle Pause.'); }
-function learnSection(){ const v=learn(); const d=v.dur; let b='';
-  b+='<p class="small"><strong>Dauer:</strong> '+(d.n>=2 ? 'Deine Einheiten dauern im Schnitt '+(Math.abs(d.raw-1)<0.03?'so lange wie geschätzt':Math.round(Math.abs(d.raw-1)*100)+' % '+(d.raw>1?'länger':'kürzer')+' als die Grundschätzung')+' (aus '+d.n+' Einheiten). AOS plant damit: '+(d.factor<1?'es passt mehr in 70 min.':d.factor>1?'pro Einheit weniger Umfang, damit es bei 70 min bleibt.':'unverändert.')+(d.capped?' Weil die Pausen zu kurz sind, rechnet AOS aber nur mit 10 % weniger Zeit.':'')
-    : 'Noch zu wenig vollständige Einheiten mit gemessener Dauer – ab 2 passt AOS die Schätzung an.')+'</p>';
-  const rs=Object.entries(v.rest).filter(([,r])=>r.n>=3);
-  b+='<p class="small"><strong>Pausen:</strong> '+(rs.length ? rs.map(([role,r])=>(ROLE_REST_LABEL[role]||role)+' Ø '+fmtSec(r.rs)+' (geplant '+fmtSec(r.plan)+')').join(' · ') : 'Werden ab jetzt beim Erfassen gemessen (Zeit zwischen zwei Sätzen derselben Übung).')+'</p>';
-  restWarnings().forEach(w=>{ b+='<div class="note small">'+esc(w)+'</div>'; });
-  return b; }
 
 /* ---------- Zeitbudget: max. 70 min pro Einheit ---------- */
 const SESSION_MAX_MIN=70;
@@ -2267,7 +2260,6 @@ function plBuild(inp){
   const valid=[];
   if(lim && cSum()>lim) valid.push('Bodenkontakte '+cSum()+' über dem Limit '+lim+'.');
   items.forEach(x=>{ const m=String(x.rpe).match(/[\d,]+(?=\s*$)/); if(m && num(m[0])>cap) valid.push(x.ex.name_de+': Ziel-RPE über dem Cap.'); });
-  { const f=plDurFactor(); if(Math.abs(f-1)>=0.05) notes.push('Dauer an deine bisherigen Einheiten angepasst: du brauchst ca. '+Math.round(Math.abs(f-1)*100)+' % '+(f>1?'länger':'weniger Zeit')+' als die Grundschätzung.'); }
   restWarnings().forEach(w=>notes.push(w));
   return { due, tpl:t, block:b, week, cap, items, dropped, notes, valid, contacts:cSum(), estMin:est(), estRaw:plEst(items, rules.warmup_min||7, true), limitMin, inp };
 }
@@ -3093,7 +3085,7 @@ function viewPlan(){
       '<div class="small muted ph-meta"><span>'+fmtDate(ph.start).slice(0,6)+' – '+fmtDate(ph.end).slice(0,6)+'</span><span>'+w+' Wochen</span>'+(cap!=null?'<span>RPE ≤ '+fmtNum(cap)+'</span>':'')+'</div></div>'; }).join('')+'</div><p class="small muted">Tipp auf eine Phase zum Öffnen oder Schließen.</p>';
   // Aktueller (oder nächster) Block
   const b=ui.planBlock && P.blocks.find(x=>x.id===ui.planBlock);
-  if(!b) return h+'<h2>AOS lernt mit</h2><div class="section">'+learnSection()+'</div>';
+  if(!b) return h;
   h+='<h2 id="plan-block">'+esc(b.name)+'</h2><div class="section"><div class="small ph-meta" style="margin-bottom:10px"><span style="flex-basis:100%">'+fmtDate(b.start).slice(0,6)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+'</span><span>'+b.weeks+' Wochen</span><span>RPE ≤ '+fmtNum(plCap(b))+'</span>'+
     '<span>'+SESSION_MAX_MIN+' min/Einheit</span></div>'+
     '';
@@ -3132,7 +3124,6 @@ function viewPlan(){
     h+=pdet('tpl-'+t.id, t.id+' – '+t.name, (t.group==='lower'?'Unterkörper':'Oberkörper')+' · ca. '+t.time_min+' min', tb+'</tbody></table></div>');
   });
   h+='<p class="small muted">Kern: hat Vorrang, wenn Einheiten ausfallen</p>';
-  h+='<h2>AOS lernt mit</h2><div class="section">'+learnSection()+'</div>';
   return h;
 }
 
