@@ -38,6 +38,10 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | T10 | **Autoregulation in der Einheit**: Liegt ein Satz einer Hauptübung über der RPE-Obergrenze, werden die restlichen Sätze automatisch 5 % leichter (mindestens 1 RPE über dem Ziel: 2,5 %) | Wiedereinstieg und schlechte Tage ohne Rechnen | ✅ erledigt | S |
 | T11 | **Standortbestimmung automatisch übernehmen**: In der Testwoche eines Blocks landen Top-Satz Kniebeuge, Bank, Trap Bar und beste Broad-Jump-Weite beim Speichern direkt als Test im Verlauf | Neue Werte fließen ohne Knopfdruck in den nächsten Block | ✅ erledigt | S |
 | T12 | **„Tag frei“ lässt Einheiten nachrücken** (wie die nicht verfügbaren Tage im Datenrepo) statt nur Kernübungen umzuverteilen | Feiertage, kurzfristige Ausfälle | ⏸ zurückgestellt (15.11.): bleibt vorerst wie bisher, evtl. später | M |
+| T13 | **Laufende Einheit bleibt offen**: beim Wechsel der Ansicht und nach Neustart der App; Gesamtdauer läuft ab „Einheit erfassen“ bis „Einheit beenden“; „Zwischenspeichern“ sichert den Stand auch für andere Geräte | Nichts geht verloren, Dauer stimmt automatisch | ✅ erledigt 19.11.2026 | M |
+| T14 | **Aufwärmsätze als eigene Zeilen** vor den Arbeitssätzen mit kurzer Pause (45–60 s); werden getrennt gespeichert und zählen nicht in Auswertungen | Aufwärmen wird mitgeführt, ohne die Statistik zu verfälschen | ✅ erledigt 19.11.2026 | S |
+| T15 | **Erfassungsfelder je Übungsart**: kein kg-Feld bei reinen Körpergewichtsübungen, „+kg“ bei Klimmzug/Dips mit Zusatzlast, kein RPE bei Plyos; Scheibenrechner für alle Übungen mit Scheiben (Langhantel, Trap Bar, SSB, Landmine, Dip-Gürtel, Scheibe) | Nur eintragen, was zählt | ✅ erledigt 19.11.2026 | S |
+| T16 | **Pausen-Alarm**: Ton, Blinken und Mitteilung, wenn die Pause vorbei ist; Bildschirm bleibt während der Einheit an | Alarm kommt auch, wenn das Handy weggelegt ist | ✅ erledigt 19.11.2026 | S |
 
 ## 2. Verlauf und Auswertung
 
@@ -78,6 +82,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | # | Idee | Nutzen | Prio | Aufwand |
 |---|---|---|---|---|
 | W1 | **CSS zusammenführen**: Die Gestaltung besteht aus mehreren übereinanderliegenden Schichten (Grundlayout, Design, Variante B, Red Tigers, Chrome Glass) mit vielen Überschreibungen und `!important`. Eine Schicht mit klaren Variablen | Änderungen am Design werden einfacher und sicherer | ✅ erledigt (15.11.: 44 Regeln und 236 Deklarationen entfernt, die überall überschrieben wurden; jede Ansicht und jeder Dialog in iPhone- und Laptop-Breite pixelgleich geprüft) | M |
+| W5 | **Design monochrom (Anthrazit, metallisch)** nach unslop: keine Glas-Effekte, Leuchten, Verläufe zwischen Farben, Großbuchstaben-Labels oder Kapitelnummern; einziger Farbfleck ist das blinkende T, Tigerlogo monochrom; Systemschrift, Ziffern in Mono | Ruhiger, eigenständiger Look | ✅ erledigt 19.11.2026 | M |
 | W2 | **Automatischer Klicktest** (Playwright) als GitHub Action: alle Ansichten in iPhone- und Laptop-Breite öffnen, jeden Button einmal antippen, Fehler melden – mit neutralen Testdaten | Fehler vor dem Ausrollen finden | ✅ erledigt | M |
 | W3 | **Altfelder im Datenmodell prüfen** (z. B. `blocks`, `unavailable`, `suggestionDecisions` aus der alten Planverwaltung): was wird noch gebraucht, was kann per `migrate()` entfernt werden | Kleinere Datei, weniger Verwirrung | ✅ erledigt | M |
 | W4 | **`index.html` aufteilen** (z. B. `css/`, `js/kern.js`, `js/training.js` …), weiterhin ohne Build-Schritt | Übersichtlicher bei weiterem Wachstum | ⏸ zurückgestellt: kein sichtbarer Nutzen, erhöht das Risiko beim Zwischenspeichern; sinnvoll erst bei deutlich mehr Code | M |

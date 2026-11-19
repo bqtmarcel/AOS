@@ -55,8 +55,17 @@ FLOW = """(async()=>{
   i.value='5'; i.dispatchEvent(new Event('input',{bubbles:true}));
   if(!document.getElementById('rest-bar')) return 'Pausentimer startet nicht';
   if(!document.querySelector('.last-perf')) return 'Hinweis „Letztes Mal“ fehlt';
+  if(!ui.draft.startedAt || !document.querySelector('[data-clock]')) return 'Einheitsdauer läuft nicht';
+  // Laufende Einheit bleibt beim Wechsel der Ansicht offen und ist auf dem Gerät gesichert
+  const sid=ui.sessionId; document.querySelector('nav [data-view="tests"]').click();
+  if(ui.sessionId!==sid || !document.querySelector('.live-bar')) return 'Laufende Einheit geht beim Wechsel der Ansicht verloren';
+  if(!localStorage.getItem('aos-live-v1')) return 'Laufende Einheit nicht auf dem Gerät gesichert';
+  document.querySelector('.live-bar').click(); if(!document.querySelector('[data-act="saveDraft"]')) return 'Zurück zur laufenden Einheit klappt nicht';
+  ACT.saveDraft(); if(!sessionById(sid).draft) return 'Zwischenspeichern speichert nichts';
   document.querySelector('[data-act="saveLog"]').click(); document.querySelectorAll('.fin').forEach(x=>x.remove());
   if(document.getElementById('rest-bar')) return 'Pausentimer bleibt nach dem Speichern';
+  const done=sessionById(sid); if(done.draft || !done.log || done.log.durationMin==null) return 'Dauer oder Zwischenstand nach dem Beenden falsch';
+  if(localStorage.getItem('aos-live-v1')) return 'Laufende Einheit bleibt nach dem Beenden gespeichert';
   return 'ok';
 })()"""
 
