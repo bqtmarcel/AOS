@@ -45,6 +45,12 @@ DEMO = """(()=>{
 
 # Ablauf: Einheit aus dem Demo-Plan starten, Satz eintragen (Pausentimer), speichern
 FLOW = """(async()=>{
+  // Zeitbudget: zu volle Einheit wird auf höchstens 70 min gebracht, Grundübungen bleiben
+  { const mk=(role,prio,method,sets,id)=>({ role, prio, method, sets, reps:'5', rest:[150,180], ex:REF.exMap[id], slot:{id}, slotId:id, reasons:[] });
+    const it=[mk('power',1,'quality',4,'broad_jump'), mk('main',1,'wave',5,'high_bar_squat'), mk('main',1,'wave',5,'bench_press'), mk('main',1,'bodyweight_reps',5,'pull_up')]
+      .concat(Array.from({length:8},(_,i)=>mk('assistance',3,'double',4,'bench_press')));
+    const f=plFit(it, 70, 7, []); if(f.min>70) return 'Zeitbudget: Einheit dauert noch '+f.min+' min';
+    if(!it.some(x=>x.ex.id==='high_bar_squat') || !it.some(x=>x.ex.id==='pull_up')) return 'Zeitbudget: Grundübung gestrichen'; }
   ui.view='training'; ui.sessionId=null; ui.draft=null; ui.pl=null; render();
   const n=plNextTraining(todayISO()); if(!n) return 'keine geplante Einheit';
   ui.pl.date=n.date; render();

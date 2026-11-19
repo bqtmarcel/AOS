@@ -42,6 +42,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | T14 | **Aufwärmsätze als eigene Zeilen** vor den Arbeitssätzen mit kurzer Pause (45–60 s); werden getrennt gespeichert und zählen nicht in Auswertungen | Aufwärmen wird mitgeführt, ohne die Statistik zu verfälschen | ✅ erledigt 19.11.2026 | S |
 | T15 | **Erfassungsfelder je Übungsart**: kein kg-Feld bei reinen Körpergewichtsübungen, „+kg“ bei Klimmzug/Dips mit Zusatzlast, kein RPE bei Plyos; Scheibenrechner für alle Übungen mit Scheiben (Langhantel, Trap Bar, SSB, Landmine, Dip-Gürtel, Scheibe) | Nur eintragen, was zählt | ✅ erledigt 19.11.2026 | S |
 | T16 | **Pausen-Alarm**: Ton, Blinken und Mitteilung, wenn die Pause vorbei ist; Bildschirm bleibt während der Einheit an | Alarm kommt auch, wenn das Handy weggelegt ist | ✅ erledigt 19.11.2026 | S |
+| T17 | **Wochenumfang neu verteilen**: Fallen Einheiten weg (Tag frei, nicht verfügbar), plant AOS die verbleibenden Einheiten komplett neu – Übungen bleiben möglichst in ihrer Einheit, der Rest geht nach Priorität dorthin, wo Zeit ist. Jede Einheit höchstens 70 min: zuerst Supersätze und weniger Sätze bei Ergänzungen/Power, dann Unwichtiges weg, Grundübungen bleiben; Restzeit wird wieder aufgefüllt | Weniger Einheiten werden nicht länger, sondern decken den Wochenumfang effizient ab | ✅ erledigt 19.11.2026 | M |
 
 ## 2. Verlauf und Auswertung
 

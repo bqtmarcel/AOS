@@ -1745,7 +1745,7 @@ function apBuildBlock(phase, prev){
   if(phase.id!=='IN' && una.length) for(let w=1; w<=weeks; w++){ const mon=addDays(phase.start,(w-1)*7); const hit=ORD.filter((d,i)=>una.includes(addDays(mon,i))); if(!hit.length) continue;
     const order=ORD.filter(d=>sched[d]).map(d=>sched[d]); const free=ORD.filter(d=>sched[d] && !hit.includes(d)); const s2={}; free.forEach((d,i)=>{ s2[d]=order[i]; });
     const skipped=order.slice(free.length); const lbl=hit.map(d=>WD[(ORD.indexOf(d)+1)%7]).join('/');
-    week_overrides[w]={ schedule:s2, skipped, note:lbl+' nicht verfügbar'+(skipped.length?' · '+skipped.join(', ')+' entfällt':'')+(week_overrides[w]&&week_overrides[w].note?' · '+week_overrides[w].note:'') }; }
+    week_overrides[w]={ schedule:s2, skipped, wander:true, note:lbl+' nicht verfügbar'+(skipped.length?' · '+skipped.join(', ')+' entfällt':'')+(week_overrides[w]&&week_overrides[w].note?' · '+week_overrides[w].note:'') }; }
   // Spielwoche: letzte schwere Einheit mindestens 4 Tage vor dem Spiel (3.2.1), danach nur kurz und schnell
   const game=((REF.plan.season||{}).first_game||[])[0];
   if(phase.id==='P5' && game){ const lw=weeks; const mon=addDays(phase.start,(lw-1)*7);
@@ -1813,26 +1813,108 @@ ACT.dayEditSet = el=>{ const d=el.dataset.d, v=el.dataset.v; const key='sched|'+
   if(ui.pl && ui.pl.date===d){ ui.pl.tpl=null; ui.pl.accept={}; }
   save(); closeDlg(); render(); toast(v==='reset'?'Wie im Plan.':(v==='none'?fmtDateShort(d)+': kein Training.':fmtDateShort(d)+': '+v+'.')); };
 /* Wie viele Einheiten finden in dieser Woche wirklich statt, und wohin wandern die Kernübungen fehlender Einheiten? */
+/* Wochenplan: Fallen in einer Woche Einheiten weg, verteilt AOS den gesamten Wochenumfang neu auf die verbleibenden Einheiten.
+   Jede Übung bleibt möglichst in ihrer Einheit, die übrigen gehen nach Priorität dorthin, wo am wenigsten Zeit verplant ist
+   (gleiche Körperhälfte bevorzugt). Danach kürzt plFit jede Einheit effizient auf max. 70 min (Supersätze, weniger Sätze, Unwichtiges weg). */
+function plSlotItem(sl, week){ const d=(sl.dose||{})[week]||[1,'']; return { slot:sl, role:sl.role, prio:sl.prio, method:sl.method, sets:d[0], reps:String(d[1]), rest:sl.rest||[60,90], ex:REF.exMap[(sl.candidates||[])[0]] }; }
+/* Reihenfolge in einer neu zusammengesetzten Einheit: Sprünge vor Gewichtheben, Kniebeuge vor Drücken/Ziehen vor Kreuzheben */
+function plSeq(sl){ const p=(REF.exMap[(sl.candidates||[])[0]]||{}).pattern||'';
+  if(sl.role==='power') return /jump/.test(p)?0:p==='olympic'?1:2;
+  if(sl.role==='main') return p==='squat'?0:/push|pull/.test(p)?1:p==='hinge'?2:3; return 0; }
 function plWeekPlan(b, week){
   const today=todayISO(); const mon=addDays(b.start,(week-1)*7);
   const mine=plSessions().filter(s=>s.planner.blockId===b.id && s.planner.week===week);
   const done=mine.filter(isDone).map(s=>s.planner.templateId); const doneDates=new Set(mine.filter(isDone).map(s=>sessionDate(s)));
+  // Übungen, die diese Woche schon gemacht wurden (egal in welcher Einheit)
+  const doneSlots=new Set(mine.filter(isDone).flatMap(s=>(s.plan||[]).map(p=>p.planner&&p.planner.slotId).filter(Boolean)));
   const upcoming=[];
   for(let i=0;i<7;i++){ const d=addDays(mon,i); if(d<today || doneDates.has(d)) continue; const t=plScheduledAt(b,d).tpl;
     if(t && !done.includes(t) && !upcoming.some(u=>u.tpl===t)) upcoming.push({ date:d, tpl:t }); }
-  // Templates, deren Kernübungen schon in einer erledigten Einheit dieser Woche steckten, gelten als abgedeckt
-  const covered=mine.filter(isDone).flatMap(s=>(s.planner.merged||[]).map(id=>String(id).split('-')[0]));
-  const ovw=(b.week_overrides||{})[week]; const present=new Set(done.concat(upcoming.map(u=>u.tpl), covered, (ovw&&ovw.skipped)||[]));   // gestrichene Einheiten wandern nicht
-  const missing=(b.session_order||[]).filter(t=>!present.has(t));
-  const hosts={}; upcoming.forEach(u=>{ hosts[u.tpl]=[]; });
-  missing.forEach(m=>{ const mt=plTemplate(b,m); const c=Object.keys(hosts); if(!c.length || !mt) return;
-    const same=c.filter(h=>plTemplate(b,h).group===mt.group);
-    const pool=(same.length?same:c).slice().sort((a,z)=>hosts[a].length-hosts[z].length || b.session_order.indexOf(a)-b.session_order.indexOf(z));
-    hosts[pool[0]].push(m); });
-  return { count:done.length+upcoming.length, done, upcoming, missing, hosts };
+  const ovw=(b.week_overrides||{})[week]; const fixedOut=(ovw&&!ovw.wander&&ovw.skipped)||[];   // Spielwoche: gestrichene Einheiten wandern nicht
+  const present=new Set(done.concat(upcoming.map(u=>u.tpl), fixedOut));
+  const full=(b.session_order||[]).filter(t=>!fixedOut.includes(t)).length;
+  const missing=(b.session_order||[]).filter(t=>!present.has(t) && (plTemplate(b,t)||{slots:[]}).slots.some(sl=>(sl.dose||{})[week] && !doneSlots.has(sl.id)));
+  const assign={}; upcoming.forEach(u=>{ assign[u.tpl]=[]; });
+  const redistributed = missing.length>0 && upcoming.length>0;
+  if(redistributed){
+    const rank={ power:0, main:1, assistance:2, optional:3 }; const pool=[];
+    upcoming.map(u=>u.tpl).concat(missing).forEach(tid=>{ const t=plTemplate(b,tid); if(!t) return;
+      t.slots.forEach((sl,i)=>{ if(!(sl.dose||{})[week] || doneSlots.has(sl.id)) return; pool.push({ sl, tid, i, home:assign[tid]?tid:null }); }); });
+    pool.sort((a,z)=>(a.sl.prio||9)-(z.sl.prio||9) || (rank[a.sl.role]??9)-(rank[z.sl.role]??9) || (a.home?0:1)-(z.home?0:1) || a.i-z.i);
+    const pat=sl=>(REF.exMap[sl.candidates[0]]||{}).pattern;
+    const clash=(tid,sl)=>assign[tid].some(x=>x.sl.candidates[0]===sl.candidates[0] || (x.sl.role==='main' && sl.role==='main' && pat(x.sl)===pat(sl)));
+    const mins=tid=>plEst(assign[tid].map(x=>plSlotItem(x.sl,week)), 0);
+    pool.forEach(p=>{ let target=null;
+      if(p.home && !clash(p.home,p.sl)) target=p.home;
+      else { const g=(plTemplate(b,p.tid)||{}).group; const cost=t=>mins(t)+(((plTemplate(b,t)||{}).group===g||(plTemplate(b,t)||{}).group==='full')?0:15);
+        target=Object.keys(assign).filter(t=>!clash(t,p.sl)).sort((x,y)=>cost(x)-cost(y))[0]||null; }
+      if(target) assign[target].push({ sl:p.sl, from:p.tid===target?null:p.tid }); });
+  }
+  return { count:done.length+upcoming.length, full, done, upcoming, missing, assign, redistributed };
 }
-function plMergeSlots(b, week, slots){ // Kernübungen (prio ≤ merge_priority) eines Templates, die in dieser Woche dosiert sind
-  const fr=(REF.plan.rules||{}).frequency||{}; return slots.filter(x=>(x.prio||9)<=(fr.merge_priority||1) && (x.dose||{})[week]); }
+/* ---------- Zeitbudget: max. 70 min pro Einheit ---------- */
+const SESSION_MAX_MIN=70;
+function sessionLimit(avail){ return Math.min(avail||SESSION_MAX_MIN, SESSION_MAX_MIN); }
+function plGroup(ex){ const p=(ex&&ex.pattern)||'';
+  if(/squat|hinge|lunge|knee|ankle|adductor|jump|olympic|sprint|cod/.test(p)) return 'legs';
+  if(/push|elbow_extension|throw/.test(p)) return 'push';
+  if(/pull|scapular|shrug|elbow_flexion|grip|neck|shoulder_abduction/.test(p)) return 'pull';
+  return 'core'; }
+function plPairable(x){ return x.role==='assistance' || x.role==='optional' || (x.role==='main' && x.method==='bodyweight_reps'); }
+/* Supersätze: zwei Übungen verschiedener Muskelgruppen abwechselnd, Pause erst nach beiden. Partner steht direkt dahinter. */
+function plPair(items){
+  items.forEach(x=>{ delete x.pair; }); let n=0; const c=items.filter(plPairable);
+  // Klimmzug (Haupt, Körpergewicht) bevorzugt mit Bankdrücken bzw. einer anderen Hauptübung ohne Zug kombinieren
+  c.filter(x=>x.role==='main').forEach(a=>{ const b=items.find(y=>y!==a && !y.pair && y.role==='main' && y.method==='wave' && plGroup(y.ex)==='push'); if(b){ const id='S'+(++n); a.pair=id; b.pair=id; } });
+  c.forEach((a,i)=>{ if(a.pair || a.role==='main') return; const b=c.find((y,j)=>j>i && !y.pair && y.role!=='main' && plGroup(y.ex)!==plGroup(a.ex)); if(b){ const id='S'+(++n); a.pair=id; b.pair=id; } });
+  // Partner hintereinander stellen
+  const out=[]; items.forEach(x=>{ if(out.includes(x)) return; out.push(x); if(x.pair){ const y=items.find(z=>z!==x && z.pair===x.pair); if(y && !out.includes(y)) out.push(y); } });
+  items.splice(0, items.length, ...out); return n; }
+function slotRamp(x){ return (x.role==='main' && x.method!=='bodyweight_reps') ? 240 : (x.method==='velocity' ? 180 : 0); }
+function pairSec(a, b){ const w=x=>x.sets*(x.role==='power'?15:(x.role==='main'?45:40))*(perSide(x.reps)?2:1); const n=Math.max(a.sets,b.sets);
+  const r=Math.max((a.rest[0]+a.rest[1])/2,(b.rest[0]+b.rest[1])/2); return w(a)+w(b)+n*20+Math.max(0,n-1)*r+180+slotRamp(a)+slotRamp(b); }
+function plEst(items, warm){ let sec=0; const seen=new Set();
+  items.forEach(x=>{ if(x.pair){ if(seen.has(x.pair)) return; seen.add(x.pair); const y=items.find(z=>z!==x && z.pair===x.pair); sec+= y?pairSec(x,y):slotSec(x); } else sec+=slotSec(x); });
+  return Math.round((warm==null?7:warm) + sec/60); }
+/* Wichtigkeit einer Übung für die Woche (1 = bleibt am längsten). Grundübungen vor Power, Power vor Ergänzungen. */
+function plTier(x, items){
+  if(x.role==='main' && x.method==='wave') return 1;                                   // Kniebeuge, Bankdrücken, Kreuzheben
+  if(x.role==='power' && (x.prio||9)<=1){ const pw=items.filter(y=>y.role==='power' && (y.prio||9)<=1); const g=y=>{ const p=(y.ex&&y.ex.pattern)||''; return /jump/.test(p)?'j':p==='olympic'?'o':'x'; };
+    const first=pw.find(y=>g(y)===g(x)); return (g(x)!=='x' && first===x) || pw.length<=2 ? 2 : 4; }   // je ein Sprung und eine Umsetz-Übung
+  if(x.role==='main' && x.method==='bodyweight_reps') return 3;                        // Klimmzug
+  if(x.role==='main') return 5;                                                        // zweite Hauptübung (z. B. Schulterdrücken, Frontkniebeuge)
+  if(x.role==='assistance' && (x.prio||9)<=2) return 6;
+  if(x.role==='power') return 7;
+  if(x.role==='assistance') return 8;
+  return 9;                                                                            // optional
+}
+/* Einheit auf das Zeitbudget bringen – Reihenfolge: erst effizienter (Supersätze, weniger Sätze bei Ergänzungen und Power),
+   dann die unwichtigsten Übungen weg, erst zuletzt Sätze der Grundübungen. */
+function plFit(items, limit, warm, dropped){
+  const steps=[]; let paired=false; const est=()=>plEst(items,warm); const over=()=>est()>limit;
+  if(!over()) return { steps, min:est(), over:false };
+  const nm=x=>x.ex?x.ex.name_de:x.slotId; const removed=[];
+  const dropTo=minTier=>{ while(over()){ const T=items.map(x=>[x,plTier(x,items)]).filter(([,t])=>t>=minTier); if(!T.length) break;
+      T.sort((a,z)=>z[1]-a[1] || (z[0].from?1:0)-(a[0].from?1:0) || items.indexOf(z[0])-items.indexOf(a[0]));
+      const x=T[0][0]; removed.push([x, items.indexOf(x)]); items.splice(items.indexOf(x),1); if(paired) plPair(items); } };
+  const cut=(pred, max, label)=>{ let n=0; items.filter(pred).sort((a,z)=>plTier(z,items)-plTier(a,items)).forEach(x=>{ if(over() && x.sets>max){ x.reasons.push('Zeitbudget '+limit+' min → '+x.sets+' → '+max+' Sätze.'); x.sets=max; n++; } }); if(n) steps.push(label); };
+  if(plPair(items)){ paired=true; steps.push('Supersätze'); }
+  cut(x=>x.role==='assistance'||x.role==='optional', 2, 'Ergänzungen auf 2 Sätze');
+  cut(x=>x.role==='power', 3, 'Power auf 3 Sätze');
+  dropTo(6);                                       // Optionales, Zusatz-Power, Ergänzungen
+  cut(x=>x.role==='main', 3, 'Hauptübungen auf 3 Sätze');
+  cut(x=>x.role==='power', 2, 'Power auf 2 Sätze');
+  dropTo(4);                                       // zweite Hauptübung, weitere Power
+  cut(x=>x.role==='main', 2, 'Hauptübungen auf 2 Sätze');
+  dropTo(3);                                       // Klimmzug zuletzt vor den Grundübungen
+  // Restzeit nutzen: Weggelassenes (Wichtigstes zuerst) wieder aufnehmen, wenn es noch hineinpasst – notfalls mit 2 Sätzen
+  removed.slice().reverse().forEach(r=>{ const [x,i]=r; items.splice(Math.min(i,items.length),0,x); if(paired) plPair(items);
+    if(over() && x.sets>2 && x.role!=='main'){ const s0=x.sets; x.sets=2; if(!over()){ x.reasons.push('Zeitbudget '+limit+' min → '+s0+' → 2 Sätze.'); r.back=true; return; } x.sets=s0; }
+    if(over()){ items.splice(items.indexOf(x),1); if(paired) plPair(items); } else r.back=true; });
+  const gone=removed.filter(r=>!r.back).map(r=>r[0]); gone.forEach(x=>dropped.push({ slot:x.slot, why:'Zeitbudget '+limit+' min' }));
+  if(gone.length) steps.push('weggelassen: '+gone.map(nm).join(', '));
+  return { steps, min:est(), over:over() };
+}
 function plFirstSession(b){ for(let i=0;i<b.weeks*7;i++){ const d=addDays(b.start,i); const w=plWeek(b,d); const t=plScheduledAt(b,d).tpl; if(t) return { date:d, tpl:t }; } return null; }
 /* Laufender Block – oder vor dessen Start der nächste (z. B. am Wochenende vor Blockbeginn) */
 function plCurrentBlock(date){ const bl=(REF.plan&&REF.plan.blocks)||[]; return plBlockAt(date) || bl.filter(b=>b.start>date).sort((a,c)=>a.start<c.start?-1:1)[0] || null; }
@@ -2059,19 +2141,14 @@ function plBuild(inp){
   const recentUse = slotId=>{ const s=plSessions().filter(x=>x.planner.blockId===b.id && isDone(x) && sessionDate(x)<inp.date).sort((a,c)=>sessionDate(a)<sessionDate(c)?1:-1);
     for(const x of s){ const pe=(x.plan||[]).find(p=>p.planner&&p.planner.slotId===slotId); if(pe) return pe.planner.dbId; } return null; };
 
-  const fr=(REF.plan.rules||{}).frequency; let slots=t.slots.slice(); let merged=[];
-  if(fr){ const wp=plWeekPlan(b, week); const from=wp.hosts[t.id]||[];
-    from.forEach(m=>plMergeSlots(b, week, plTemplate(b,m).slots).forEach(sl=>{
-      const ex=REF.exMap[sl.candidates[0]];
-      const dup=slots.concat(merged).some(x=>x.candidates[0]===sl.candidates[0] || (x.role==='main' && sl.role==='main' && ex && REF.exMap[x.candidates[0]] && REF.exMap[x.candidates[0]].pattern===ex.pattern));
-      if(!dup) merged.push(Object.assign({}, sl, { from:m })); }));
-    if(merged.length){
-      const src=[...new Set(merged.map(x=>x.from))].join(', ');
-      slots=slots.filter(sl=>{ if((sl.prio||0)>=(fr.drop_host_priority||3) && (sl.dose||{})[week]){ dropped.push({ slot:sl, why:'Platz für Kernübungen aus '+src }); return false; } return true; });
-      const rank={ power:0, main:1, assistance:2, optional:3 };
-      slots=slots.concat(merged).sort((a,z)=>(rank[a.role]??9)-(rank[z.role]??9));
-      notes.push('Diese Woche '+wp.count+' Einheiten: Das Wichtigste aus '+src+' ist hier eingebaut ('+merged.map(x=>(REF.exMap[x.candidates[0]]||{}).name_de).join(', ')+').');
-    } }
+  // Weniger Einheiten in dieser Woche → Wochenumfang auf die verbleibenden Einheiten verteilt (plWeekPlan)
+  let slots=t.slots.slice(); const wp=plWeekPlan(b, week); let redist=null;
+  if(wp.redistributed && wp.assign[t.id]){
+    const rank={ power:0, main:1, assistance:2, optional:3 };
+    slots=wp.assign[t.id].map((x,i)=>Object.assign({}, x.sl, { from:x.from, _i:i }))
+      .sort((a,z)=>(rank[a.role]??9)-(rank[z.role]??9) || plSeq(a)-plSeq(z) || (a.from?1:0)-(z.from?1:0) || a._i-z._i);
+    redist={ at:notes.length }; notes.push('');
+  }
   slots.forEach(slot=>{
     const d=(slot.dose||{})[week]; if(!d){ return; }
     if(slot.role==='optional' && fieldToday){ dropped.push({ slot, why:'optional – heute abends Feldtraining' }); return; }
@@ -2098,7 +2175,7 @@ function plBuild(inp){
     if(ex.id!==slot.candidates[0]) reasons.push('Ersatz für '+(REF.exMap[slot.candidates[0]]?REF.exMap[slot.candidates[0]].name_de:slot.candidates[0])+(skipWhy.length?' ('+skipWhy.join('; ')+')':' (im Block bisher so gemacht)')+'.');
     let sets=d[0], reps=d[1];
     if(slot.from) reasons.unshift('Aus '+slot.from+' übernommen (diese Woche weniger Einheiten).');
-    const x={ slot, from:slot.from||null, slotId:slot.id, dbId:ex.id, ex, role:slot.role, method:slot.method, sets, reps, rest:slot.rest||[60,90], rpe:((slot.rpe_wave||{})[week]!=null ? fmtNum(slot.rpe_wave[week]) : (slot.rpe||'')), reasons, note:slot.note||'', alternatives: filt.filter(e=>e.id!==ex.id).map(e=>e.name_de) };
+    const x={ slot, from:slot.from||null, slotId:slot.id, dbId:ex.id, ex, role:slot.role, prio:slot.prio, method:slot.method, sets, reps, rest:slot.rest||[60,90], rpe:((slot.rpe_wave||{})[week]!=null ? fmtNum(slot.rpe_wave[week]) : (slot.rpe||'')), reasons, note:slot.note||'', alternatives: filt.filter(e=>e.id!==ex.id).map(e=>e.name_de) };
     // Readiness (7)
     if(fieldToday){ const lim = x.role==='main' ? 4 : 2;
       if(['power','assistance','main'].includes(x.role) && x.sets>=lim){ x.sets--; reasons.push('Abends Feldtraining → 1 Satz weniger.'); } }
@@ -2120,18 +2197,17 @@ function plBuild(inp){
   const cSum=()=>items.reduce((a,x)=>a+contactsOf(x),0);
   if(lim){ for(let i=items.length-1; i>=0 && cSum()>lim; i--){ const x=items[i]; while(contactsOf(x)>0 && x.sets>1 && cSum()>lim){ x.sets--; x.reasons.push('Bodenkontakte über dem Blocklimit '+lim+' → 1 Satz weniger.'); } } }
 
-  // Zeitbudget (8)
-  const limitMin=Math.min(inp.avail||rules.max_session_min||65, rules.max_session_min||65);
-  const est=()=>Math.round((rules.warmup_min||7) + items.reduce((a,x)=>a+slotSec(x),0)/60);
-  if(est()>limitMin){
-    const steps=[];
-    for(let i=items.length-1;i>=0 && est()>limitMin;i--) if(items[i].role==='optional'){ dropped.push({slot:items[i].slot, why:'Zeitbudget'}); items.splice(i,1); steps.push('optionale Übung gestrichen'); }
-    if(est()>limitMin){ let any=false; items.forEach(x=>{ if(x.role==='assistance' && x.sets>1){ x.sets--; x.reasons.push('Zeitbudget → 1 Satz weniger.'); any=true; } }); if(any) steps.push('Ergänzung −1 Satz'); }
-    for(let i=items.length-1;i>=0 && est()>limitMin;i--) if(items[i].role==='assistance'){ dropped.push({slot:items[i].slot, why:'Zeitbudget'}); steps.push(items[i].ex.name_de+' gestrichen'); items.splice(i,1); }
-    const firstPower=items.findIndex(x=>x.role==='power');
-    if(est()>limitMin) items.forEach((x,i)=>{ if(x.role==='power' && x.sets>1 && est()>limitMin){ x.sets--; x.reasons.push('Zeitbudget → 1 Satz weniger.'); } });
-    notes.push('Zeit: '+limitMin+' min verfügbar → gekürzt ('+(steps.join(', ')||'Sätze reduziert')+'). Hauptübungen'+(firstPower>=0?' und der erste Power-Block':'')+' bleiben'+(est()>limitMin?', deshalb dauert die Einheit trotzdem ca. '+est()+' min':'')+'.');
-  }
+  // Zeitbudget (8): höchstens 70 min, effizient gekürzt (plFit)
+  const limitMin=sessionLimit(inp.avail);
+  const fit=plFit(items, limitMin, rules.warmup_min||7, dropped);
+  if(fit.steps.length) notes.push('Zeit: höchstens '+limitMin+' min → '+fit.steps.map(x=>/^weggelassen/.test(x)?(n=>n+(n===1?' Übung':' Übungen')+' weggelassen (siehe unten)')(x.split(',').length):x).join(', ')+'.'+(fit.over?' Die Grundübungen bleiben, deshalb ca. '+fit.min+' min.':''));
+  if(redist){ const ext=items.filter(x=>x.from); const src=[...new Set(ext.map(x=>x.from))];
+    notes[redist.at]='Diese Woche '+wp.count+' statt '+wp.full+' Einheiten: AOS verteilt den ganzen Wochenumfang neu auf die verbleibenden Einheiten, jede höchstens '+SESSION_MAX_MIN+' min.'+
+      (ext.length?' Hier dazu aus '+src.join(', ')+': '+ext.map(x=>x.ex.name_de).join(', ')+'.':''); }
+  items.forEach(x=>{ if(!x.pair) return; const y=items.find(z=>z!==x && z.pair===x.pair); if(!y) return; const first=items.indexOf(x)<items.indexOf(y);
+    x.reasons.unshift('Supersatz mit '+y.ex.name_de+': abwechselnd je 1 Satz, '+(first?'kurz wechseln, Pause erst nach '+y.ex.name_de+'.':'danach Pause.'));
+    if(first) x.rest=[20,30]; });
+  const est=()=>plEst(items, rules.warmup_min||7);
   // Validierung (9)
   const valid=[];
   if(lim && cSum()>lim) valid.push('Bodenkontakte '+cSum()+' über dem Limit '+lim+'.');
@@ -2148,7 +2224,7 @@ function plToSession(P){
     rpeTarget:x.rpe, rest:x.rest[0]===x.rest[1] ? x.rest[0]+' s' : x.rest[0]+'–'+x.rest[1]+' s',
     metric:metricOf(x.ex, Object.assign({doseTxt:x.reps}, x.slot)), positionTag:'allgemein', equipment:[], alternatives:x.alternatives.map(n=>({name:n, note:''})),
     notes:[x.note].concat(x.reasons).filter(Boolean).join(' '),
-    planner:{ dbId:x.dbId, slotId:x.slotId, method:x.method, role:x.role, fastCheck:x.method==='velocity', range:x.slot.range||null }
+    planner:{ dbId:x.dbId, slotId:x.slotId, method:x.method, role:x.role, fastCheck:x.method==='velocity', range:x.slot.range||null, pair:x.pair||null }
   }));
   return { id:uid('ses'), blockId:b.id, dayId:null, name:t.id+' – '+t.name, focus:t.goal||'', plannedDate:date, week:mondayOf(date),
     status:'geplant', location:'', plan, dayVersion:null, log:null, skipReason:'', moves:[], createdAt:new Date().toISOString(),
@@ -2170,7 +2246,7 @@ function plPreview(P){
   P.notes.forEach(n=>{ h+='<div class="note small">'+esc(n)+'</div>'; });
   P.items.forEach((x,i)=>{
     const load = x.loadKg!=null ? fmtNum(x.loadKg)+' kg'+(x.perHand?' je Hand':'')+(x.increased?' ↑':'') : (x.load.calibrate?'kalibrieren':(x.load.text||''));
-    h+='<div class="ex"><div class="ex-head"><span class="ex-name">'+(i+1)+'. '+esc(x.ex.name_de)+'</span>'+(x.from?badge('aus '+x.from,'warn')+' ':'')+badge(ROLE_LABEL[x.role]||x.role, x.role==='main'?'ok':(x.role==='power'?'info':''))+'</div>';
+    h+='<div class="ex"><div class="ex-head"><span class="ex-name">'+(i+1)+'. '+esc(x.ex.name_de)+'</span>'+(x.from?badge('aus '+x.from,'warn')+' ':'')+(x.pair?badge('Supersatz '+x.pair.slice(1))+' ':'')+badge(ROLE_LABEL[x.role]||x.role, x.role==='main'?'ok':(x.role==='power'?'info':''))+'</div>';
     h+='<div><strong>'+x.sets+' × '+esc(x.reps)+'</strong>'+(load?' · '+esc(load):'')+(x.rpe?' · RPE '+esc(x.rpe):'')+' · Pause '+(x.rest[0]===x.rest[1]?x.rest[0]:x.rest[0]+'–'+x.rest[1])+' s</div>';
     // Wichtiges direkt zeigen (Anleitung, Ersatz, Reduktion), Herkunft der Last nur auf Nachfrage
     const info=r=>/^(Letzte Einheit|Bestätigte Startlast|Startgewicht von AOS|Steigerung auf .* bestätigt)/.test(r);
@@ -2962,7 +3038,7 @@ function viewPlan(){
   const b=ui.planBlock && P.blocks.find(x=>x.id===ui.planBlock);
   if(!b) return h;
   h+='<h2 id="plan-block">'+esc(b.name)+'</h2><div class="section"><div class="small ph-meta" style="margin-bottom:10px"><span style="flex-basis:100%">'+fmtDate(b.start).slice(0,6)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+'</span><span>'+b.weeks+' Wochen</span><span>RPE ≤ '+fmtNum(plCap(b))+'</span>'+
-    '<span>'+((P.rules||{}).max_session_min||65)+' min/Einheit</span></div>'+
+    '<span>'+SESSION_MAX_MIN+' min/Einheit</span></div>'+
     '';
   // Wochenraster
   const days=['MON','TUE','WED','THU','FRI','SAT','SUN'], dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
@@ -2983,8 +3059,8 @@ function viewPlan(){
     if(wsub) h+='<tr class="wk-sub"><td></td><td colspan="7" class="muted">'+esc(wsub)+'</td></tr>';
   }
   h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ offen · ✗ verpasst<br>Tag antippen zum Ändern</p>';
-  if(plBlockAt(today)===b){ const wk=plWeek(b,today); const wp=plWeekPlan(b,wk); const m=Object.entries(wp.hosts).filter(([,l])=>l.some(x=>plMergeSlots(b,wk,plTemplate(b,x).slots).length));
-    h+='<p class="small"><strong>Diese Woche: '+wp.count+' Einheit'+(wp.count===1?'':'en')+'.</strong> '+(m.length?m.map(([hst,l])=>'Kernübungen aus '+l.join(', ')+' → '+hst).join(' · '):'Alle Einheiten wie geplant.')+'</p>'; }
+  if(plBlockAt(today)===b){ const wk=plWeek(b,today); const wp=plWeekPlan(b,wk);
+    h+='<p class="small"><strong>Diese Woche: '+wp.count+' Einheit'+(wp.count===1?'':'en')+'.</strong> '+(wp.redistributed?'Der Umfang von '+wp.missing.join(', ')+' ist auf '+wp.upcoming.map(u=>u.tpl+' ('+WD[weekdayOf(u.date)]+')').join(', ')+' verteilt, jede Einheit höchstens '+SESSION_MAX_MIN+' min.':'Alle Einheiten wie geplant.')+'</p>'; }
   h+='</div>';
   // Templates
   h+='<h2>Einheiten</h2>';
@@ -3353,7 +3429,7 @@ function plSection(){
   // Seltene Angaben eingeklappt
   const more = p.tpl || p.sleep!=null || p.avail!=null || p.noEquip.length || p.grip;
   h+='<details'+(more?' open':'')+'><summary class="small">Mehr Angaben</summary>';
-  h+='<div class="fields">'+inp('pl-avail','Zeit (min)',p.avail==null?'':p.avail,'inputmode="numeric" placeholder="'+((REF.plan.rules||{}).max_session_min||65)+'" data-chg="plIn"')+inp('pl-sleep','Schlaf (h)',p.sleep==null?'':fmtNum(p.sleep),'inputmode="decimal" data-chg="plIn"')+'</div>';
+  h+='<div class="fields">'+inp('pl-avail','Zeit (min)',p.avail==null?'':p.avail,'inputmode="numeric" placeholder="'+SESSION_MAX_MIN+'" data-chg="plIn"')+inp('pl-sleep','Schlaf (h)',p.sleep==null?'':fmtNum(p.sleep),'inputmode="decimal" data-chg="plIn"')+'</div>';
   if(t){
     if(t.slots.some(s=>s.grip && (s.dose||{})[due.week])) h+='<div>'+chipBtn('plChip','grip','1','Griff stark ermüdet',p.grip)+'</div>'; }
   h+='<div class="fields">'+inp('pl-date','Anderer Tag',p.date,'type="date" data-chg="plIn"')+(b?sel('pl-tpl','Andere Einheit',b.templates.map(x=>[x.id, x.id+' – '+x.name]), pin.tpl||'', 'data-chg="plIn"'):'')+'</div>';
