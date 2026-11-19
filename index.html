@@ -493,7 +493,8 @@ function migrate(d){
   d.suggestionDecisions = d.suggestionDecisions || {};
   // Einheiten: Zwischenstand (draft) einer laufenden Einheit und getrennt gespeicherte Aufwärmsätze (warmup) – beides optional
   (d.sessions||[]).forEach(s=>{ if(s.draft!=null && (typeof s.draft!=='object' || !Array.isArray(s.draft.exercises))) delete s.draft;
-    if(s.log && Array.isArray(s.log.exercises)) s.log.exercises.forEach(e=>{ if(e.warmup!=null && !Array.isArray(e.warmup)) delete e.warmup; }); });
+    if(s.log && Array.isArray(s.log.exercises)) s.log.exercises.forEach(e=>{ if(e.warmup!=null && !Array.isArray(e.warmup)) delete e.warmup;
+      (e.sets||[]).forEach(x=>{ if(x && x.rs!=null && !(typeof x.rs==='number' && x.rs>=0)) delete x.rs; }); }); });   // rs = gemessene Pause vor dem Satz (s)
   d.push = pushNormalize(d.push);   // Erinnerungen (Push): Einstellungen und Push-Abos der Geräte
   if(!d.pushAgenda || !Array.isArray(d.pushAgenda.days)) d.pushAgenda = { from:'', days:[] };   // vorberechnete Trainingstage für den Versand
   if(!d.nutrition || !Array.isArray(d.nutrition.items)) d.nutrition = defaultNutrition();
@@ -1047,17 +1048,25 @@ function startLog(id){
 const REST={ start:0, min:0, max:0, key:'', iv:null, beeped:0, ac:null, label:'Pause', next:'' };
 const WU_REST=[45,60];   // kurze Pause nach Aufwärmsätzen
 function restRange(pe){ const m=String((pe&&pe.rest)||'').match(/(\d+)(?:\s*[–-]\s*(\d+))?/); if(!m) return [90,90]; const a=+m[1], b=m[2]?+m[2]:a; return [a,b]; }
+/* Tatsächliche Pause messen: Zeit seit dem Eintrag des Vorsatzes derselben Übung minus geschätzte Satzdauer */
+const LASTSET={ k:'', at:0 };
+function restMeasure(ei, sj, pe){ const e=ui.draft.exercises[ei]; const x=e.sets[sj]; const pv=e.sets[sj-1];
+  if(x.wu || !pv || pv.wu || LASTSET.k!==ei+'-'+(sj-1) || x.rs!=null) return;
+  const role=(pe&&pe.planner&&pe.planner.role)||'assistance'; const work=(role==='power'?15:role==='main'?45:40)*(pe&&perSide(pe.reps)?2:1)+10;
+  const gap=(Date.now()-LASTSET.at)/1000; if(gap<20 || gap>900) return; x.rs=Math.max(0, Math.round(gap-work)); }
 function restMaybeStart(ei, sj, f, n){
   const s=sessionById(ui.sessionId); if(!s || s.log || typeof n!=='number' || Number.isNaN(n)) return;
   const e=ui.draft.exercises[ei]; const keys=(e.metric||'kraft')==='kraft' ? ['reps'] : ['reps',(METRIC_FIELDS[e.metric]||METRIC_FIELDS.kraft)[0][0]];
   if(!keys.includes(f)) return; const k=ei+'-'+sj; if(REST.key===k) return;
   const pe=(s.plan||[]).find(p=>p.id===e.planExId); const wu=!!e.sets[sj].wu;
+  restMeasure(ei, sj, pe); LASTSET.k=k; LASTSET.at=Date.now();
   const [a,b]=wu?WU_REST:restRange(pe);
   // Nächster Satz für die Mitteilung
   let next=''; const nj=sj+1;
   if(nj<e.sets.length) next=e.name+' · '+(e.sets[nj].wu?'Aufwärmsatz':'Satz '+(nj-e.sets.filter(x=>x.wu).length+1));
   else if(ui.draft.exercises[ei+1]) next=ui.draft.exercises[ei+1].name;
-  restStart(a,b,k,wu?'Aufwärmpause':'Pause',next);
+  let label=wu?'Aufwärmpause':'Pause'; if(!wu){ try{ const r=learn().rest[(pe&&pe.planner&&pe.planner.role)||'assistance']; if(r&&r.warn) label='Volle Pause'; }catch(err){} }
+  restStart(a,b,k,label,next);
 }
 function restStart(a,b,k,label,next){ Object.assign(REST,{ start:Date.now(), min:a, max:b, key:k||'', beeped:0, label:label||'Pause', next:next||'' });
   try{ if(!REST.ac){ const C=window.AudioContext||window.webkitAudioContext; if(C) REST.ac=new C(); } if(REST.ac && REST.ac.state==='suspended') REST.ac.resume(); }catch(e){}
@@ -1185,6 +1194,10 @@ function autoreg(s, e){
   const cap=(s.planner&&s.planner.cap!=null)?s.planner.cap:null; const tgt=pe.rpeTarget!=null?Number(String(pe.rpeTarget).replace(',','.')):null;
   let j=-1; e.sets.forEach((x,k)=>{ if(!x.wu && typeof x.kg==='number' && !isNaN(x.kg) && typeof x.rpe==='number' && !isNaN(x.rpe)) j=k; }); if(j<0) return null;
   const x=e.sets[j]; let p=0, why='';
+  // Zu kurze Pause vor dem Satz: erst volle Pause, gleiche Last (außer deutlich über der Obergrenze)
+  const [ra]=restRange(pe); const nW0=e.sets.filter(y=>y.wu).length;
+  if(x.rs!=null && x.rs<0.8*ra && !(cap!=null && x.rpe>cap+1) && ((cap!=null && x.rpe>cap) || (tgt!=null && !isNaN(tgt) && x.rpe>=tgt+1)))
+    return { from:j, kg:x.kg, text:'Satz '+(j-nW0+1)+': RPE '+fmtNum(x.rpe)+' nach nur '+fmtSec(x.rs)+' Pause (geplant ab '+fmtSec(ra)+'). Nimm die volle Pause und bleib bei '+fmtNum(x.kg)+' kg.' };
   if(cap!=null && x.rpe>cap){ p=0.05; why='über der Obergrenze RPE '+fmtNum(cap); }
   else if(tgt!=null && !isNaN(tgt) && x.rpe>=tgt+1){ p=0.025; why='deutlich über dem Ziel RPE '+fmtNum(tgt); }
   if(!p) return null;
@@ -1852,6 +1865,48 @@ function plWeekPlan(b, week){
   }
   return { count:done.length+upcoming.length, full, done, upcoming, missing, assign, redistributed };
 }
+/* ---------- AOS lernt mit (je Athlet aus seinen eigenen Protokollen) ----------
+   Dauer: Verhältnis tatsächliche Dauer / ungekorrigierte Schätzung der letzten vollständigen Einheiten (Median, ab 2 Einheiten, 0,6–1,4).
+   Pausen: tatsächliche Pause vor einem Satz (beim Erfassen gemessen) gegen die geplante Pause, zusammen mit dem RPE-Anstieg zum Vorsatz. */
+const LEARN={ key:'', v:null };
+function median(a){ if(!a.length) return null; const b=a.slice().sort((x,y)=>x-y), m=Math.floor(b.length/2); return b.length%2?b[m]:(b[m-1]+b[m])/2; }
+function learn(){
+  const L=loggedSessions(); const key=L.length+'|'+(L.length?L[L.length-1].log.loggedAt||'':'');
+  if(LEARN.key===key && LEARN.v) return LEARN.v;
+  // Dauer
+  const D=L.filter(s=>s.planner && s.status==='absolviert' && s.log.durationMin>0 && (s.planner.estRaw||s.planner.estMin)>0).slice(-8)
+    .map(s=>({ r:s.log.durationMin/(s.planner.estRaw||s.planner.estMin), est:s.planner.estRaw||s.planner.estMin, act:s.log.durationMin }));
+  const fr=D.length>=2 ? Math.min(1.4, Math.max(0.6, median(D.map(x=>x.r)))) : 1;
+  // Pausen: je Rolle (Haupt, Power, Ergänzung)
+  const R={};
+  L.slice(-10).forEach(s=>s.log.exercises.forEach(e=>{
+    const pe=(s.plan||[]).find(p=>p.id===e.planExId); const role=(pe&&pe.planner&&pe.planner.role)||'assistance'; const [a,b]=restRange(pe);
+    e.sets.forEach((x,j)=>{ if(x.rs==null || !(x.rs>0)) return; const r=R[role]=R[role]||{ rs:[], plan:[], short:[], ok:[], n:0 }; r.n++; r.rs.push(x.rs); r.plan.push((a+b)/2);
+      const pv=e.sets[j-1]; if(!pv || pv.rpe==null || x.rpe==null || pv.kg!==x.kg) return;
+      (x.rs<0.8*a ? r.short : r.ok).push(x.rpe-pv.rpe); }); }));
+  const rest={}; Object.entries(R).forEach(([role,r])=>{ const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+    const ratio=median(r.rs.map((v,i)=>v/r.plan[i])); const dS=avg(r.short), dO=avg(r.ok);
+    const warn = r.short.length>=4 && r.short.length/(r.short.length+r.ok.length)>=0.4 && dS>=0.5 && (r.ok.length<3 || dS-dO>=0.4);
+    rest[role]={ n:r.n, rs:Math.round(median(r.rs)), plan:Math.round(median(r.plan)), ratio, nShort:r.short.length, nOk:r.ok.length, dShort:dS, dOk:dO, warn }; });
+  // Ist der Athlet nur schneller, weil er zu kurz pausiert (und der RPE dadurch steigt), plant AOS damit nicht mehr Umfang ein
+  const anyWarn=Object.values(rest).some(r=>r.warn); const f2=anyWarn?Math.max(fr,0.9):fr;
+  LEARN.key=key; LEARN.v={ dur:{ factor:f2, raw:fr, capped:f2!==fr, n:D.length, last:D.slice(-3) }, rest };
+  return LEARN.v;
+}
+function plDurFactor(){ try{ return learn().dur.factor; }catch(e){ return 1; } }
+const ROLE_REST_LABEL={ main:'Hauptübungen', power:'Power-Übungen', assistance:'Ergänzungen', optional:'optionalen Übungen' };
+function fmtSec(t){ return Math.floor(t/60)+':'+String(Math.round(t%60)).padStart(2,'0'); }
+/* Hinweise, wenn zu kurze Pausen den RPE im Folgesatz hochtreiben */
+function restWarnings(){ let v; try{ v=learn(); }catch(e){ return []; }
+  return Object.entries(v.rest).filter(([,r])=>r.warn).map(([role,r])=>'Pausen bei '+(ROLE_REST_LABEL[role]||role)+' meist zu kurz (Ø '+fmtSec(r.rs)+' statt '+fmtSec(r.plan)+'): Der nächste Satz liegt dann im Schnitt '+fmtNum(Math.round(r.dShort*10)/10)+' RPE höher'+(r.nOk>=3?' als nach voller Pause (+'+fmtNum(Math.round(r.dOk*10)/10)+')':'')+'. Nimm dir die volle Pause.'); }
+function learnSection(){ const v=learn(); const d=v.dur; let b='';
+  b+='<p class="small"><strong>Dauer:</strong> '+(d.n>=2 ? 'Deine Einheiten dauern im Schnitt '+(Math.abs(d.raw-1)<0.03?'so lange wie geschätzt':Math.round(Math.abs(d.raw-1)*100)+' % '+(d.raw>1?'länger':'kürzer')+' als die Grundschätzung')+' (aus '+d.n+' Einheiten). AOS plant damit: '+(d.factor<1?'es passt mehr in 70 min.':d.factor>1?'pro Einheit weniger Umfang, damit es bei 70 min bleibt.':'unverändert.')+(d.capped?' Weil die Pausen zu kurz sind, rechnet AOS aber nur mit 10 % weniger Zeit.':'')
+    : 'Noch zu wenig vollständige Einheiten mit gemessener Dauer – ab 2 passt AOS die Schätzung an.')+'</p>';
+  const rs=Object.entries(v.rest).filter(([,r])=>r.n>=3);
+  b+='<p class="small"><strong>Pausen:</strong> '+(rs.length ? rs.map(([role,r])=>(ROLE_REST_LABEL[role]||role)+' Ø '+fmtSec(r.rs)+' (geplant '+fmtSec(r.plan)+')').join(' · ') : 'Werden ab jetzt beim Erfassen gemessen (Zeit zwischen zwei Sätzen derselben Übung).')+'</p>';
+  restWarnings().forEach(w=>{ b+='<div class="note small">'+esc(w)+'</div>'; });
+  return b; }
+
 /* ---------- Zeitbudget: max. 70 min pro Einheit ---------- */
 const SESSION_MAX_MIN=70;
 function sessionLimit(avail){ return Math.min(avail||SESSION_MAX_MIN, SESSION_MAX_MIN); }
@@ -1873,9 +1928,9 @@ function plPair(items){
 function slotRamp(x){ return (x.role==='main' && x.method!=='bodyweight_reps') ? 240 : (x.method==='velocity' ? 180 : 0); }
 function pairSec(a, b){ const w=x=>x.sets*(x.role==='power'?15:(x.role==='main'?45:40))*(perSide(x.reps)?2:1); const n=Math.max(a.sets,b.sets);
   const r=Math.max((a.rest[0]+a.rest[1])/2,(b.rest[0]+b.rest[1])/2); return w(a)+w(b)+n*20+Math.max(0,n-1)*r+180+slotRamp(a)+slotRamp(b); }
-function plEst(items, warm){ let sec=0; const seen=new Set();
+function plEst(items, warm, raw){ let sec=0; const seen=new Set();
   items.forEach(x=>{ if(x.pair){ if(seen.has(x.pair)) return; seen.add(x.pair); const y=items.find(z=>z!==x && z.pair===x.pair); sec+= y?pairSec(x,y):slotSec(x); } else sec+=slotSec(x); });
-  return Math.round((warm==null?7:warm) + sec/60); }
+  return Math.round(((warm==null?7:warm) + sec/60) * (raw?1:plDurFactor())); }   // an die tatsächliche Dauer des Athleten angepasst
 /* Wichtigkeit einer Übung für die Woche (1 = bleibt am längsten). Grundübungen vor Power, Power vor Ergänzungen. */
 function plTier(x, items){
   if(x.role==='main' && x.method==='wave') return 1;                                   // Kniebeuge, Bankdrücken, Kreuzheben
@@ -2212,7 +2267,9 @@ function plBuild(inp){
   const valid=[];
   if(lim && cSum()>lim) valid.push('Bodenkontakte '+cSum()+' über dem Limit '+lim+'.');
   items.forEach(x=>{ const m=String(x.rpe).match(/[\d,]+(?=\s*$)/); if(m && num(m[0])>cap) valid.push(x.ex.name_de+': Ziel-RPE über dem Cap.'); });
-  return { due, tpl:t, block:b, week, cap, items, dropped, notes, valid, contacts:cSum(), estMin:est(), limitMin, inp };
+  { const f=plDurFactor(); if(Math.abs(f-1)>=0.05) notes.push('Dauer an deine bisherigen Einheiten angepasst: du brauchst ca. '+Math.round(Math.abs(f-1)*100)+' % '+(f>1?'länger':'weniger Zeit')+' als die Grundschätzung.'); }
+  restWarnings().forEach(w=>notes.push(w));
+  return { due, tpl:t, block:b, week, cap, items, dropped, notes, valid, contacts:cSum(), estMin:est(), estRaw:plEst(items, rules.warmup_min||7, true), limitMin, inp };
 }
 
 /* Plan → Einheit im App-Format (Snapshot inkl. Eingaben und Begründungen, Spezifikation 10) */
@@ -2230,7 +2287,7 @@ function plToSession(P){
     status:'geplant', location:'', plan, dayVersion:null, log:null, skipReason:'', moves:[], createdAt:new Date().toISOString(),
     planner:{ planVersion:REF.plan.version, blockId:b.id, phase:P.due.phase?P.due.phase.id:null, week:P.week, wave:P.due.wave, templateId:t.id, cap:P.cap,
       checkin:{ readiness:P.inp.readiness, sleep:P.inp.sleep, pain:P.inp.pain, regions:P.inp.regions, avail:P.inp.avail, grip:!!P.inp.grip, noEquip:P.inp.noEquip, loc:P.inp.loc||null, locName:(P.inp.loc&&locById(P.inp.loc)||{}).name||null },
-      notes:P.notes, merged:P.items.filter(x=>x.from).map(x=>x.slotId), dropped:P.dropped.map(d=>({ slot:d.slot.id, why:d.why })), contacts:P.contacts, estMin:P.estMin, generatedAt:new Date().toISOString() } };
+      notes:P.notes, merged:P.items.filter(x=>x.from).map(x=>x.slotId), dropped:P.dropped.map(d=>({ slot:d.slot.id, why:d.why })), contacts:P.contacts, estMin:P.estMin, estRaw:P.estRaw, generatedAt:new Date().toISOString() } };
 }
 
 /* ---------- Sessionplaner: Oberfläche ---------- */
@@ -3036,7 +3093,7 @@ function viewPlan(){
       '<div class="small muted ph-meta"><span>'+fmtDate(ph.start).slice(0,6)+' – '+fmtDate(ph.end).slice(0,6)+'</span><span>'+w+' Wochen</span>'+(cap!=null?'<span>RPE ≤ '+fmtNum(cap)+'</span>':'')+'</div></div>'; }).join('')+'</div><p class="small muted">Tipp auf eine Phase zum Öffnen oder Schließen.</p>';
   // Aktueller (oder nächster) Block
   const b=ui.planBlock && P.blocks.find(x=>x.id===ui.planBlock);
-  if(!b) return h;
+  if(!b) return h+'<h2>AOS lernt mit</h2><div class="section">'+learnSection()+'</div>';
   h+='<h2 id="plan-block">'+esc(b.name)+'</h2><div class="section"><div class="small ph-meta" style="margin-bottom:10px"><span style="flex-basis:100%">'+fmtDate(b.start).slice(0,6)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+'</span><span>'+b.weeks+' Wochen</span><span>RPE ≤ '+fmtNum(plCap(b))+'</span>'+
     '<span>'+SESSION_MAX_MIN+' min/Einheit</span></div>'+
     '';
@@ -3074,7 +3131,8 @@ function viewPlan(){
         '<td>'+esc(plCurrentLoad(s, s.candidates[0], b))+'</td></tr>'; });
     h+=pdet('tpl-'+t.id, t.id+' – '+t.name, (t.group==='lower'?'Unterkörper':'Oberkörper')+' · ca. '+t.time_min+' min', tb+'</tbody></table></div>');
   });
-  h+='<p class="small muted">Kern: wird bei Ausfall verschoben</p>';
+  h+='<p class="small muted">Kern: hat Vorrang, wenn Einheiten ausfallen</p>';
+  h+='<h2>AOS lernt mit</h2><div class="section">'+learnSection()+'</div>';
   return h;
 }
 
@@ -3121,7 +3179,7 @@ function ovToday(today){
   else if(due.plannedToday && !due.plannedToday.planner){ state='open'; title=due.plannedToday.name; sub='offen · bereit zum Erfassen';
     btn=phBtn((ui.sessionId===due.plannedToday.id&&isLive())||due.plannedToday.draft?'Einheit fortsetzen':'Einheit erfassen','data-act="startLog" data-id="'+due.plannedToday.id+'"'); }
   else if(due.block && due.tpl && !due.offday){ const t=plTemplate(due.block, due.tpl); state='open'; title=t.id+' – '+t.name;
-    sub='ca. '+t.time_min+' min';
+    sub='ca. '+Math.min(SESSION_MAX_MIN, Math.round(t.time_min*plDurFactor()))+' min';
     btn=phBtn('Einheit starten','data-act="go" data-view="training"'); }
   else if(isFieldDay(today)){ title='Kein Gym – '+((fieldCfg()||{}).name||'Feldtraining'); sub=((fieldCfg()||{}).time||'')+' · siehe unten'; }
   else { const n=plNextTraining(addDays(today,1)); sub=n?'Nächste Einheit: '+n.tpl+' · '+WD[weekdayOf(n.date)]+' '+fmtDate(n.date).slice(0,6):'Erholung'; }
@@ -3132,6 +3190,7 @@ function ovToday(today){
     h+='<div class="tc-row tc-weight"><span class="tc-k">'+esc(fc.time||'Feld')+'</span><span>'+esc(fc.name||'Football-Training')+'<br><span class="small muted">'+(fl?esc(fieldSummary(fl)):'ca. '+(fc.duration_min||90)+' min')+'</span></span><button class="small'+(fl?' link':'')+'" data-act="fieldLog" data-d="'+today+'">'+(fl?'ändern':'Erfassen')+'</button></div>'; }
   const hints=[];
   if(T && T.entry) hints.push('Einstiegsphase: KH −'+NUT().entry.carb_minus_g+' g bis '+fmtDate(NUT().entry.until).slice(0,6));
+  if(state==='open') restWarnings().forEach(w=>hints.push(w));
   if(hints.length) h+='<div class="tc-hints">'+hints.map(x=>'<div>› '+esc(x)+'</div>').join('')+'</div>';
   let kc=''; if(T){ const di=nutDayItems(today,T); const k=di.length?Math.round(sumMac(di).kcal):null;
     kc='<div class="tc-kcal"><span class="tc-k">Kalorien</span><span>'+(k!=null?'<b>'+fmtK(k)+'</b> / '+fmtK(T.kcal):'<b>'+fmtK(T.kcal)+'</b>')+' kcal</span></div>'; }
