@@ -84,7 +84,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | # | Idee | Nutzen | Prio | Aufwand |
 |---|---|---|---|---|
 | W1 | **CSS zusammenführen**: Die Gestaltung besteht aus mehreren übereinanderliegenden Schichten (Grundlayout, Design, Variante B, Red Tigers, Chrome Glass) mit vielen Überschreibungen und `!important`. Eine Schicht mit klaren Variablen | Änderungen am Design werden einfacher und sicherer | ✅ erledigt (15.11.: 44 Regeln und 236 Deklarationen entfernt, die überall überschrieben wurden; jede Ansicht und jeder Dialog in iPhone- und Laptop-Breite pixelgleich geprüft) | M |
-| W5 | **Design monochrom (Anthrazit, metallisch)** nach unslop: keine Glas-Effekte, Leuchten, Verläufe zwischen Farben, Großbuchstaben-Labels oder Kapitelnummern; einziger Farbfleck ist das blinkende T, Tigerlogo monochrom; Systemschrift, Ziffern in Mono | Ruhiger, eigenständiger Look | ✅ erledigt 19.11.2026 | M |
+| W9 | **Design monochrom (Anthrazit, metallisch)** nach unslop: keine Glas-Effekte, Leuchten, Verläufe zwischen Farben, Großbuchstaben-Labels oder Kapitelnummern; einziger Farbfleck ist das blinkende T, Tigerlogo monochrom; Systemschrift, Ziffern in Mono | Ruhiger, eigenständiger Look | ✅ erledigt 19.11.2026 | M |
 | W2 | **Automatischer Klicktest** (Playwright) als GitHub Action: alle Ansichten in iPhone- und Laptop-Breite öffnen, jeden Button einmal antippen, Fehler melden – mit neutralen Testdaten | Fehler vor dem Ausrollen finden | ✅ erledigt | M |
 | W3 | **Altfelder im Datenmodell prüfen** (z. B. `blocks`, `unavailable`, `suggestionDecisions` aus der alten Planverwaltung): was wird noch gebraucht, was kann per `migrate()` entfernt werden | Kleinere Datei, weniger Verwirrung | ✅ erledigt | M |
 | W4 | **`index.html` aufteilen** (z. B. `css/`, `js/kern.js`, `js/training.js` …), weiterhin ohne Build-Schritt | Übersichtlicher bei weiterem Wachstum | ⏸ zurückgestellt: kein sichtbarer Nutzen, erhöht das Risiko beim Zwischenspeichern; sinnvoll erst bei deutlich mehr Code | M |
@@ -92,3 +92,9 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | W6 | **Token-Ablauf**: rechtzeitig vor Ablauf des GitHub-Tokens warnen | Kein plötzlicher Ausfall der Speicherung | ✅ erledigt | S |
 | W7 | **Barrierefreiheit** prüfen (Kontraste der grauen Texte, Fokus-Rahmen, Beschriftungen der Icon-Buttons) | Bessere Lesbarkeit im Gym-Licht | ✅ erledigt | S |
 | W8 | **Klicktest prüft den Abgleich** mit einem nachgebauten Datenrepo: lokale Eingabe übersteht einen älteren Stand mit Altfeldern, neuere Änderung eines anderen Geräts kommt an. Dabei behoben: neue Installation hatte keine Standard-Trainingsorte | Fehler wie der Ausstattungs-Verlust fallen vor dem Hochladen auf | ✅ erledigt | S |
+
+## 6. Später (ganz hinten)
+
+| Nr. | Was | Nutzen | Status | Aufwand |
+|---|---|---|---|---|
+| Z1 | **Chat in der App**: Athlet beschreibt Änderungen in normaler Sprache („Donnerstag geht nicht“, „Schulter zwickt“, „heute nur 45 min“). Ein Sprachmodell übersetzt das nur in die vorhandenen Engine-Aktionen, die Engine plant weiter regelbasiert, Änderung wird angezeigt und bestätigt. Braucht Server (Schlüssel nicht in der öffentlichen App) und verursacht laufende API-Kosten; frühestens nach dem Mehrbenutzerbetrieb | Planung anpassen ohne Menüs | ⏸ zurückgestellt (20.11.2026) – derzeit nicht gewünscht | L |
