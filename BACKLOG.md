@@ -44,6 +44,8 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | T16 | **Pausen-Alarm**: Ton, Blinken und Mitteilung, wenn die Pause vorbei ist; Bildschirm bleibt während der Einheit an | Alarm kommt auch, wenn das Handy weggelegt ist | ✅ erledigt 19.11.2026 | S |
 | T17 | **Wochenumfang neu verteilen**: Fallen Einheiten weg (Tag frei, nicht verfügbar), plant AOS die verbleibenden Einheiten komplett neu – Übungen bleiben möglichst in ihrer Einheit, der Rest geht nach Priorität dorthin, wo Zeit ist. Jede Einheit höchstens 70 min: zuerst Supersätze und weniger Sätze bei Ergänzungen/Power, dann Unwichtiges weg, Grundübungen bleiben; Restzeit wird wieder aufgefüllt | Weniger Einheiten werden nicht länger, sondern decken den Wochenumfang effizient ab | ✅ erledigt 19.11.2026 | M |
 | T18 | **AOS lernt mit (je Athlet)**: Dauer – Verhältnis tatsächliche/geschätzte Dauer der letzten vollständigen Einheiten passt die Planung an (mehr oder weniger Umfang in 70 min). Pausen – werden beim Erfassen gemessen; sind sie oft zu kurz und steigt dadurch der RPE im Folgesatz, gibt es einen Hinweis (Heute, Planvorschau, Pausentimer „Volle Pause“); Lernwerte selbst nur in der Engine, nicht in der Oberfläche, und die Autoregulation rät zu voller Pause statt Lastabzug. Schneller nur wegen zu kurzer Pausen zählt höchstens 10 % | Planung passt zum echten Trainingsverhalten | ✅ erledigt 19.11.2026 | M |
+| T19 | **Gesamtbelastung Gym + Feld (Session-RPE)**: nach jeder Einheit (Gym, Feldtraining, Spiel) eine Frage „Wie hart war's?“ (0–10); Last = Session-RPE × Dauer. AOS vergleicht die Last dieser Woche mit dem Schnitt der letzten 4 Wochen und entlastet automatisch, wenn sie zu schnell steigt (Hinweis mit Begründung) | Schutz vor Überlastung, wenn ab Jänner Feldtraining dazukommt | offen | M |
+| T20 | **Spielwoche steuern**: Gym-Belastung nach Abstand zum Spiel (schwer früh in der Woche, am Vortag nur Aktivierung, nach dem Spiel Regeneration); kurze Abfrage nach dem Spiel (Snaps, Kontakte, Beschwerden) fließt in die Planung der Folgetage | Frisch am Spieltag, schnelle Erholung danach | offen | M |
 
 ## 2. Verlauf und Auswertung
 
@@ -78,6 +80,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | U5 | **Laptop-Layout** mit zwei Spalten ab großer Breite (z. B. Ernährung: Mahlzeiten links, Abdeckung rechts) | Platz am Laptop nutzen | ✅ erledigt | M |
 | U6 | **Sync-Status** verständlicher: Punkt im Kopf antippbar mit „zuletzt gespeichert um …“ | Vertrauen in die Speicherung | ✅ erledigt | S |
 | U7 | **Push-Erinnerungen** (Einheit des Tages, Readiness-Check, Protokoll offen) mit eigener Uhrzeit pro Erinnerung; Versand per GitHub Action im Datenrepo | Training nicht vergessen, ohne andere App | ✅ erledigt (16.11.) | M |
+| U8 | **Wochenrückblick per Push (Sonntag)**: Einheiten erledigt/geplant, Bestleistungen, Gewichtstrend, Ernährung (Ziel getroffen), Ausblick auf die nächste Woche | Überblick ohne die App zu durchsuchen, Motivation | offen | S |
 
 ## 5. Technik und Wartung
 
