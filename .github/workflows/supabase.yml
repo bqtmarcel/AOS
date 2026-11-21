@@ -1,0 +1,35 @@
+name: Datenbank
+
+# Legt die Datenbankstruktur in Supabase an bzw. aktualisiert sie (supabase/migrations)
+# und prüft danach die Zugriffsregeln (supabase/tests). Zugangsdaten nur aus den GitHub-Secrets.
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/**', '.github/workflows/supabase.yml']
+  workflow_dispatch:
+
+concurrency: { group: supabase, cancel-in-progress: false }
+
+jobs:
+  db:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secrets vorhanden?
+        run: |
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF; do
+            if [ -z "${!v}" ]; then echo "::error::GitHub-Secret $v fehlt"; exit 1; fi
+          done
+          if [ "$SUPABASE_PROJECT_REF" != "sraocwhvkisomjjoqznr" ]; then echo "::error::SUPABASE_PROJECT_REF passt nicht zur Projekt-URL"; exit 1; fi
+      - uses: supabase/setup-cli@v1
+        with: { version: latest }
+      - name: Mit dem Projekt verbinden
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" -p "$SUPABASE_DB_PASSWORD"
+      - name: Datenbankstruktur aktualisieren
+        run: supabase db push --linked -p "$SUPABASE_DB_PASSWORD"
+      - name: Zugriffsregeln prüfen
+        run: supabase test db --linked

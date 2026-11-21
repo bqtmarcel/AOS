@@ -1,0 +1,2 @@
+# Supabase-CLI: nur für "supabase link", "db push" und "test db" aus der GitHub Action.
+project_id = "aos"
