@@ -59,17 +59,37 @@ FLOW = """(async()=>{
     if(mix!=='RB70,DL30') return 'Positionsgruppen falsch gemischt ('+mix+')';
     if(sc!=='{"TUE":"D1","THU":"D2"}') return 'Trainingstage: Wochenplan falsch ('+sc+')';
     if(legacy!=='{"MON":"D1","WED":"D2","THU":"D3","FRI":"D4"}') return 'Bestehende Profile ohne Trainingstage bekommen einen anderen Wochenplan ('+legacy+')'; }
+  // T19/T20/U8: Gesamtbelastung, Spielwoche, Wochenrückblick
+  { const kf=clone(S.fieldLogs||[]), kc=clone(S.calendar||[]); const t=todayISO();
+    let d=null; for(let i=0;i<21 && !d;i++){ const x=addDays(t,i); const due=plDue(x); if(due.tpl==='A' && !due.offday) d=x; }
+    if(!d) return 'Testdatum für Spielwoche fehlt';
+    // Belastung: 3 ruhige Wochen, dann eine harte → nächste Einheit wird entlastet
+    S.fieldLogs=[]; for(let w=1; w<=4; w++) for(const k of [1,3,5]) S.fieldLogs.push({ id:'l'+w+k, date:addDays(d,-(w*7)+k), status:'absolviert', rpe:w===1?9:5, durationMin:w===1?120:60, contact:'leicht' });
+    const LR=loadRatio(d); if(!LR || !(LR.ratio>1.3)) return 'Gesamtbelastung: Anstieg nicht erkannt ('+JSON.stringify(LR)+')';
+    let P=plBuild({ date:d, tpl:'A', readiness:4 }); if(!P.notes.some(n=>/Belastung der letzten 7 Tage/.test(n))) return 'Gesamtbelastung: keine Entlastung in der Einheit';
+    S.fieldLogs=[];
+    // Vortag Spiel: nur Aktivierung (Power), keine Hauptübung
+    S.calendar=(S.calendar||[]).concat([{ id:'g1', kind:'game', date:addDays(d,1), title:'Test' }]);
+    P=plBuild({ date:d, tpl:'A', readiness:4 }); if(P.items.some(x=>x.role==='main') || !P.notes.some(n=>/Morgen Spiel/.test(n))) return 'Spielwoche: Vortag nicht nur Aktivierung';
+    // Tag nach dem Spiel mit Beschwerden: Regeneration, Beschwerden wirken wie Check-in
+    S.calendar=kc.concat([{ id:'g2', kind:'game', date:addDays(d,-1), title:'Test' }]);
+    S.fieldLogs=[{ id:'gl', kind:'game', date:addDays(d,-1), status:'absolviert', rpe:9, snaps:60, contact:'hoch', pain:5, regions:['knee'], durationMin:150 }];
+    P=plBuild({ date:d, tpl:'A', readiness:4 }); if(P.items.some(x=>x.role==='main'||x.role==='power') || !P.notes.some(n=>/Beschwerden aus dem Spiel/.test(n))) return 'Spielwoche: Tag danach nicht als Regeneration geplant';
+    if(fieldLog(addDays(d,-1))) return 'Spiel-Eintrag wird als Feldtraining gelesen';
+    S.fieldLogs=kf; S.calendar=kc;
+    const R=weekReview(mondayOf(t)); if(!R || R.week!==mondayOf(t) || typeof R.planned!=='number' || !('next' in R)) return 'Wochenrückblick fehlt';
+    if(!(S.push.on.weekly===true && S.push.hours.weekly===19)) return 'Wochenrückblick: Standard-Einstellung fehlt'; }
   // M3: Gruppenregeln (ohne Übungsdatenbank prüfbar; die Testprofile mit echter Datenbank laufen im Datenrepo)
   { const kp=clone(S.profile); const setP=(...a)=>{ S.profile.positions=a.map(([c,w],i)=>({id:'q'+i,code:c,name:c,weight:w})); };
-    S.profile.experience='fortgeschritten'; S.profile.cleanSafe=true;
+    S.profile.experience='fortgeschritten'; S.profile.cleanSafe=true; S.profile.injuries=[]; S.profile.mobility={}; S.profile.birthYear=null; S.profile.extLoad=false; S.profile.weightGoal='halten'; S.profile.heightCm=null; const kbw=clone(S.bodyweight); S.bodyweight=[];
     setP(['QB',100]); let C=tpContext(); const qb=C.excl.has('bb_push_press') && C.excl.has('dips') && C.req.band_external_rotation===3;
-    setP(['RB',70],['DE',30]); C=tpContext(); const rb=C.req.nordic_hamstring===2 && C.req.neck_plate_isometric===1 && C.req.carry_contact===1 && C.req.copenhagen_plank===1 && C.kf===1 && C.label==='RB 70 % / DL 30 %';
+    setP(['RB',70],['DE',30]); C=tpContext(); const rb=C.req.nordic_hamstring===2 && C.req.neck_plate_isometric===1 && C.req.carry_contact===1 && C.req.copenhagen_plank===1 && C.kf===1 && C.label==='RB 70 % / DL 30 %'; const rbInfo=JSON.stringify({req:C.req,kf:C.kf,label:C.label,age:C.age,by:S.profile.birthYear,bw:bwNow()});
     setP(['WR',100]); C=tpContext(); const wr=C.setsDelta('main_squat','P3')===-1 && C.setsDelta('main_push','P3')===0;
     setP(['T',60],['WR',40]); C=tpContext(); const mix=C.setsDelta('main_squat','P3')===0 && C.setsDelta('main_squat','P2')===1;
     S.profile.experience='einsteiger'; S.profile.cleanSafe=false; setP(['DT',100]); C=tpContext(); const ein=C.excl.has('power_clean') && C.excl.has('hang_power_clean') && C.excl.has('depth_jump') && Math.abs(C.kf-0.5)<1e-9;
     S.profile.planEngine='klassisch'; const off=!apUseGroups({start:'2030-01-01'}); S.profile.planEngine='gruppen'; S.profile.planEngineSince='2030-01-01'; const since=!apUseGroups({start:'2029-12-01'}) && apUseGroups({start:'2030-01-06'});
-    S.profile=kp;
-    if(!qb) return 'Gruppenregeln QB falsch (Ausschlüsse/Pflicht)'; if(!rb) return 'Gruppenregeln RB 70 / DE 30 falsch';
+    S.profile=kp; S.bodyweight=kbw;
+    if(!qb) return 'Gruppenregeln QB falsch (Ausschlüsse/Pflicht)'; if(!rb) return 'Gruppenregeln RB 70 / DE 30 falsch '+rbInfo;
     if(!wr) return 'WR: Sätze-Delta der Hauptübungen falsch'; if(!mix) return 'Mischung Sätze-Delta (OL 60 / WR 40) falsch';
     if(!ein) return 'Einsteiger/Umsetzen/DT: Ausschlüsse oder Kontaktfaktor falsch'; if(!off||!since) return 'Umstellung auf Positionsgruppen greift nicht wie vorgesehen'; }
   // Zeitbudget: zu volle Einheit wird auf höchstens 70 min gebracht, Grundübungen bleiben

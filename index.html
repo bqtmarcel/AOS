@@ -1177,6 +1177,7 @@ function logForm(){
   });
   h+='<button data-act="addLogEx">+ Übung hinzufügen</button>';
   h+='<h2>Einheit</h2><div class="fields">'+sel('lg-form','Tagesform',[['','— nicht angegeben —']].concat([1,2,3,4,5].map(n=>[n,FORM_LABEL[n]])),dr.form,'data-log="meta" data-f="form"')+
+    (s.log?sel('lg-srpe','Wie hart war’s? (1–10)',[['','—']].concat([1,2,3,4,5,6,7,8,9,10].map(n=>[n,n])),dr.srpe,'data-log="meta" data-f="srpe"'):'')+
     (live && dr.startedAt ? '' : inp('lg-dur','Dauer (min, optional)',dr.durationMin,'inputmode="numeric" data-log="meta" data-f="durationMin"'))+'</div>';
   h+=ta('lg-pain','Schmerzen oder Beschwerden (optional)',dr.pain,'data-log="meta" data-f="pain" placeholder="z. B. Ort, Art, wann aufgetreten"');
   h+='<p class="small muted">Nur zur Dokumentation – keine Diagnose. Anhaltende Beschwerden bitte abklären lassen.</p>';
@@ -1222,7 +1223,7 @@ function updateDraftFromInput(t){
   else if(k==='exnote') dr.exercises[+t.dataset.e].note=t.value;
   else if(k==='fast') dr.exercises[+t.dataset.e].fast = t.value==='' ? null : t.value==='ja';
   else if(k==='meta'){ const f=t.dataset.f;
-    if(f==='form') dr.form=t.value===''?null:Number(t.value);
+    if(f==='form'||f==='srpe') dr[f]=t.value===''?null:Number(t.value);
     else if(f==='durationMin') dr.durationMin=t.value.trim()===''?null:(/^\d+$/.test(t.value.trim())?parseInt(t.value,10):NaN);
     else dr[f]=t.value; }
   liveSave();
@@ -1315,7 +1316,7 @@ function viewTests(){
   // Körpergewicht
   const bws=S.bodyweight.slice().sort((a,b)=>(a.date||'')<(b.date||'')?-1:1);
   const goalW=S.profile.targetWeightKg;
-  const fls=(S.fieldLogs||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
+  const fls=(S.fieldLogs||[]).filter(l=>l.kind!=='game').slice().sort((a,b)=>a.date<b.date?1:-1);
   if(fls.length) h+=pdet('v-field','Feldtraining',fls.length===1?'1 Einheit':fls.length+' Einheiten','<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Anstrengung</th><th>Kontakt</th><th>Belastung</th></tr></thead><tbody>'+
     fls.slice(0,12).map(l=>'<tr><td><button class="link" data-act="fieldLog" data-d="'+l.date+'">'+fmtDateShort(l.date)+'</button></td><td>'+(l.status==='ausgefallen'?'fand nicht statt':l.rpe+'/10')+'</td><td>'+esc(l.contact||'—')+'</td><td>'+(l.rpe&&l.durationMin?(l.rpe*l.durationMin)+' AU':'—')+'</td></tr>').join('')+
     '</tbody></table></div><p class="small muted">Belastung = Anstrengung × Minuten (Session-RPE). Hilft, harte Wochen zu erkennen.</p>');
@@ -1372,8 +1373,7 @@ ACT.testsFromTrainingOk = ()=>{ const L=fromTrainingCandidates(); let n=0;
 function weeklyLoad(weeks){
   const mon=mondayOf(todayISO()); const W=[]; for(let i=weeks-1;i>=0;i--) W.push({mon:addDays(mon,-7*i), gym:0, field:0, miss:0});
   const at=d=>W.find(w=>d>=w.mon && d<=addDays(w.mon,6));
-  loggedSessions().forEach(s=>{ const w=at(sessionDate(s)); if(!w) return; const rp=[]; s.log.exercises.forEach(e=>e.sets.forEach(x=>{ if(x.rpe!=null) rp.push(x.rpe); }));
-    if(s.log.durationMin && rp.length) w.gym+=Math.round(s.log.durationMin*rp.reduce((a,b)=>a+b,0)/rp.length); else w.miss++; });
+  loggedSessions().forEach(s=>{ const w=at(sessionDate(s)); if(!w) return; const v=sessLoad(s); if(v) w.gym+=v; else w.miss++; });
   (S.fieldLogs||[]).forEach(l=>{ const w=at(l.date); if(!w||l.status==='ausgefallen') return; if(l.rpe&&l.durationMin) w.field+=l.rpe*l.durationMin; else w.miss++; });
   return W;
 }
@@ -1396,10 +1396,11 @@ function loadSection(){
     if(w.field) svg+='<rect class="bar-field" x="'+x+'" y="'+(y0-g-f)+'" width="'+wd+'" height="'+f+'"><title>Feld '+w.field+' AU</title></rect>';
     svg+='<text x="'+(x+wd/2)+'" y="'+(H-8)+'" text-anchor="middle">'+fmtDate(w.mon).slice(0,6)+'</text>'; });
   svg+='</svg>';
-  let b=svg+'<p class="small"><span class="lg lg-gym"></span> Gym <span class="lg lg-field"></span> Feld · diese Woche <strong>'+tot(cur)+' AU</strong>'+(avg?' · Schnitt der 3 Wochen davor '+Math.round(avg)+' AU':'')+'</p>';
+  let b=svg+'<p class="small"><span class="lg lg-gym"></span> Gym <span class="lg lg-field"></span> Feld und Spiele · diese Woche <strong>'+tot(cur)+' AU</strong>'+(avg?' · Schnitt der 3 Wochen davor '+Math.round(avg)+' AU':'')+'</p>';
   if(ratio!=null && ratio>1.3) b+='<div class="note warn small">Diese Woche liegt die Belastung <strong>'+Math.round((ratio-1)*100)+' %</strong> über dem Schnitt der Vorwochen. Starke Sprünge erhöhen das Verletzungsrisiko – Schlaf, Essen und Erholung im Blick behalten.</div>';
   const miss=W.reduce((a,w)=>a+w.miss,0); if(miss) b+='<p class="small muted">'+miss+' Einheit'+(miss===1?'':'en')+' ohne Dauer oder RPE nicht enthalten.</p>';
-  b+='<p class="small muted">Belastung = Anstrengung (RPE) × Minuten. Gym: Ø RPE der Sätze × Dauer.</p>';
+  const LR=loadRatio(addDays(todayISO(),1)); if(LR) b+='<p class="small">Letzte 7 Tage '+Math.round(LR.acute)+' AU = '+Math.round(LR.ratio*100)+' % des Wochenschnitts der letzten 4 Wochen ('+LR.chronic+' AU).'+(LR.ratio>LOAD_UP?' AOS entlastet die nächste Einheit automatisch.':'')+'</p>';
+  b+='<p class="small muted">Belastung = Anstrengung (1–10) × Minuten. Gym: deine Angabe „Wie hart war’s?“ nach der Einheit, sonst Ø RPE der Sätze.</p>';
   return pdet('v-load','Wochenbelastung','diese Woche '+tot(cur)+' AU'+(ratio!=null&&ratio>1.3?' · stark gestiegen':''), b);
 }
 function testCard(name){
@@ -1636,7 +1637,7 @@ CHG.apPos = ()=>{ const m=val('ap-main'), s=val('ap-sec'); const old=S.profile.p
   save(); render(); };
 ACT.apShare = el=>{ const P=S.profile.positions||[]; if(P.length<2) return; const v=+el.dataset.v; const mi=P[0].weight>=P[1].weight?0:1; P[mi].weight=100-v; P[1-mi].weight=v; save(); render(); };
 /* Profil: Rahmen und Belastbarkeit (Trainingspfade, Modifikatoren) */
-function loadSection(){ const p=S.profile; const inj=p.injuries||[]; const mob=p.mobility||{}; const sm=sessionMax();
+function frameSection(){ const p=S.profile; const inj=p.injuries||[]; const mob=p.mobility||{}; const sm=sessionMax();
   const chips=(act,list,on)=>'<div>'+list.map(([v,n])=>'<button class="chip" data-act="'+act+'" data-v="'+v+'" aria-pressed="'+on(v)+'">'+n+'</button>').join('')+'</div>';
   const yn=k=>chips('apMob',[[k+':1','ok'],[k+':0','eingeschränkt']],v=>(mob[k]!==false)===(v.slice(-1)==='1'));
   let b='<label>Zeit pro Einheit (inkl. Aufwärmen)</label>'+chips('apTime',[45,60,70,75,90].map(m=>[m,m+' min']),v=>+v===sm)+
@@ -2454,7 +2455,14 @@ function plBuild(inp){
       : (nx ? '„'+nx.name+'“ startet am '+WD_LONG[weekdayOf(nx.start)]+', '+fmtDate(nx.start)+(nf?'. Erste Einheit: '+nf.tpl+' am '+WD_LONG[weekdayOf(nf.date)]+', '+fmtDate(nf.date)+' – stell oben das Datum um, um sie vorab anzusehen.':'.') : 'Für dieses Datum gibt es keinen Block im Plan.')) : 'In dieser Woche ist keine Einheit mehr offen.' };
   const t=plTemplate(b, inp.tpl); const week=due.week; const cap=plCap(b);
   const rules=REF.plan.rules||{}; const thr=rules.pain_threshold||3;
-  const pain=inp.pain||0, regions=inp.regions||[], rd=inp.readiness;
+  let pain=inp.pain||0, regions=(inp.regions||[]).slice(); const rd=inp.readiness;
+  // Spielwoche (T20): Abstand zum Spiel, Beschwerden aus dem Spiel wirken wie ein Check-in (bis 3 Tage danach)
+  const GN=gameNear(inp.date); const gl=GN.prev?gameLog(GN.prev):null; const gameAfter=GN.after; const gameHardY=gameHard(gl) && gameAfter!=null && gameAfter<=2;
+  const gamePain = gl && gl.status==='absolviert' && (gl.pain||0)>=thr && gameAfter!=null && gameAfter<=3;
+  if(gamePain){ pain=Math.max(pain, gl.pain); (gl.regions||[]).forEach(r=>{ if(!regions.includes(r)) regions.push(r); }); }
+  const gameDay=GN.md===0, gameEve=GN.md===1, gameNext=gameAfter===1 && !gameDay;
+  // Gesamtbelastung (T19): letzte 7 Tage gegen den Wochenschnitt der letzten 4 Wochen
+  const LR=loadRatio(inp.date); const lrUp=!!(LR && LR.ratio>LOAD_UP), lrUp2=!!(LR && LR.ratio>LOAD_UP2);
   const painOn = pain>=thr;
   const legPain = painOn && regions.some(r=>(rules.leg_regions||[]).includes(r));
   const notes=[], dropped=[], items=[];
@@ -2462,10 +2470,17 @@ function plBuild(inp){
   const ydLog=fieldLog(addDays(inp.date,-1)); const fieldYest=fieldHard(ydLog);
   if(fieldToday) notes.push('Heute '+(fc.time||'')+' '+(fc.name||'Feldtraining')+' (ca. '+(fc.duration_min||90)+' min): Power/Sprünge und Zusatzübungen je −1 Satz, optionale Übungen entfallen, Hauptübungen ab 4 Sätzen −1 Satz.');
   if(fieldYest) notes.push('Gestern hartes Feldtraining ('+fieldSummary(ydLog).replace('✓ ','')+'): intensive Sprünge entfallen heute.');
+  if(gameDay) notes.push('Heute ist Spieltag: kein Krafttraining. Nur Aufwärmen mit dem Team.');
+  else if(gameEve) notes.push('Morgen Spiel: nur kurze Aktivierung (2 Power-Übungen, wenige Wdh, volle Pausen), kein schweres Heben.');
+  else if(gameNext) notes.push('Gestern Spiel: Regeneration – nur leichte Ergänzung und Prehab, keine Power- und Hauptübungen.');
+  else if(gameHardY) notes.push('Hartes Spiel am '+WD[weekdayOf(GN.prev)]+' ('+gameSummary(gl)+'): intensive Sprünge entfallen, Hauptübungen 1 Satz weniger.');
+  if(gamePain) notes.push('Beschwerden aus dem Spiel ('+(gl.regions||[]).map(r=>REGION_LABEL[r]||r).join(', ')+') berücksichtigt.');
+  if(lrUp) notes.push('Belastung der letzten 7 Tage '+Math.round(LR.acute)+' AU = '+Math.round(LR.ratio*100)+' % des Wochenschnitts der letzten 4 Wochen ('+LR.chronic+' AU)'+
+    ' → AOS entlastet: '+(lrUp2?'Hauptübungen und ':'')+'Power/Ergänzung je 1 Satz weniger, optionale Übungen entfallen'+(lrUp2?', keine Steigerungen':'')+'. Zu schnelle Steigerungen erhöhen das Verletzungsrisiko.');
   const locObj=inp.loc?locById(inp.loc):null; const locR=locObj?locParse(locObj.text):null;
   if(locObj && locR && !locR.empty) notes.push('Ort '+locObj.name+': '+locSummary(locObj)+'. Übungen, die dort nicht gehen, werden ersetzt oder weggelassen.');
   const dlSig = inp.date>=todayISO() ? deloadSignals() : []; const deload = dlSig.length>=2;
-  const noIncrease = painOn ? 'Beschwerden '+pain+'/10' : (rd!=null && rd<=2 ? 'Readiness '+rd : (deload ? 'automatische Entlastung' : ''));
+  const noIncrease = painOn ? 'Beschwerden '+pain+'/10' : (rd!=null && rd<=2 ? 'Readiness '+rd : (deload ? 'automatische Entlastung' : (lrUp2 ? 'Belastung stark gestiegen' : (gameEve||gameNext ? 'Spielwoche' : ''))));
   if(deload) notes.push('Automatische Entlastung (Erholungssignale: '+dlSig.join('; ')+'): ca. 40 % weniger Sätze, keine Steigerungen. Sobald die Signale weg sind, geht es normal weiter.');
   ((b.week_notes||{})[week]||[]).forEach(n=>notes.push(n));
   if(rd===1) notes.push('Readiness 1: Empfehlung ist eine Recovery-/Technik-Einheit oder Pause. Falls du trotzdem trainierst, ist die Einheit unten stark reduziert.');
@@ -2484,6 +2499,10 @@ function plBuild(inp){
   slots.forEach(slot=>{
     const d=(slot.dose||{})[week]; if(!d){ return; }
     if(slot.role==='optional' && fieldToday){ dropped.push({ slot, why:'optional – heute abends Feldtraining' }); return; }
+    if(gameDay){ dropped.push({ slot, why:'Spieltag' }); return; }
+    if(gameEve && slot.role!=='power'){ dropped.push({ slot, why:'Vortag Spiel – nur Aktivierung' }); return; }
+    if(gameNext && (slot.role==='power'||slot.role==='main')){ dropped.push({ slot, why:'Tag nach dem Spiel – Regeneration' }); return; }
+    if(slot.role==='optional' && lrUp && !gameNext){ dropped.push({ slot, why:'optional – Belastung stark gestiegen' }); return; }
     if(slot.role==='optional' && !(rd==null || rd>=4)){ dropped.push({ slot, why:'optional – nur bei Readiness 4–5' }); return; }
     // Kandidaten: Ausstattung, Beschwerden, Kontinuität (5.2)
     let cands=slot.candidates.map(id=>REF.exMap[id]).filter(Boolean);
@@ -2497,6 +2516,8 @@ function plBuild(inp){
       const hit=painOn ? (e.regions||[]).filter(r=>regions.includes(r)) : [];
       if(hit.length){ skipWhy.push(e.name_de+' belastet '+hit.map(r=>REGION_LABEL[r]||r).join(', ')); return; }
       if(fieldYest && (e.pattern==='jump'||e.pattern==='jump_loaded')){ skipWhy.push(e.name_de+': gestern hartes Feldtraining'); return; }
+      if(gameHardY && (e.pattern==='jump'||e.pattern==='jump_loaded'||e.pattern==='olympic')){ skipWhy.push(e.name_de+': hartes Spiel vor '+gameAfter+' Tagen'); return; }
+      if(gameEve && (e.pattern==='olympic'||e.pattern==='jump_loaded'||e.fatigue==='H')){ skipWhy.push(e.name_de+': zu schwer für den Vortag'); return; }
       if(legPain && (e.pattern==='jump'||e.pattern==='jump_loaded')){ skipWhy.push(e.name_de+': intensive Sprünge entfallen bei Beschwerden in Bein/Hüfte/Leiste'); return; }
       filt.push(e);
     });
@@ -2514,6 +2535,11 @@ function plBuild(inp){
     if(rd!=null && rd<=3 && x.role==='assistance' && x.sets>1){ x.sets--; reasons.push('Readiness '+rd+' → 1 Satz weniger.'); }
     if(rd!=null && rd<=2 && x.role==='power'){ const n=Math.max(1, Math.round(x.sets*0.75)); if(n<x.sets){ reasons.push('Readiness '+rd+' → Power-Volumen ca. −25 % ('+x.sets+' → '+n+' Sätze).'); x.sets=n; } }
     if(slot.grip && inp.grip && x.sets>1){ x.sets--; reasons.push('Griff ermüdet → 1 Satz weniger.'); }
+    if(gameEve && x.sets>2){ reasons.push('Vortag Spiel → '+x.sets+' → 2 Sätze, volle Pausen.'); x.sets=2; }
+    if(gameNext && x.sets>2){ reasons.push('Regeneration nach dem Spiel → 2 lockere Sätze.'); x.sets=2; }
+    if(gameHardY && !gameNext && x.role==='main' && x.sets>2){ x.sets--; reasons.push('Hartes Spiel → 1 Satz weniger.'); }
+    if(lrUp && !gameEve && !gameNext){ if(['power','assistance'].includes(x.role) && x.sets>=2){ x.sets--; reasons.push('Belastung stark gestiegen → 1 Satz weniger.'); }
+      else if(lrUp2 && x.role==='main' && x.sets>=3){ x.sets--; reasons.push('Belastung sehr stark gestiegen → 1 Satz weniger.'); } }
     // Last
     const L=plLoad(slot, ex.id, { date:inp.date, cap, block:b, readiness:rd, noIncrease, week, reps:repMin(String(reps)) });
     x.load=L; x.loadKg=L.kg; L.reasons.forEach(r=>reasons.push(r));
@@ -2523,6 +2549,7 @@ function plBuild(inp){
     items.push(x);
   });
 
+  if(gameEve) while(items.length>2){ const x=items.pop(); dropped.push({ slot:x.slot, why:'Vortag Spiel – höchstens 2 Aktivierungsübungen' }); }
   if(deload) items.forEach(x=>{ const n=Math.max(1, Math.round(x.sets*0.6)); if(n<x.sets){ x.reasons.push('Automatische Entlastung → '+x.sets+' → '+n+' Sätze.'); x.sets=n; } });
   // Kontakte gegen Blocklimit (6.5) – autonom kürzen
   const lim=((b.limits||{}).contacts_per_session||[])[1];
@@ -3430,8 +3457,8 @@ function phBtn(label,attrs){ return '<button class="primary block ph" '+attrs+'>
 function finShow(s){ document.querySelectorAll('.fin').forEach(x=>x.remove());
   const sets=(s.log&&s.log.exercises||[]).reduce((a,e)=>a+e.sets.filter(x=>Object.values(x).some(v=>v!=null)).length,0);
   const info=[(s.planner&&s.planner.templateId)||s.name, s.status==='teilweise'?'teilweise erledigt':'erledigt'].join(' ')+(s.log&&s.log.durationMin?' · '+s.log.durationMin+' min':'')+(sets?' · '+sets+' Sätze':'');
-  document.body.insertAdjacentHTML('beforeend','<div class="fin" role="dialog" aria-modal="true" aria-label="Einheit gespeichert">'+CLAW+'<h1>Finish strong</h1><p>'+esc(info)+'</p><button class="primary" data-act="finClose">Weiter</button></div>');
-  const bt=document.querySelector('.fin button'); if(bt) bt.focus(); }
+  document.body.insertAdjacentHTML('beforeend','<div class="fin" role="dialog" aria-modal="true" aria-label="Einheit gespeichert">'+CLAW+'<h1>Finish strong</h1><p>'+esc(info)+'</p><p class="small">Wie hart war die Einheit insgesamt? (1–10)</p><div class="chips10">'+[1,2,3,4,5,6,7,8,9,10].map(n=>'<button class="chip" data-act="finRpe" data-id="'+s.id+'" data-v="'+n+'" aria-pressed="'+(s.log&&s.log.srpe===n)+'">'+n+'</button>').join('')+'</div><button class="primary" data-act="finClose">Weiter</button></div>');
+  const bt=document.querySelector('.fin button.primary'); if(bt) bt.focus(); }
 ACT.finClose=()=>document.querySelectorAll('.fin').forEach(x=>x.remove());
 function ovPhaseLine(td){
   const pb=plCurrentBlock(td); if(!pb) return '';
@@ -3497,7 +3524,7 @@ ACT.hideInstall = ()=>{ S.settings.hideInstallHint=true; save(); render(); };
 /* ---------- Feldtraining (Team, Football-spezifisch, Inhalte vorgegeben) ----------
    Konfiguration in planner/plan.json → field { start, days, time, duration_min, name }. */
 function fieldCfg(){ return (typeof REF!=='undefined' && REF.plan && REF.plan.field) || null; }
-function fieldLog(date){ return (S.fieldLogs||[]).find(l=>l.date===date) || null; }
+function fieldLog(date){ return (S.fieldLogs||[]).find(l=>l.date===date && l.kind!=='game') || null; }
 function isFieldDay(date){ const c=fieldCfg(); if(!c || !date || date<c.start || (c.end && date>c.end)) return false; return (c.days||[]).includes(WDKEY[weekdayOf(date)]); }
 function fieldActive(date){ if(!isFieldDay(date)) return false; const l=fieldLog(date); return !(l && l.status==='ausgefallen'); }
 const FIELD_CONTACT = [['keiner','kein Kontakt'],['leicht','leicht'],['mittel','mittel'],['hoch','hoch']];
@@ -3516,17 +3543,74 @@ ACT.fieldLog = el=>{ const date=el.dataset.d||todayISO(); const l=fieldLog(date)
   ui.fieldDraft={ date, rpe:l&&l.rpe||null, contact:l&&l.contact||null, durationMin:l&&l.durationMin||c.duration_min||90, note:l&&l.note||'' }; fieldDlgOpen(); };
 ACT.fieldSet = el=>{ const d=ui.fieldDraft; d.durationMin=num(val('fl-min'))||d.durationMin; d.note=val('fl-note');
   if(el.dataset.k==='rpe') d.rpe=Number(el.dataset.v); else d.contact=el.dataset.v; fieldDlgOpen(); };
-function fieldPut(rec){ S.fieldLogs=S.fieldLogs||[]; const i=S.fieldLogs.findIndex(l=>l.date===rec.date);
+function fieldPut(rec){ S.fieldLogs=S.fieldLogs||[]; const i=S.fieldLogs.findIndex(l=>l.date===rec.date && l.kind!=='game');
   if(i>=0){ rec.id=S.fieldLogs[i].id; rec.createdAt=S.fieldLogs[i].createdAt; S.fieldLogs[i]=rec; } else S.fieldLogs.push(rec); save(); closeDlg(); render(); }
 ACT.fieldSave = ()=>{ const d=ui.fieldDraft; const m=num(val('fl-min'));
   if(!d.rpe){ toast('Bitte die Anstrengung (1–10) antippen.'); return; } if(!d.contact){ toast('Bitte die Kontaktintensität antippen.'); return; }
   fieldPut({ id:uid('fld'), date:d.date, status:'absolviert', rpe:d.rpe, contact:d.contact, durationMin:m&&m>0?Math.round(m):null, note:val('fl-note')||'', createdAt:new Date().toISOString() });
   toast('Feldtraining gespeichert.'); };
 ACT.fieldCancel = ()=>{ const d=ui.fieldDraft; fieldPut({ id:uid('fld'), date:d.date, status:'ausgefallen', rpe:null, contact:null, durationMin:null, note:val('fl-note')||'', createdAt:new Date().toISOString() }); toast('Als „fand nicht statt“ gespeichert.'); };
-ACT.fieldDel = ()=>{ const d=ui.fieldDraft; S.fieldLogs=(S.fieldLogs||[]).filter(l=>l.date!==d.date); save(); closeDlg(); render(); toast('Eintrag gelöscht.'); };
+ACT.fieldDel = ()=>{ const d=ui.fieldDraft; S.fieldLogs=(S.fieldLogs||[]).filter(l=>l.date!==d.date || l.kind==='game'); save(); closeDlg(); render(); toast('Eintrag gelöscht.'); };
 function fieldCard(date){ if(!isFieldDay(date)) return ''; const c=fieldCfg(); const l=fieldLog(date); const today=todayISO();
   return '<div class="section field-card"><div class="eyebrow">'+(c.time?esc(c.time)+' · ':'')+'Feldtraining</div><div class="row between" style="align-items:center;margin-top:6px"><div><strong>'+esc(c.name||'Football-Training')+'</strong><div class="small muted">'+(l?esc(fieldSummary(l)):'ca. '+(c.duration_min||90)+' min · Inhalte vom Team')+'</div></div>'+
     (date<=today ? '<button class="small'+(l?'':' primary')+'" data-act="fieldLog" data-d="'+date+'">'+(l?'ändern':'Erfassen')+'</button>' : '')+'</div></div>'; }
+
+/* ===== AOS – Gesamtbelastung (Backlog T19) und Spielwoche (T20) =====
+   Belastung = Anstrengung (Session-RPE 1–10) × Minuten („AU“) aus Gym, Feldtraining und Spielen.
+   Steigt die Belastung der letzten 7 Tage deutlich über den Schnitt der letzten 4 Wochen, entlastet AOS die nächste Einheit selbst.
+   Spielwoche: Vortag nur Aktivierung, Tag danach Regeneration, nach einem harten Spiel keine intensiven Sprünge; Beschwerden aus dem Spiel wirken wie ein Check-in. */
+const LOAD_UP=1.3, LOAD_UP2=1.5, LOAD_MIN_CHRONIC=150;
+function sessLoad(s){ if(!s.log || !(s.log.durationMin>0)) return null; if(s.log.srpe) return s.log.srpe*s.log.durationMin;
+  const rp=[]; (s.log.exercises||[]).forEach(e=>(e.sets||[]).forEach(x=>{ if(x.rpe!=null) rp.push(x.rpe); })); return rp.length?Math.round(s.log.durationMin*rp.reduce((a,b)=>a+b,0)/rp.length):null; }
+function extLoad(l){ return (l && l.status==='absolviert' && l.rpe && l.durationMin) ? l.rpe*l.durationMin : null; }
+function loadBetween(from, to){ let sum=0; const days=new Set();
+  loggedSessions().forEach(s=>{ const d=sessionDate(s); if(d<from||d>to) return; const v=sessLoad(s); if(v){ sum+=v; days.add(d); } });
+  (S.fieldLogs||[]).forEach(l=>{ if(l.date<from||l.date>to) return; const v=extLoad(l); if(v){ sum+=v; days.add(l.date); } });
+  return { sum, days }; }
+/* Verhältnis letzte 7 Tage zu Wochenschnitt der letzten 28 Tage (vor dem Datum). Erst ab 3 Wochen mit Daten. */
+function loadRatio(date){ const a=loadBetween(addDays(date,-7), addDays(date,-1)); const c=loadBetween(addDays(date,-28), addDays(date,-1));
+  const weeks=new Set([...c.days].map(d=>Math.floor(daysBetween(d,date)/7))); const chronic=c.sum/4;
+  if(weeks.size<3 || chronic<LOAD_MIN_CHRONIC) return null;
+  return { ratio:a.sum/chronic, acute:a.sum, chronic:Math.round(chronic) }; }
+/* Spiele: Abstand zum nächsten und zum letzten Spiel */
+function gameNear(date){ const G=apGames(); const next=G.find(d=>d>=date)||null; const prev=G.filter(d=>d<date).slice(-1)[0]||null;
+  return { next, prev, md:next?daysBetween(date,next):null, after:prev?daysBetween(prev,date):null }; }
+function gameLog(date){ return (S.fieldLogs||[]).find(l=>l.kind==='game' && l.date===date) || null; }
+function gameHard(l){ return !!(l && l.status==='absolviert' && ((l.rpe||0)>=8 || l.contact==='hoch' || (l.snaps||0)>=50)); }
+const GAME_REGIONS=['knee','hip','lower_back','hamstrings','adductors','ankle','calf','shoulder','neck','wrist'];
+/* Spiel eintragen (nach dem Spiel, bis 3 Tage später) */
+function gameCard(date){ const G=apGames(); const g=[0,1,2,3].map(i=>addDays(date,-i)).find(d=>G.includes(d)); if(!g) return ''; const l=gameLog(g);
+  if(l && g!==date) return '';
+  return '<div class="section field-card"><div class="eyebrow">Spiel</div><div class="row between" style="align-items:center;margin-top:6px"><div><strong>Spiel '+WD[weekdayOf(g)]+' '+fmtDate(g).slice(0,6)+'</strong><div class="small muted">'+
+    (l?esc(gameSummary(l)):'Kurz eintragen: Anstrengung, Snaps, Kontakt, Beschwerden – AOS plant die nächsten Tage danach.')+'</div></div>'+
+    (g<=todayISO()?'<button class="small'+(l?'':' primary')+'" data-act="gameLog" data-d="'+g+'">'+(l?'ändern':'Eintragen')+'</button>':'')+'</div></div>'; }
+function gameSummary(l){ if(l.status==='ausgefallen') return 'nicht gespielt';
+  return 'Anstrengung '+l.rpe+'/10'+(l.snaps!=null?' · '+l.snaps+' Snaps':'')+' · Kontakt '+((FIELD_CONTACT.find(x=>x[0]===l.contact)||[,l.contact])[1])+(l.pain>=3&&(l.regions||[]).length?' · Beschwerden: '+l.regions.map(r=>REGION_LABEL[r]||r).join(', '):''); }
+function gameDlg(){ const d=ui.gameDraft;
+  const chips=(k,list)=>'<div>'+list.map(([v,n])=>'<button class="chip" data-act="gameSet" data-k="'+k+'" data-v="'+v+'" aria-pressed="'+(k==='regions'?(d.regions||[]).includes(v):String(d[k])===String(v))+'">'+esc(n)+'</button>').join('')+'</div>';
+  openDlg('Spiel '+WD[weekdayOf(d.date)]+' '+fmtDate(d.date).slice(0,6),
+    '<label>Wie anstrengend war es? (1–10)</label>'+chips('rpe',[1,2,3,4,5,6,7,8,9,10].map(n=>[n,n]))+
+    '<div class="fields">'+inp('gm-snaps','Snaps (ungefähr, optional)',d.snaps==null?'':d.snaps,'inputmode="numeric"')+inp('gm-min','Spielzeit inkl. Aufwärmen (min)',d.durationMin||'','inputmode="numeric"')+'</div>'+
+    '<label>Kontakte</label>'+chips('contact',FIELD_CONTACT)+
+    '<label>Beschwerden (0 = keine)</label>'+chips('pain',[[0,'0'],[3,'leicht'],[5,'mittel'],[7,'stark']])+
+    ((d.pain||0)>=3?'<label>Wo?</label>'+chips('regions',GAME_REGIONS.map(r=>[r,REGION_LABEL[r]||r])):'')+
+    '<p class="small muted">Starke Beschwerden nach einem Spiel bitte ärztlich abklären lassen. AOS stellt keine Diagnose.</p>',
+    '<button data-act="gameNo">Nicht gespielt</button><button class="primary" data-act="gameSave">Speichern</button>'); }
+function gameRead(){ const d=ui.gameDraft; const sn=val('gm-snaps'), m=val('gm-min'); d.snaps=sn===''?null:Math.max(0,Math.round(num(sn)||0)); d.durationMin=num(m)||d.durationMin; }
+ACT.gameLog = el=>{ const date=el.dataset.d; const l=gameLog(date);
+  ui.gameDraft={ date, rpe:l&&l.rpe||null, snaps:l&&l.snaps!=null?l.snaps:null, contact:l&&l.contact||null, pain:l&&l.pain||0, regions:(l&&l.regions)||[], durationMin:l&&l.durationMin||150 }; gameDlg(); };
+ACT.gameSet = el=>{ gameRead(); const d=ui.gameDraft; const k=el.dataset.k, v=el.dataset.v;
+  if(k==='regions') d.regions=d.regions.includes(v)?d.regions.filter(x=>x!==v):d.regions.concat([v]); else if(k==='contact') d.contact=v; else d[k]=Number(v);
+  if(k==='pain' && !(d.pain>=3)) d.regions=[]; gameDlg(); };
+function gamePut(rec){ S.fieldLogs=S.fieldLogs||[]; const i=S.fieldLogs.findIndex(l=>l.kind==='game' && l.date===rec.date);
+  if(i>=0){ rec.id=S.fieldLogs[i].id; rec.createdAt=S.fieldLogs[i].createdAt; S.fieldLogs[i]=rec; } else S.fieldLogs.push(rec); save(); closeDlg(); render(); }
+ACT.gameSave = ()=>{ gameRead(); const d=ui.gameDraft; if(!d.rpe){ toast('Bitte die Anstrengung antippen.'); return; } if(!d.contact){ toast('Bitte die Kontakte antippen.'); return; }
+  gamePut({ id:uid('game'), kind:'game', date:d.date, status:'absolviert', rpe:d.rpe, snaps:d.snaps, contact:d.contact, pain:d.pain||0, regions:d.pain>=3?d.regions:[], durationMin:d.durationMin?Math.round(d.durationMin):null, createdAt:new Date().toISOString() });
+  toast('Spiel gespeichert – die nächsten Tage sind angepasst.'); };
+ACT.gameNo = ()=>{ const d=ui.gameDraft; gamePut({ id:uid('game'), kind:'game', date:d.date, status:'ausgefallen', rpe:null, contact:null, durationMin:null, createdAt:new Date().toISOString() }); toast('Gespeichert.'); };
+/* Session-RPE nach der Einheit (Abschluss-Bildschirm) */
+ACT.finRpe = el=>{ const s=sessionById(el.dataset.id); if(!s||!s.log) return; s.log.srpe=Number(el.dataset.v); save();
+  document.querySelectorAll('.fin [data-act="finRpe"]').forEach(b=>b.setAttribute('aria-pressed', String(b===el))); };
 /* ---------- Kalender & Countdown ---------- */
 function calSorted(){ return (S.calendar||[]).slice().sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||''))); }
 function calGames(){ const g=calSorted().filter(e=>e.kind==='game' && e.date);
@@ -3581,9 +3665,9 @@ ACT.calDel = ()=>{ const id=ui.calDraft.id; S.calendar=(S.calendar||[]).filter(x
 function viewTraining(){
   if(ui.sessionId && ui.draft && sessionById(ui.sessionId) && !ui.logHidden) return logForm();
   const today=todayISO();
-  let h='<h1>Training</h1>'+plSection()+fieldCard((ui.pl&&ui.pl.date)||today);
+  let h='<h1>Training</h1>'+gameCard(today)+plSection()+fieldCard((ui.pl&&ui.pl.date)||today);
   const ready=S.sessions.filter(s=>s.status==='geplant' && !s.planner && (s.plan||[]).length && s.plannedDate===today);
-  if(ready.length) h='<h1>Training</h1><h2>Heute angelegt</h2><div class="section sv-list">'+ready.map(s=>'<div class="sv-row"><button class="link sv-name" data-act="openSession" data-id="'+s.id+'" title="'+esc(s.name)+'">'+esc(s.name)+'</button><button class="small primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button></div>').join('')+'</div>'+fieldCard(today);
+  if(ready.length) h='<h1>Training</h1><h2>Heute angelegt</h2><div class="section sv-list">'+ready.map(s=>'<div class="sv-row"><button class="link sv-name" data-act="openSession" data-id="'+s.id+'" title="'+esc(s.name)+'">'+esc(s.name)+'</button><button class="small primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button></div>').join('')+'</div>'+fieldCard(today)+gameCard(today);
   const saved=S.sessions.filter(s=>s.status==='geplant' && (s.plan||[]).length && s.plannedDate && s.plannedDate<today).sort(bySessionDate);
   if(saved.length){ h+='<h2>Nicht erfasst</h2><div class="section sv-list">'+saved.map(s=>{ const ov=s.plannedDate&&s.plannedDate<today; const id=(s.planner&&s.planner.templateId)||s.name;
       return '<div class="sv-row"><button class="link sv-name" data-act="openSession" data-id="'+s.id+'" title="'+esc(s.name)+'">'+esc(id)+' <span class="small muted">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+(ov?' · nicht erfasst':'')+'</span></button><button class="small primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button></div>'; }).join('')+'</div>'; }
@@ -3603,12 +3687,33 @@ const PUSH_VAPID_PUBLIC = 'BPlHvhAeamNzrx1GJtImXUPzbfasjiRbnpDA21YcGmLnEwb708MXI
 const PUSH_KINDS = [
   ['morning','Einheit des Tages','Morgens: welche Einheit heute dran ist'],
   ['readiness','Readiness-Check','Erinnerung, die Tagesform einzutragen (nur wenn noch offen)'],
-  ['evening','Protokoll offen','Abends, wenn die heutige Einheit noch nicht eingetragen ist']
+  ['evening','Protokoll offen','Abends, wenn die heutige Einheit noch nicht eingetragen ist'],
+  ['weekly','Wochenrückblick','Sonntags: Einheiten, Bestwerte, Gewicht, Ernährung und Ausblick auf die nächste Woche']
 ];
 const PUSH_HOURS = [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22];
-function pushDefaults(){ return { subs:[], on:{ morning:true, readiness:true, evening:true }, hours:{ morning:7, readiness:16, evening:20 } }; }
+function pushDefaults(){ return { subs:[], on:{ morning:true, readiness:true, evening:true, weekly:true }, hours:{ morning:7, readiness:16, evening:20, weekly:19 } }; }
 function pushNormalize(p){ const d=pushDefaults(); p=(p&&typeof p==='object')?p:{};
   return { subs:Array.isArray(p.subs)?p.subs.filter(x=>x&&x.endpoint&&x.keys):[], on:Object.assign(d.on, p.on||{}), hours:Object.assign(d.hours, p.hours||{}) }; }
+/* Wochenrückblick (Backlog U8): wird mit der Vorschau gespeichert, der Versand am Sonntag liest ihn (push/erinnerungen.mjs im Datenrepo) */
+function weekReview(mon){ const sun=addDays(mon,6), today=todayISO();
+  const inW=d=>d>=mon && d<=sun;
+  const done=loggedSessions().filter(s=>inW(sessionDate(s)));
+  let planned=0; for(let i=0;i<7;i++){ const d=addDays(mon,i); const b=REF.plan?plBlockAt(d):null; if(b && plScheduledAt(b,d).tpl) planned++; }
+  // Bestwerte: geschätztes 1RM dieser Woche über dem bisherigen Bestwert (Übungen aus dem Plan)
+  const prs=[]; const ids=new Set(); done.forEach(s=>(s.plan||[]).forEach(p=>{ if(p.planner&&p.planner.dbId) ids.add(p.planner.dbId); }));
+  ids.forEach(id=>{ let now=0, before=0; plHistory(id).forEach(h=>workSets(h.le).forEach(x=>{ if(!(x.kg>0)||!(x.reps>=1)||x.reps>10||x.rpe==null||x.rpe<6) return; const e=x.kg/pctRM(x.reps,x.rpe);
+      if(inW(h.date)) now=Math.max(now,e); else if(h.date<mon) before=Math.max(before,e); }));
+    if(now>0 && before>0 && now>before*1.005) prs.push({ name:(REF.exMap[id]||{}).name_de||id, kg:Math.round(now*2)/2 }); });
+  prs.sort((a,b)=>b.kg-a.kg);
+  const tests=(S.tests||[]).filter(t=>t.date && inW(t.date) && t.value!=null).map(t=>t.name+' '+fmtNum(t.value)+' '+(t.unit||''));
+  const bwIn=(a,b)=>{ const L=(S.bodyweight||[]).filter(x=>x.kg!=null&&x.date>=a&&x.date<=b); return L.length?L.reduce((s,x)=>s+x.kg,0)/L.length:null; };
+  const bw=bwIn(mon,sun), bwPrev=bwIn(addDays(mon,-7),addDays(mon,-1));
+  let nutHit=0, nutDays=0; try{ if(REF.nut) for(let i=0;i<7;i++){ const d=addDays(mon,i); if(d>today) break; const plan=nutMealPlan(nutTargets(d)); if(!plan.length) continue; nutDays++;
+    if(plan.every(t=>(nutMeal(d,t.slot.id)||{}).done)) nutHit++; } }catch(e){ nutDays=0; }
+  let next=0, first=null; const nm=addDays(mon,7); for(let i=0;i<7;i++){ const d=addDays(nm,i); const b=REF.plan?plBlockAt(d):null; const t=b&&plScheduledAt(b,d).tpl; if(t){ next++; if(!first) first={ day:WD[weekdayOf(d)], tpl:t, wave:((b.week_wave||{})[plWeek(b,d)])||'' }; } }
+  const G=apGames().filter(d=>d>=nm && d<=addDays(nm,6));
+  return { week:mon, done:done.length, planned, prs:prs.slice(0,3), tests:tests.slice(0,3), bw:bw!=null?Math.round(bw*10)/10:null, bwDelta:bw!=null&&bwPrev!=null?Math.round((bw-bwPrev)*10)/10:null,
+    nutHit, nutDays, next, first, game:G[0]||null }; }
 /* Vorschau: welche Einheit an den nächsten 14 Tagen laut Plan fällig ist (nur Name, Hauptübungen, Dauer) */
 function pushAgenda(){
   if(typeof REF==='undefined' || !REF.plan) return null;
@@ -3618,7 +3723,8 @@ function pushAgenda(){
     const t=plTemplate(due.block, due.tpl)||{};
     const main=(t.slots||[]).filter(x=>x.role==='main' && (!x.dose || x.dose[due.week])).map(x=>{ const id=(x.candidates||[])[0]; const e=REF.exMap[id]||{}; return e.name_de||e.name||id; }).filter(Boolean);
     days.push({ date:d, tpl:due.tpl, name:t.name||'', min:t.time_min||null, main }); }
-  return { from:today, days };
+  let review=null; try{ review=weekReview(mondayOf(today)); }catch(e){}
+  return { from:today, days, review };
 }
 /* true, wenn sich die Vorschau geändert hat (ohne selbst zu speichern) */
 function pushAgendaUpdate(){
@@ -3643,7 +3749,7 @@ function pushSection(){
   b+=PUSH_KINDS.map(([k,l,d])=>'<div class="row" style="flex-wrap:nowrap;align-items:flex-end;gap:10px"><div style="flex:1;min-width:0"><label>'+esc(l)+'</label><div class="small muted">'+esc(d)+'</div><div>'+
     chipBtn('pushTog',k,'1','An',!!P.on[k])+chipBtn('pushTog',k,'0','Aus',!P.on[k])+'</div></div>'+
     '<div style="width:110px">'+sel('push-h-'+k,'Uhrzeit',PUSH_HOURS.map(h=>[h,pad(h)+':00']),P.hours[k],'data-chg="pushHour" data-k="'+k+'"'+(P.on[k]?'':' disabled'))+'</div></div>').join('');
-  b+='<p class="small muted">Nur an Trainingstagen laut Plan. Der Versand läuft stündlich über eine GitHub Action im Datenrepo und kann ein paar Minuten später ankommen. Nach dem Aktivieren kommt innerhalb einer Stunde eine Bestätigung.</p>';
+  b+='<p class="small muted">Tageserinnerungen nur an Trainingstagen laut Plan, der Wochenrückblick sonntags. Der Versand läuft stündlich über eine GitHub Action im Datenrepo und kann ein paar Minuten später ankommen. Nach dem Aktivieren kommt innerhalb einer Stunde eine Bestätigung.</p>';
   return pdet('push','Erinnerungen', here?'aktiv':(n?n+' Gerät'+(n>1?'e':''):'aus'), b);
 }
 ACT.pushOn = async ()=>{
@@ -3677,7 +3783,7 @@ function viewProfile(){
   h+=pdet('person','Persönliche Daten',[p.name,p.heightCm?p.heightCm+' cm':''].filter(Boolean).join(' · '),'<div class="fields">'+inp('p-name','Name',p.name)+inp('p-by','Geburtsjahr',p.birthYear,'inputmode="numeric" placeholder="z. B. 1990"')+'</div>'+
     '<div class="fields">'+inp('p-h','Größe (cm)',p.heightCm,'inputmode="numeric"')+inp('p-tw','Zielgewicht (kg, optional)',fmtNum(p.targetWeightKg),'inputmode="decimal"')+'</div>'+
     '<button class="primary" data-act="saveProfileSlim">Speichern</button>');
-  h+=athleteSection(); h+=loadSection();
+  h+=athleteSection(); h+=frameSection();
   h+=calSection();
   h+=pdet('loc','Trainingsorte',(S.profile.locations||[]).length+' Orte',locSection());
   h+=pushSection();
