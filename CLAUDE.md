@@ -1,7 +1,9 @@
 # Hinweise für Claude
 
-- Dieses Repo ist **öffentlich** (GitHub Pages). Niemals persönliche Daten des Athleten hier ablegen: keine Körperwerte, Tests, Lasten, Startwerte, Trainingspläne, Ernährungs- oder Gesundheitsangaben, keine Spezifikationen mit solchen Werten. All das gehört ins private Repo `bqtmarcel/AOS_DATA`.
-- `seedData()` in `index.html` bleibt neutral. Persönliche Startdaten liegen in `AOS_DATA/aos-data.json`.
+- Dieses Repo ist **öffentlich** (GitHub Pages). Niemals persönliche Daten des Athleten hier ablegen: keine Körperwerte, Tests, Lasten, Startwerte, Trainingspläne, Ernährungs- oder Gesundheitsangaben, keine Spezifikationen mit solchen Werten. All das liegt in Supabase (Daten der Athleten) bzw. im privaten Repo `bqtmarcel/AOS_DATA` (Planer- und Datenbankdateien, Spezifikationen, Backup).
+- `seedData()` in `index.html` bleibt neutral. Persönliche Daten liegen seit 21.11.2026 in Supabase (`records` je Athlet); `AOS_DATA/aos-data.json` ist nur noch Archiv.
+- **Supabase:** Struktur und Zugriffsregeln nur über neue Dateien in `supabase/migrations/` (nie bestehende ändern), Tests in `supabase/tests/`; die Action „Datenbank“ spielt beides ein und prüft. Öffentliche Verbindungsdaten in `supabase/projekt.json`; geheime Schlüssel nur in GitHub-Secrets.
+- Änderungen an `AOS_DATA/planner/` oder `AOS_DATA/db/` überträgt die Action „Supabase“ im Datenrepo automatisch (Modus `plan`).
 - Datenformat der App: siehe `validateData`, `migrate`, `syncRecords` und `mergeData` in `index.html`. Schemaänderungen brauchen eine Migration in `migrate()`, damit bestehende Daten auf iPhone und Laptop erhalten bleiben.
 - Nach jeder Änderung an `index.html` die Cache-Version in `sw.js` erhöhen: `./tools/bump-cache.sh` (die GitHub Action prüft das).
 - Vor dem Hochladen den Klicktest laufen lassen: `python tests/smoke.py` (läuft auch automatisch als GitHub Action bei jedem Push).
