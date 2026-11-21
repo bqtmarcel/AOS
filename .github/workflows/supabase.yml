@@ -32,4 +32,4 @@ jobs:
       - name: Datenbankstruktur aktualisieren
         run: supabase db push --remote --yes -p "$SUPABASE_DB_PASSWORD"
       - name: Zugriffsregeln prüfen
-        run: supabase test db --remote
+        run: supabase test db --remote --yes
