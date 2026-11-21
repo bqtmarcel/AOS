@@ -59,6 +59,19 @@ FLOW = """(async()=>{
     if(mix!=='RB70,DL30') return 'Positionsgruppen falsch gemischt ('+mix+')';
     if(sc!=='{"TUE":"D1","THU":"D2"}') return 'Trainingstage: Wochenplan falsch ('+sc+')';
     if(legacy!=='{"MON":"D1","WED":"D2","THU":"D3","FRI":"D4"}') return 'Bestehende Profile ohne Trainingstage bekommen einen anderen Wochenplan ('+legacy+')'; }
+  // M3: Gruppenregeln (ohne Übungsdatenbank prüfbar; die Testprofile mit echter Datenbank laufen im Datenrepo)
+  { const kp=clone(S.profile); const setP=(...a)=>{ S.profile.positions=a.map(([c,w],i)=>({id:'q'+i,code:c,name:c,weight:w})); };
+    S.profile.experience='fortgeschritten'; S.profile.cleanSafe=true;
+    setP(['QB',100]); let C=tpContext(); const qb=C.excl.has('bb_push_press') && C.excl.has('dips') && C.req.band_external_rotation===3;
+    setP(['RB',70],['DE',30]); C=tpContext(); const rb=C.req.nordic_hamstring===2 && C.req.neck_plate_isometric===1 && C.req.carry_contact===1 && C.req.copenhagen_plank===1 && C.kf===1 && C.label==='RB 70 % / DL 30 %';
+    setP(['WR',100]); C=tpContext(); const wr=C.setsDelta('main_squat','P3')===-1 && C.setsDelta('main_push','P3')===0;
+    setP(['T',60],['WR',40]); C=tpContext(); const mix=C.setsDelta('main_squat','P3')===0 && C.setsDelta('main_squat','P2')===1;
+    S.profile.experience='einsteiger'; S.profile.cleanSafe=false; setP(['DT',100]); C=tpContext(); const ein=C.excl.has('power_clean') && C.excl.has('hang_power_clean') && C.excl.has('depth_jump') && Math.abs(C.kf-0.5)<1e-9;
+    S.profile.planEngine='klassisch'; const off=!apUseGroups({start:'2030-01-01'}); S.profile.planEngine='gruppen'; S.profile.planEngineSince='2030-01-01'; const since=!apUseGroups({start:'2029-12-01'}) && apUseGroups({start:'2030-01-06'});
+    S.profile=kp;
+    if(!qb) return 'Gruppenregeln QB falsch (Ausschlüsse/Pflicht)'; if(!rb) return 'Gruppenregeln RB 70 / DE 30 falsch';
+    if(!wr) return 'WR: Sätze-Delta der Hauptübungen falsch'; if(!mix) return 'Mischung Sätze-Delta (OL 60 / WR 40) falsch';
+    if(!ein) return 'Einsteiger/Umsetzen/DT: Ausschlüsse oder Kontaktfaktor falsch'; if(!off||!since) return 'Umstellung auf Positionsgruppen greift nicht wie vorgesehen'; }
   // Zeitbudget: zu volle Einheit wird auf höchstens 70 min gebracht, Grundübungen bleiben
   { const mk=(role,prio,method,sets,id)=>({ role, prio, method, sets, reps:'5', rest:[150,180], ex:REF.exMap[id], slot:{id}, slotId:id, reasons:[] });
     const it=[mk('power',1,'quality',4,'broad_jump'), mk('main',1,'wave',5,'high_bar_squat'), mk('main',1,'wave',5,'bench_press'), mk('main',1,'bodyweight_reps',5,'pull_up')]

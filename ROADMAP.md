@@ -20,7 +20,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 | **0** | 17.–22.11.2026 | Vorbereitung | Zugänge da | 2 / 2 ✅ |
 | **M1** | 21.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 12 / 12 ✅ |
 | **M2** | 21.11.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 6 / 6 ✅ |
-| **M3** | 14.–27.12.2026 | Positionsgruppen | Planung für alle Positionen | 0 / 9 |
+| **M3** | 21.11.2026 | Positionsgruppen | Planung für alle Positionen | 8 / 9 |
 | **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 0 / 12 |
 | **Start** | ab 11.01.2027 | Teamstart | alle eingeladenen Spieler | 0 / 2 |
 | **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 0 / 5 |
@@ -61,17 +61,19 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 - [x] **M2.5** Neutrales Standardprofil für neue Athleten ✅ 21.11.2026 (Standardprofil ohne Position und Ziele, Mo/Di/Do/Fr; allgemeine Planerregeln als Referenzdokument)
 - [x] **M2.6** Prüfung: eigener Plan unverändert; Testprofil „Einsteiger, WR, Home Gym“ bekommt einen vollständigen, eigenen Plan ohne fremde Vorlieben ✅ 21.11.2026 (eigener Plan bis Ende Jänner 0 Unterschiede; Testprofil WR/Home Gym vollständig; positionsspezifische Übungswahl folgt in M3)
 
-## M3 · Positionsgruppen (14.–27.12.2026)
+## M3 · Positionsgruppen (21.11.2026)
 
-- [ ] **M3.1** Fünf Positionsgruppen (Big Men, Big Skill, Skill, QB, Specialists) und Zuordnung aller Positionen
-- [ ] **M3.2** Haupt- und Nebenposition nach Anteil mischen
-- [ ] **M3.3** Übungsdatenbank v2.0: Positionsrelevanz 0–3 je Gruppe (in `AOS_DATA/db`)
-- [ ] **M3.4** Fehlende Übungen ergänzen (z. B. Partner-/Schlittendrücken, Backpedal-Drills, Rotationsübungen QB, Übungen für Specialists)
-- [ ] **M3.5** Gruppenregeln im Planer: Sätze, Wiederholungen, Power-Schwerpunkt, Bodenkontakte, Sprintinhalte, Prehab, keine schweren Überkopfübungen für QB
-- [ ] **M3.6** Positionsspezifische Inhalte in P4 je Gruppe
-- [ ] **M3.7** Trainingserfahrung: Regeln für Einsteiger, „Umsetzen technisch sicher?“ → sonst Trap-Bar-Sprung und Speed Pull
-- [ ] **M3.8** Ein Testprofil je Gruppe im Klicktest
-- [ ] **M3.9** 👤 Fachliche Prüfung: Pläne P2–P5 der Testprofile nebeneinander (Vergleichsansicht von Claude). Ein O-Liner trainiert erkennbar anders als ein Cornerback
+- [x] **M3.1** Acht Positionsgruppen (OL, DL, LB, TE, RB, WR, DB, QB) und Zuordnung aller Positionen; Varianten DE/DT/NT, CB/S, FB (Trainingspfade 2.0, Specialists derzeit nicht vorgesehen) ✅ 21.11.2026
+- [x] **M3.2** Haupt- und Nebenposition nach Anteil mischen (Übungswahl über Score, Positionsslots der Nebengruppe, Pflicht halb ab 30 %, Zahlenwerte gemittelt) ✅ 21.11.2026
+- [x] **M3.3** Übungsdatenbank v2.0: Positionsrelevanz 0–3 je Gruppe (in `AOS_DATA/db`) ✅ 21.11.2026
+- [x] **M3.4** Fehlende Übungen ergänzt: Schlitten, Hand Fight, 2-Punkt-Start, Backpedal + Turn, QB Drop-Back, Hüftbeuger-Marsch, Außenrotation Band, Release, Press/Jam ✅ 21.11.2026
+- [x] **M3.5** Gruppenregeln im Planer: Vorlage nach Trainingstagen (2/3/4), Kandidaten, Sätze-Delta der Hauptübungen, Wdh der Ergänzung, Kontaktfaktor, Pflichtübungen, Ausschlüsse (QB kein schweres Überkopfdrücken, OL/DT keine Depth Jumps) ✅ 21.11.2026
+- [x] **M3.6** Positionsspezifische Inhalte P3–P5 je Gruppe: Feld-Slot (Starts, Cuts, Backpedal, Press/Jam, Get-off, Drop-Back) an Feldtagen aus dem Profil, sonst Hinweis aufs Teamtraining ✅ 21.11.2026
+- [x] **M3.7** Trainingserfahrung (Einsteiger: Ausschlüsse, Grundübungen, RPE −0,5, weniger Kontakte) und „Umsetzen technisch sicher?“ (sonst Trap-Bar-Sprung, Speed Pull, KB Swing); hohes Körpergewicht ≥ 115 kg ✅ 21.11.2026
+- [x] **M3.8** Testprofil je Gruppe: Action „Gruppentest“ im Datenrepo (echte Übungsdatenbank, 8 Profile, Prüffälle der Trainingspfade); Gruppenregeln zusätzlich im Klicktest ✅ 21.11.2026
+- [ ] **M3.9** 👤 Fachliche Prüfung: Pläne P2–P5 der Testprofile nebeneinander (Vergleichsansicht von Claude). Ein O-Liner trainiert erkennbar anders als ein Cornerback. Danach entscheidet Marcel, ob er seinen eigenen Plan umstellt (Profil → Planung, gilt ab dem nächsten Block)
+
+Hinweis: Bestehende Profile planen weiter mit den bisherigen Vorlagen, bis der Athlet umstellt. Alter, Verletzungen, Mobilitäts-Screen und Zeit pro Einheit aus den Trainingspfaden kommen mit dem Onboarding (M4.2).
 
 ## M4 · Einladungen, Onboarding, Pilot (28.12.2026–10.01.2027)
 

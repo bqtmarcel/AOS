@@ -446,7 +446,7 @@ function seedData(){
   return {
     schemaVersion: SCHEMA_VERSION,
     meta: { createdAt: now, updatedAt: now, app:'AOS – Athlete Operating System' },
-    profile: { name:'', birthYear:null, heightCm:null, targetWeightKg:null, positions:[], locations:[], trainingDays:['MON','TUE','THU','FRI'] },
+    profile: { name:'', birthYear:null, heightCm:null, targetWeightKg:null, positions:[], locations:[], trainingDays:['MON','TUE','THU','FRI'], experience:'fortgeschritten', cleanSafe:false, planEngine:'gruppen', planEngineSince:'' },
     goals: [], tests: [], bodyweight: [], blocks: [], sessions: [],
     unavailable: [], suggestionDecisions: {}, calendar: [],
     nutrition: defaultNutrition(),
@@ -1586,6 +1586,10 @@ function schedFromDays(ids){ const out={}; trainingDays().slice(0, ids.length).f
 function ensureProfileDefaults(){ if(!S||!S.profile) return; const p=S.profile; let ch=false;
   if(!Array.isArray(p.trainingDays)){ p.trainingDays=LEGACY_TRAINING_DAYS.slice(); ch=true; }   // neue Profile haben die Tage schon aus seedData()
   if(!Array.isArray(p.positions)){ p.positions=[]; ch=true; }
+  // M3: Bestand plant mit den bisherigen Vorlagen weiter, bis der Athlet umstellt; Erfahrung/Umsetzen wie bisher angenommen
+  if(!p.planEngine){ p.planEngine='klassisch'; p.planEngineSince=''; ch=true; }
+  if(!p.experience){ p.experience='fortgeschritten'; ch=true; }
+  if(typeof p.cleanSafe!=='boolean'){ p.cleanSafe=true; ch=true; }
   if(ch) save(true); }
 function bwNow(){ const L=(S.bodyweight||[]).filter(b=>b.kg!=null&&b.date).sort((a,b)=>a.date<b.date?-1:1); if(!L.length) return null;
   const last=L[L.length-1].date; const w=L.filter(b=>daysBetween(b.date,last)<7); return w.reduce((a,b)=>a+b.kg,0)/w.length; }
@@ -1610,6 +1614,14 @@ function athleteSection(){ const mix=posMix(); const main=mix[0]||null, sec=mix[
     '<label for="ap-sec">Nebenposition (optional)</label><select id="ap-sec" data-chg="apPos">'+opt(sec&&sec.code,true)+'</select>';
   if(sec) b+='<label>Anteil Nebenposition</label><div>'+[10,20,30,40,50].map(v=>'<button class="chip" data-act="apShare" data-v="'+v+'" aria-pressed="'+(sec.share===v)+'">'+v+' %</button>').join('')+'</div>';
   const gm=groupMix(); if(gm.length) b+='<p class="small muted">Positionsgruppe: '+esc(gm.map(g=>GROUP_NAME[g.group]+(gm.length>1?' '+g.share+' %':'')).join(' · '))+'</p>';
+  const exp=S.profile.experience||'fortgeschritten';
+  b+='<label>Trainingserfahrung</label><div>'+EXP_LIST.map(([k,n])=>'<button class="chip" data-act="apExp" data-v="'+k+'" aria-pressed="'+(exp===k)+'">'+n+'</button>').join('')+'</div>'+
+    '<label>Umsetzen technisch sicher?</label><div>'+[[true,'Ja'],[false,'Nein']].map(([v,n])=>'<button class="chip" data-act="apClean" data-v="'+v+'" aria-pressed="'+((S.profile.cleanSafe!==false)===v)+'">'+n+'</button>').join('')+'</div>'+
+    '<p class="small muted">'+(exp==='einsteiger'?'Einsteiger: einfachere Grundübungen, keine Umsetz- und Reißvarianten vom Boden, weniger Sprungkontakte, RPE-Grenze −0,5. ':'')+(S.profile.cleanSafe===false?'Statt Umsetzen plant AOS Trap-Bar-Sprung, Speed Pull oder KB Swing.':'')+'</p>';
+  const grp=S.profile.planEngine==='gruppen';
+  b+='<label>Planung</label>'+(grp
+    ? '<p class="small">Nach Positionsgruppe'+(S.profile.planEngineSince?' ab '+fmtDate(S.profile.planEngineSince):'')+'. <button class="link" data-act="apEngine" data-v="klassisch">Zurück zur bisherigen Planung</button></p>'
+    : '<p class="small">Bisherige Vorlagen. <button class="link" data-act="apEngine" data-v="gruppen">Auf Positionsgruppen umstellen</button> (gilt ab dem nächsten Block, der laufende bleibt).</p>');
   b+='<label>Trainingstage (Krafttraining)</label><div class="chips7">'+DAY_KEYS.map(d=>'<button class="chip" data-act="apDay" data-v="'+d+'" aria-pressed="'+days.includes(d)+'">'+dn[d]+'</button>').join('')+'</div>'+
     '<p class="small muted">AOS plant bis zu 4 Einheiten pro Woche. Bei weniger Tagen wird der Wochenumfang auf diese Tage verteilt.</p>';
   return pdet('athlet','Position & Trainingstage', [main?main.code+(sec?' / '+sec.code+' '+sec.share+' %':''):'keine Position', days.length+' Tage'].join(' · '), b); }
@@ -1621,6 +1633,12 @@ CHG.apPos = ()=>{ const m=val('ap-main'), s=val('ap-sec'); const old=S.profile.p
   S.profile.positions=[{ id:keep(m)||uid('pos'), code:m, name:name(m), weight:100-share }].concat(share?[{ id:keep(s)||uid('pos'), code:s, name:name(s), weight:share }]:[]);
   save(); render(); };
 ACT.apShare = el=>{ const P=S.profile.positions||[]; if(P.length<2) return; const v=+el.dataset.v; const mi=P[0].weight>=P[1].weight?0:1; P[mi].weight=100-v; P[1-mi].weight=v; save(); render(); };
+ACT.apExp = el=>{ S.profile.experience=el.dataset.v; save(); apReplan(); render(); };
+ACT.apClean = el=>{ S.profile.cleanSafe=el.dataset.v==='true'; save(); apReplan(); render(); };
+ACT.apEngine = el=>{ const v=el.dataset.v; const t=todayISO();
+  const next=((REF.plan&&REF.plan.phases)||[]).map(p=>p.start).filter(d=>d>t).sort()[0]||t;
+  if(v==='gruppen' && !confirm('Ab '+fmtDate(next)+' plant AOS nach deiner Positionsgruppe. Der laufende Block bleibt unverändert. Umstellen?')) return;
+  S.profile.planEngine=v; S.profile.planEngineSince=v==='gruppen'?next:''; save(); apReplan(); render(); toast(v==='gruppen'?'Umgestellt ab '+fmtDate(next):'Bisherige Planung aktiv'); };
 ACT.apDay = el=>{ const d=el.dataset.v; let days=trainingDays(); days=days.includes(d)?days.filter(x=>x!==d):days.concat([d]);
   if(!days.length){ toast('Mindestens ein Trainingstag.'); return; }
   S.profile.trainingDays=DAY_KEYS.filter(k=>days.includes(k)); save(); apReplan(); render();
@@ -1760,35 +1778,46 @@ function apEmphasis(start){ if(typeof S==='undefined'||!S) return null;
     const p=goalVal(L[L.length-1])/g.target; if(!best||p<best.p) best={ key, p, name:g.name }; });
   return best;
 }
-function apBuildBlock(phase, prev){
+function apBuildBlock(phase, prev, prev2){
   const P=AP_PROFILE[phase.id]; if(!P || !REF.exMap) return null;
   const weeks=Math.max(1, Math.round((daysBetween(phase.start, phase.end)+1)/7));
   const types=apWeekTypes(phase.id, phase.start, weeks); const prevUsed=apUsedIn(prev); const taken=new Set(); const emph=(phase.id==='IN'||phase.id==='P1')?null:apEmphasis(phase.start);   // Wiedereinstieg und Saison: kein Zusatzsatz
-  const SL=phase.id==='IN'?AP_SLOTS_IN:AP_SLOTS;
-  const templates=Object.entries(SL).map(([tid,T])=>{
+  const C=apUseGroups(phase) ? tpContext() : null;   // Positionsgruppen (M3) oder bisherige Vorlagen
+  const TPL=C ? tpTemplates(phase, C) : Object.entries(phase.id==='IN'?AP_SLOTS_IN:AP_SLOTS).map(([tid,T])=>({ tid, name:T.name, group:T.group, time:T.time, slots:T.slots }));
+  const tids=TPL.map(t=>t.tid); const firstLower=(TPL.find(t=>t.group!=='upper')||TPL[0]||{}).tid;
+  const prevCtx={ b1:prev, b2:prev2, used:prevUsed };
+  const buildSlot=(tid, spec, id, c)=>{
+    const ex=REF.exMap[c[0]]; const dose={}, rw={}; let rng=null, rpe=null;
+    types.forEach((wt,w)=>{ let d=spec.field ? tpFieldDose(phase.id, wt) : apSlotDose(spec, ex, P, wt, emph && ((emph.key==='squat'&&spec.k==='squat')||(emph.key==='bench'&&spec.k==='bench')||(emph.key==='hinge'&&spec.k==='hinge')));
+      if(C && !spec.field) d=tpDose(d, spec, ex, C, phase.id, wt);
+      dose[w+1]=d.dose; if(typeof d.rpe==='number' && spec.main && spec.main!=='pull') rw[w+1]=d.rpe; else if(d.rpe!=null) rpe=String(d.rpe); if(d.range) rng=d.range; });
+    const method = spec.field ? 'quality' : (spec.main==='main'||spec.main==='hinge') ? 'wave' : spec.main==='pull' ? 'bodyweight_reps' : spec.second ? ((ex.progression||[]).includes('wave') ? 'rpe_linear' : 'double') : ((ex.progression||[])[0]||'quality');
+    const sl={ id, role:spec.role, prio:spec.prio, method, candidates:c, dose, rest:spec.role==='main'?[150,180]:spec.role==='power'?[75,90]:[60,75] };
+    if(spec.tp) sl.tp=spec.tp; if(spec.grp) sl.grp=spec.grp; if(spec.pflicht) sl.pflicht=true;
+    if(Object.keys(rw).length) sl.rpe_wave=rw; if(rpe) sl.rpe=rpe; if(rng && method==='double') sl.range=rng; if(spec.grip) sl.grip=true;
+    if(spec.k==='oly'||method==='velocity'||(ex.pattern==='olympic'&&C)) sl.note='Jede Wdh schnell und sauber. „Alle schnell?“ notieren.';
+    if(spec.field && C) sl.note=tpSprintNote(C, phase.id);
+    if(ex.cue) sl.note=(sl.note?sl.note+' ':'')+ex.cue;
+    return sl; };
+  const templates=TPL.map(T=>{ const tid=T.tid;
     const slots=[];
     T.slots.forEach((spec,i)=>{ if((spec.skip||[]).includes(phase.id)) return;
-      const c=apPick(spec, phase.id, prevUsed, taken); if(!c) return; taken.add(c[0]);
-      const ex=REF.exMap[c[0]]; const dose={}, rw={}; let rng=null, rpe=null;
-      types.forEach((wt,w)=>{ const d=apSlotDose(spec, ex, P, wt, emph && ((emph.key==='squat'&&spec.k==='squat')||(emph.key==='bench'&&spec.k==='bench')||(emph.key==='hinge'&&spec.k==='hinge')));
-        dose[w+1]=d.dose; if(typeof d.rpe==='number' && spec.main && spec.main!=='pull') rw[w+1]=d.rpe; else if(d.rpe!=null) rpe=String(d.rpe); if(d.range) rng=d.range; });
-      const method = (spec.main==='main'||spec.main==='hinge') ? 'wave' : spec.main==='pull' ? 'bodyweight_reps' : spec.second ? ((ex.progression||[]).includes('wave') ? 'rpe_linear' : 'double') : ((ex.progression||[])[0]||'quality');
-      const sl={ id:tid+'-'+(i+1), role:spec.role, prio:spec.prio, method, candidates:c, dose, rest:spec.role==='main'?[150,180]:spec.role==='power'?[75,90]:[60,75] };
-      if(Object.keys(rw).length) sl.rpe_wave=rw; if(rpe) sl.rpe=rpe; if(rng && method==='double') sl.range=rng; if(spec.grip) sl.grip=true;
-      if(spec.k==='oly'||method==='velocity') sl.note='Jede Wdh schnell und sauber. „Alle schnell?“ notieren.';
-      if(ex.cue) sl.note=(sl.note?sl.note+' ':'')+ex.cue;
-      slots.push(sl); });
-    // Standortbestimmung: Broad Jump in der Testwoche (D1), wenn er nicht ohnehin geplant ist
-    if(tid==='D1' && types.some(t=>t==='H'||t==='DT') && !slots.some(s=>s.candidates[0]==='broad_jump') && REF.exMap.broad_jump){
-      const tw=types.findIndex(t=>t==='H'||t==='DT')+1; slots.unshift({ id:'D1-0', role:'power', prio:1, method:'quality', candidates:['broad_jump'], dose:{[tw]:[1,'3']}, rest:[60,90], note:'Standortbestimmung: 3 Versuche nach dem Aufwärmen, beste Weite notieren.' }); }
+      const c=(C&&spec.tp) ? tpPick(spec, phase.id, prevCtx, taken, C) : apPick(spec, phase.id, prevUsed, taken); if(!c) return; taken.add(c[0]);
+      slots.push(buildSlot(tid, spec, tid+'-'+(i+1), c)); });
     return { id:tid, name:T.name, group:T.group, time_min:T.time, goal:P.goal, slots };
   });
-  const ps=prev&&prev.week_schedule; const sched=phase.id==='IN' ? { TUE:'IN1', THU:'IN2' } : schedFromDays(Object.keys(AP_SLOTS));   // Trainingstage aus dem Profil
+  if(C && phase.id!=='IN') tpPflicht(templates, TPL, C, phase, buildSlot);
+  // Standortbestimmung: Broad Jump in der Testwoche (erste Unterkörper-Einheit), wenn er nicht ohnehin geplant ist
+  templates.forEach(t=>{ const slots=t.slots; if(t.id===firstLower && types.some(x=>x==='H'||x==='DT') && !slots.some(s=>s.candidates[0]==='broad_jump') && REF.exMap.broad_jump){
+      const tw=types.findIndex(x=>x==='H'||x==='DT')+1; slots.unshift({ id:t.id+'-0', role:'power', prio:1, method:'quality', candidates:['broad_jump'], dose:{[tw]:[1,'3']}, rest:[60,90], note:'Standortbestimmung: 3 Versuche nach dem Aufwärmen, beste Weite notieren.' }); } });
+  const ps=prev&&prev.week_schedule; const sched=phase.id==='IN' ? { TUE:'IN1', THU:'IN2' } : schedFromDays(tids);   // Trainingstage aus dem Profil
   const week_wave={}, week_notes={}, week_overrides={};
   types.forEach((t,w)=>{ week_wave[w+1]=AP_WAVE_LABEL[t]; });
   week_notes[1]=[P.goal+'. Hauptübungen fix, Rest wechselt.'];
   (P.notes||[]).forEach(n=>week_notes[1].push(n));
   if(emph) week_notes[1].push('Schwerpunkt: '+emph.name+' +1 Satz (erst '+Math.round(emph.p*100)+' % vom Ziel).');
+  if(C){ week_notes[1].push('Positionsgruppe: '+C.label+(C.exp!=='fortgeschritten'?' · '+(EXP_LIST.find(e=>e[0]===C.exp)||['',''])[1]:'')+(C.clean?'':' · Umsetzen ersetzt durch Trap-Bar-Sprung/Speed Pull')+'.');
+    if(phase.id!=='IN' && phase.id!=='P1' && phase.id!=='P2' && !templates.some(t=>t.slots.some(s=>s.tp==='field'))) week_notes[1].push('Sprints und Positionsarbeit über das Teamtraining (kein Feldtag im Profil).'); }
   types.forEach((t,w)=>{ if(t==='D') week_overrides[w+1]={ note:'Entlastung: weniger Sätze, gleiche Last'+(addDays(phase.start,w*7).slice(5)<='12-31'&&addDays(phase.start,w*7).slice(5)>='12-18'?' · Feiertage: Tage frei setzen':'') };
     if(t==='H'||t==='DT') (week_notes[w+1]=week_notes[w+1]||[]).push('Standortbestimmung: Broad Jump (D1), Top-Sets Kniebeuge, Kreuzheben, Bank bis RPE '+fmtNum(P.cap)+', kein Maxtest. Ergebnisse gehen automatisch in den Verlauf.'); });
   // Nicht verfügbare Tage (plan.json „unavailable“): Einheiten der Woche rücken in Reihenfolge auf die übrigen Trainingstage, was nicht passt, entfällt (kein Nachholen)
@@ -1801,7 +1830,7 @@ function apBuildBlock(phase, prev){
   const game=((REF.plan.season||{}).first_game||[])[0];
   if(phase.id==='P5' && game){ const lw=weeks; const mon=addDays(phase.start,(lw-1)*7);
     if(game>=mon && game<=addDays(mon,6)){ const order=['MON','TUE','WED','THU','FRI','SAT','SUN']; const s2={}; Object.entries(sched).forEach(([d,t])=>{ const dt=addDays(mon,order.indexOf(d)); if(daysBetween(dt,game)>=4) s2[d]=t; });
-      const kept=Object.values(s2); week_overrides[lw]={ schedule:s2, skipped:Object.keys(AP_SLOTS).filter(t=>!kept.includes(t)), note:'Spielwoche: letzte Einheit spätestens 4 Tage vor dem Spiel, danach frei.' }; } }
+      const kept=Object.values(s2); week_overrides[lw]={ schedule:s2, skipped:tids.filter(t=>!kept.includes(t)), note:'Spielwoche: letzte Einheit spätestens 4 Tage vor dem Spiel, danach frei.' }; } }
   // Saison: Spielwochen 1 Einheit (Kraft) mindestens 4 Tage vor dem Spiel, spielfreie Wochen 2 Einheiten (2.3 In-Season)
   if(phase.id==='IN'){ const games=apGames(); const order=['MON','TUE','WED','THU','FRI','SAT','SUN'];
     for(let w=1; w<=weeks; w++){ const mon=addDays(phase.start,(w-1)*7); const g=games.find(d=>d>=mon && d<=addDays(mon,6));
@@ -1813,8 +1842,10 @@ function apBuildBlock(phase, prev){
         week_wave[w]='Spielwoche '+WD[weekdayOf(g)]+' '+fmtDate(g).slice(0,6); }
       else { week_wave[w]=AP_WAVE_LABEL.B; }
     } }
-  return { id:'AUTO-'+phase.id, auto:true, name:'Block '+phase.id.slice(1)+' – '+P.name, phase:phase.id, start:phase.start, weeks, rpe_cap:[P.cap,P.cap], status:'automatisch',
-    week_wave, test_weeks:types.map((t,i)=>(t==='H'||t==='DT')?i+1:0).filter(Boolean), week_schedule:sched, week_overrides, session_order:Object.keys(SL), limits:{ contacts_per_session:P.contacts, sprint_m_per_session:[0,0] }, week_notes, start_loads:{}, templates };
+  const cap=C&&C.E ? P.cap+C.E.cap : P.cap; const kf=C?C.kf:1;
+  return { id:'AUTO-'+phase.id, auto:true, name:'Block '+phase.id.slice(1)+' – '+P.name, phase:phase.id, start:phase.start, weeks, rpe_cap:[cap,cap], status:'automatisch',
+    week_wave, test_weeks:types.map((t,i)=>(t==='H'||t==='DT')?i+1:0).filter(Boolean), week_schedule:sched, week_overrides, session_order:tids, limits:{ contacts_per_session:P.contacts.map(x=>Math.round(x*kf)), sprint_m_per_session:[0,0] }, week_notes, start_loads:{}, templates,
+    groups:C?C.label:null };
 }
 function apGames(){ const own=(typeof S!=='undefined'&&S ? (S.calendar||[]) : []).filter(e=>e.kind==='game'&&e.date).map(e=>e.date);
   const team=((typeof REF!=='undefined'&&REF.plan&&REF.plan.games)||[]).filter(e=>e&&e.date).map(e=>e.date);   // Teamkalender (team_season)
@@ -1830,11 +1861,181 @@ function apInSeason(plan){
 }
 function apGenerate(plan){
   if(!plan || !plan.phases) return; plan.blocks=(plan.blocks||[]).filter(b=>!b.auto); apInSeason(plan);
-  const phases=plan.phases.slice().sort((a,b)=>a.start<b.start?-1:1); let prev=null;
-  phases.forEach(ph=>{ const own=plan.blocks.find(b=>b.phase===ph.id); if(own){ prev=own; return; }
-    const b=apBuildBlock(ph, prev); if(b){ plan.blocks.push(b); prev=b; } });
+  const phases=plan.phases.slice().sort((a,b)=>a.start<b.start?-1:1); let prev=null, prev2=null;
+  phases.forEach(ph=>{ const own=plan.blocks.find(b=>b.phase===ph.id); if(own){ prev2=prev; prev=own; return; }
+    const b=apBuildBlock(ph, prev, prev2); if(b){ plan.blocks.push(b); prev2=prev; prev=b; } });
   plan.blocks.sort((a,b)=>a.start<b.start?-1:1);
 }
+
+/* ===== AOS – Positionsgruppen (Roadmap M3, Trainingspfade) =====
+   Die Gruppe bestimmt WAS trainiert wird und wie es dosiert wird, nicht WANN (Phasen, Wochenwelle, RPE-Grenzen bleiben gleich).
+   - Vorlage aus der Zahl der Trainingstage (4: Unter-/Oberkörper im Wechsel, 3 und 2: Ganzkörper).
+   - Übungswahl je Slot: Score = Σ Anteil × Relevanz der Gruppe − Abzug + Rangbonus aus der Liste der Hauptgruppe (Platz 1 +0,5, Platz 2 +0,25).
+   - Positionsslots (Feld, Medizinball, Kontakt) teilweise aus der Liste der Nebengruppe; Pflichtübungen pro Woche; Ausschlüsse je Gruppe, Erfahrung und Umsetz-Technik.
+   - Zahlen (Sätze-Delta der Hauptübungen, Kontaktfaktor, Wdh der Ergänzung) nach Anteil gemittelt.
+   Profile ohne Umstellung (planEngine ≠ 'gruppen') planen weiter mit den bisherigen Vorlagen. */
+/* TP-BEGIN (tools/tp-gen.py) */
+const TP={ version:"2.0",
+  slots:{"field":{"n":"Sprint / Positionsarbeit (Feld)","r":["field","conditioning"],"p":1,"m":[],"ph":["P3","P4","P5","IN"]},"jump":{"n":"Sprünge","r":["power"],"p":1,"m":["jump"]},"power_lower":{"n":"Power Unterkörper (beladen/olympisch)","r":["power"],"p":1,"m":["olympic","jump_loaded","hinge","sled"]},"throw":{"n":"Medizinball","r":["power"],"p":2,"m":["throw"]},"power_upper":{"n":"Power Oberkörper","r":["power"],"p":2,"m":["vertical_push","angled_push","horizontal_push"]},"main_squat":{"n":"Hauptübung Kniebeuge","r":["main"],"p":1,"m":["squat"]},"main_hinge":{"n":"Hauptübung Hüftstreckung","r":["main"],"p":1,"m":["hinge"]},"main_push":{"n":"Hauptübung Drücken horizontal","r":["main"],"p":1,"m":["horizontal_push"]},"main_pull":{"n":"Hauptübung Ziehen vertikal","r":["main","assistance"],"p":1,"m":["vertical_pull"]},"push_2":{"n":"Drücken ergänzend","r":["main","assistance"],"p":2,"m":["incline_push","vertical_push","angled_push","horizontal_push","vertical_push_down"]},"pull_2":{"n":"Rudern","r":["assistance"],"p":2,"m":["horizontal_pull"]},"single_leg":{"n":"Einbeinig kniebetont","r":["assistance"],"p":2,"m":["lunge","squat"]},"posterior":{"n":"Hintere Kette / Hamstrings","r":["assistance"],"p":2,"m":["hinge","knee_flexion"]},"lateral_adductor":{"n":"Seitlich / Adduktoren","r":["assistance","prehab"],"p":3,"m":["lunge","adductor"]},"trunk":{"n":"Rumpf","r":["assistance","power"],"p":3,"m":["anti_extension","anti_lateral","anti_rotation","rotation","carry"]},"carry_contact":{"n":"Kontakt / Griff / Nacken","r":["assistance","prehab"],"p":3,"m":["shrug","carry","neck","grip"]},"prehab_lower":{"n":"Prehab Unterkörper","r":["prehab","assistance"],"p":3,"m":["ankle","adductor","hip_flexion","hinge","knee_flexion"]},"prehab_upper":{"n":"Prehab Oberkörper","r":["prehab"],"p":3,"m":["scapular","shoulder_rotation","elbow_flexion","elbow_extension","shoulder_abduction"]}},
+  vorlagen:{"4":[{"id":"D1","name":"Lower Force","half":"lower","slots":["field","jump","main_squat","single_leg","posterior","trunk","prehab_lower"]},{"id":"D2","name":"Upper Strength","half":"upper","slots":["throw","main_push","main_pull","push_2","pull_2","carry_contact","prehab_upper"]},{"id":"D3","name":"Lower Power","half":"lower","slots":["field","power_lower","main_hinge","single_leg","lateral_adductor","trunk","prehab_lower"]},{"id":"D4","name":"Upper Power","half":"upper","slots":["power_upper","throw","push_2","main_pull","pull_2","carry_contact","prehab_upper"]}],"3":[{"id":"G1","name":"Ganzkörper Kniebeuge","half":"full","slots":["field","jump","main_squat","main_push","pull_2","posterior","prehab_lower"]},{"id":"G2","name":"Ganzkörper Power","half":"full","slots":["throw","power_lower","main_pull","push_2","single_leg","carry_contact","prehab_upper"]},{"id":"G3","name":"Ganzkörper Hüfte","half":"full","slots":["field","power_upper","main_hinge","push_2","pull_2","lateral_adductor","trunk"]}],"2":[{"id":"G1","name":"Ganzkörper A","half":"full","slots":["field","jump","main_squat","main_push","main_pull","posterior","trunk","prehab_lower"]},{"id":"G2","name":"Ganzkörper B","half":"full","slots":["field","power_lower","main_hinge","push_2","pull_2","single_leg","carry_contact","prehab_upper"]}]},
+  mod:{"einsteiger":{"x":["power_clean","clean_pull","high_pull","conventional_deadlift","depth_jump","bb_push_press","weighted_pull_up","pause_squat","ssb_good_morning"],"cap":-0.5,"minReps":3,"kf":0.7,"wd":2,"pref":{"main_squat":["goblet_squat","ssb_squat","high_bar_squat"],"main_hinge":["trap_bar_deadlift"],"main_push":["db_bench_press","bench_press"]}},"clean":{"ausgeschlossen":["hang_power_clean","hang_power_clean_bk","power_clean"],"ersatz":["trap_bar_jump","trap_bar_speed_pull","kb_swing"]},"schwer":{"kg":115,"kf":0.7,"x":["depth_jump","split_jump","single_leg_broad_jump"]}},
+  gruppen:{
+    OL:{"k":{"field":["three_point_start","sled_push","hand_fight_partner","accel_10_20m"],"jump":["box_jump","countermovement_jump","broad_jump","trap_bar_jump"],"power_lower":["hang_power_clean","hang_power_clean_bk","trap_bar_jump","trap_bar_speed_pull","clean_pull","sled_push","power_clean","kb_swing"],"throw":["mb_chest_pass","mb_split_stance_punch","mb_scoop_toss","mb_slam"],"power_upper":["bb_push_press","db_push_press_single_arm","landmine_push_press","explosive_push_up"],"main_squat":["high_bar_squat","ssb_squat","box_squat","pause_squat","front_squat","belt_squat"],"main_hinge":["trap_bar_deadlift","conventional_deadlift","romanian_deadlift"],"main_push":["bench_press","pause_bench","floor_press","db_bench_press"],"main_pull":["chin_up","pull_up","weighted_pull_up","inverted_row","lat_pulldown"],"push_2":["incline_bb_bench","close_grip_bench","incline_db_press","db_overhead_press","landmine_press","dips"],"pull_2":["pendlay_row","db_row","chest_supported_db_row","seated_cable_row"],"single_leg":["reverse_lunge","high_step_up","bulgarian_split_squat","walking_lunge"],"posterior":["romanian_deadlift","back_extension_45","hip_thrust","ssb_good_morning","nordic_hamstring"],"lateral_adductor":["lateral_lunge","copenhagen_plank","adductor_machine"],"trunk":["suitcase_carry","dead_bug","pallof_press","side_plank","bb_rollout"],"carry_contact":["trap_bar_shrug","neck_plate_isometric","farmer_carry","db_shrug","kb_front_rack_carry"],"prehab_lower":["back_extension_45","tibialis_raise","db_single_leg_calf_raise","copenhagen_plank"],"prehab_upper":["band_pull_apart","db_reverse_fly","face_pull","db_hammer_curl","db_triceps_extension"]},"sd":{"P1":0,"P2":1,"P3":1,"P4":0,"P5":0,"IN":0},"sf":null,"w":[6,10],"kf":0.7,"sprint":{"P3":"5–10 m aus 2/3-Punkt-Stand, Schlitten","P4":"Stance-Starts 5 m, Schlitten, Hand Fight, kurze Pass-Set-Folgen","P5":"wenige kurze Starts, volle Pausen","IN":"Erhalt über Teamtraining"},"p":[["neck_plate_isometric",1],["carry_contact",2],["back_extension_45",1]],"x":[["depth_jump","hauptgruppe"]],"sp":{"carry_contact":2,"trunk":2}},
+    DL:{"k":{"field":["de_get_off","three_point_start","hand_fight_partner","sled_push","accel_10_20m","pro_agility"],"jump":["box_jump","broad_jump","countermovement_jump","lateral_bound","depth_jump","trap_bar_jump"],"power_lower":["hang_power_clean","hang_power_clean_bk","trap_bar_jump","trap_bar_speed_pull","power_clean","clean_pull","sled_push","kb_swing"],"throw":["mb_split_stance_punch","mb_chest_pass","mb_rotational_throw","mb_slam"],"power_upper":["db_push_press_single_arm","landmine_push_press","bb_push_press","explosive_push_up"],"main_squat":["high_bar_squat","ssb_squat","box_squat","front_squat","pause_squat","belt_squat"],"main_hinge":["trap_bar_deadlift","conventional_deadlift","romanian_deadlift"],"main_push":["bench_press","pause_bench","floor_press","db_bench_press"],"main_pull":["pull_up","weighted_pull_up","chin_up","lat_pulldown"],"push_2":["incline_bb_bench","landmine_press","incline_db_press","close_grip_bench","db_overhead_press","dips"],"pull_2":["db_row","pendlay_row","chest_supported_db_row","inverted_row"],"single_leg":["reverse_lunge","bulgarian_split_squat","high_step_up","walking_lunge"],"posterior":["romanian_deadlift","hip_thrust","db_single_leg_rdl","nordic_hamstring","back_extension_45"],"lateral_adductor":["lateral_lunge","copenhagen_plank","adductor_machine"],"trunk":["landmine_rotation","pallof_press","suitcase_carry","dead_bug","bb_rollout"],"carry_contact":["neck_plate_isometric","trap_bar_shrug","farmer_carry","db_shrug","plate_pinch"],"prehab_lower":["copenhagen_plank","db_single_leg_calf_raise","tibialis_raise","back_extension_45"],"prehab_upper":["prone_ytw","band_pull_apart","db_reverse_fly","face_pull","db_hammer_curl"]},"sd":{"P1":0,"P2":1,"P3":0,"P4":0,"P5":0,"IN":0},"sf":null,"w":[5,8],"kf":0.85,"sprint":{"P3":"5–20 m aus 3-Punkt-Stand","P4":"Get-off mit Reaktion, Hand Fight, Verfolgung 10–20 m","P5":"kurz und schnell, volle Pausen","IN":"Erhalt über Teamtraining"},"p":[["neck_plate_isometric",2],["carry_contact",2]],"x":[],"sp":{"carry_contact":2},"v":{"DE":{"kontakte_faktor":1.0,"hauptuebungen_saetze_delta":{"P2":0},"kandidaten_vorne":{"field":["de_get_off","three_point_start","hand_fight_partner","accel_10_20m","pro_agility"],"jump":["broad_jump","lateral_bound","box_jump"],"lateral_adductor":["lateral_lunge","copenhagen_plank"]},"p":[["copenhagen_plank",1]]},"DT":{"kontakte_faktor":0.7,"hauptuebungen_saetze_delta":{"P3":1},"kandidaten_vorne":{"field":["three_point_start","hand_fight_partner","sled_push","de_get_off"],"jump":["box_jump","countermovement_jump"]},"x":["depth_jump"]},"NT":{"wie":"DT"}}},
+    LB:{"k":{"field":["two_point_start","pro_agility","backpedal_turn","hand_fight_partner","accel_10_20m","repeated_sprint","flying_10m"],"jump":["broad_jump","lateral_bound","box_jump","countermovement_jump","skater_hop","depth_jump"],"power_lower":["hang_power_clean","hang_power_clean_bk","trap_bar_jump","trap_bar_speed_pull","power_clean","high_pull","kb_swing"],"throw":["mb_split_stance_punch","mb_rotational_throw","mb_chest_pass","mb_scoop_toss"],"power_upper":["db_push_press_single_arm","landmine_push_press","explosive_push_up","bb_push_press"],"main_squat":["high_bar_squat","ssb_squat","front_squat","box_squat","pause_squat","belt_squat"],"main_hinge":["trap_bar_deadlift","conventional_deadlift","romanian_deadlift"],"main_push":["bench_press","db_bench_press","pause_bench","floor_press"],"main_pull":["pull_up","weighted_pull_up","chin_up","lat_pulldown"],"push_2":["incline_db_press","landmine_press","db_overhead_press","incline_bb_bench","weighted_push_up"],"pull_2":["db_row","pendlay_row","chest_supported_db_row","inverted_row"],"single_leg":["reverse_lunge","bulgarian_split_squat","high_step_up","lateral_lunge"],"posterior":["db_single_leg_rdl","nordic_hamstring","romanian_deadlift","hip_thrust","back_extension_45"],"lateral_adductor":["lateral_lunge","copenhagen_plank","adductor_machine"],"trunk":["landmine_rotation","pallof_press","suitcase_carry","dead_bug","hanging_knee_raise"],"carry_contact":["neck_plate_isometric","trap_bar_shrug","farmer_carry","db_shrug"],"prehab_lower":["copenhagen_plank","db_single_leg_calf_raise","banded_hip_flexor_march","tibialis_raise"],"prehab_upper":["prone_ytw","band_pull_apart","db_reverse_fly","face_pull"]},"sd":{"P1":0,"P2":0,"P3":0,"P4":0,"P5":0,"IN":0},"sf":null,"w":[5,8],"kf":1.0,"sprint":{"P3":"10–20 m aus 2-Punkt-Stand, erste Richtungswechsel","P4":"Reaktionsstarts, Pro Agility, Backpedal + Turn, Block abwehren (Hand Fight), wiederholte Sprints","P5":"kurz und schnell","IN":"Erhalt über Teamtraining"},"p":[["neck_plate_isometric",2],["copenhagen_plank",1],["nordic_hamstring",1]],"x":[],"sp":{}},
+    TE:{"k":{"field":["two_point_start","three_point_start","release_drill","hand_fight_partner","accel_10_20m","flying_10m","sled_push"],"jump":["broad_jump","box_jump","countermovement_jump","lateral_bound","split_jump"],"power_lower":["hang_power_clean","trap_bar_jump","hang_power_clean_bk","trap_bar_speed_pull","power_clean","high_pull","kb_swing"],"throw":["mb_split_stance_punch","mb_chest_pass","mb_scoop_toss","mb_rotational_throw"],"power_upper":["db_push_press_single_arm","landmine_push_press","explosive_push_up","bb_push_press"],"main_squat":["high_bar_squat","front_squat","ssb_squat","box_squat","pause_squat","belt_squat"],"main_hinge":["trap_bar_deadlift","romanian_deadlift","conventional_deadlift"],"main_push":["bench_press","db_bench_press","pause_bench","floor_press"],"main_pull":["pull_up","weighted_pull_up","chin_up","lat_pulldown"],"push_2":["incline_db_press","landmine_press","db_overhead_press","incline_bb_bench"],"pull_2":["db_row","pendlay_row","chest_supported_db_row","inverted_row"],"single_leg":["reverse_lunge","bulgarian_split_squat","high_step_up","walking_lunge"],"posterior":["nordic_hamstring","romanian_deadlift","db_single_leg_rdl","hip_thrust","back_extension_45"],"lateral_adductor":["copenhagen_plank","lateral_lunge","adductor_machine"],"trunk":["pallof_press","landmine_rotation","suitcase_carry","dead_bug"],"carry_contact":["neck_plate_isometric","plate_pinch","farmer_carry","trap_bar_shrug"],"prehab_lower":["db_single_leg_calf_raise","copenhagen_plank","banded_hip_flexor_march","tibialis_raise"],"prehab_upper":["band_pull_apart","prone_ytw","db_reverse_fly","db_hammer_curl"]},"sd":{"P1":0,"P2":0,"P3":0,"P4":0,"P5":0,"IN":0},"sf":null,"w":[5,8],"kf":0.9,"sprint":{"P3":"10–30 m, Starts aus 2/3-Punkt-Stand","P4":"Release + 10–20 m, fliegende Sprints (Seam), Hand Fight","P5":"kurz und schnell","IN":"Erhalt über Teamtraining"},"p":[["neck_plate_isometric",1],["nordic_hamstring",1],["plate_pinch",1]],"x":[],"sp":{},"v":{"FB":{"kontakte_faktor":0.9,"kandidaten_vorne":{"field":["three_point_start","sled_push","hand_fight_partner","accel_10_20m"]}}}},
+    RB:{"k":{"field":["accel_10_20m","cut_45_90","flying_10m","two_point_start","pro_agility","repeated_sprint"],"jump":["broad_jump","single_leg_broad_jump","lateral_bound","skater_hop","pogo_jumps","split_jump","box_jump","depth_jump"],"power_lower":["hang_power_clean","trap_bar_jump","trap_bar_speed_pull","hang_power_clean_bk","kb_swing","high_pull"],"throw":["mb_scoop_toss","mb_rotational_throw","mb_slam","mb_chest_pass"],"power_upper":["landmine_push_press","db_push_press_single_arm","explosive_push_up"],"main_squat":["high_bar_squat","front_squat","ssb_squat","box_squat","pause_squat","goblet_squat"],"main_hinge":["trap_bar_deadlift","romanian_deadlift","conventional_deadlift"],"main_push":["bench_press","db_bench_press","floor_press","weighted_push_up"],"main_pull":["pull_up","weighted_pull_up","chin_up","inverted_row"],"push_2":["incline_db_press","landmine_press","db_overhead_press","weighted_push_up"],"pull_2":["db_row","chest_supported_db_row","pendlay_row","inverted_row"],"single_leg":["bulgarian_split_squat","reverse_lunge","high_step_up","lateral_lunge"],"posterior":["nordic_hamstring","db_single_leg_rdl","romanian_deadlift","hip_thrust","back_extension_45"],"lateral_adductor":["lateral_lunge","copenhagen_plank","adductor_machine"],"trunk":["pallof_press","landmine_rotation","side_plank","dead_bug","hanging_knee_raise"],"carry_contact":["neck_plate_isometric","plate_pinch","suitcase_carry","farmer_carry","trap_bar_shrug"],"prehab_lower":["db_single_leg_calf_raise","banded_hip_flexor_march","copenhagen_plank","tibialis_raise"],"prehab_upper":["band_pull_apart","prone_ytw","db_reverse_fly"]},"sd":{"P1":0,"P2":0,"P3":0,"P4":0,"P5":0,"IN":0},"sf":null,"w":[5,8],"kf":1.0,"sprint":{"P3":"10–30 m, erste fliegende Sprints","P4":"Cuts 45°/90°, Beschleunigung, Höchstgeschwindigkeit, wiederholte Sprints","P5":"kurz, schnell, volle Pausen","IN":"Erhalt über Teamtraining"},"p":[["nordic_hamstring",2],["copenhagen_plank",1],["db_single_leg_calf_raise",2],["banded_hip_flexor_march",1],["neck_plate_isometric",1]],"x":[],"sp":{"posterior":1}},
+    WR:{"k":{"field":["flying_10m","accel_10_20m","release_drill","cut_45_90","two_point_start","repeated_sprint","pro_agility"],"jump":["box_jump","single_leg_broad_jump","pogo_jumps","countermovement_jump","broad_jump","lateral_bound","split_jump","depth_jump"],"power_lower":["trap_bar_jump","hang_power_clean","kb_swing","trap_bar_speed_pull","high_pull"],"throw":["mb_scoop_toss","mb_rotational_throw","mb_slam"],"power_upper":["explosive_push_up","landmine_push_press","db_push_press_single_arm"],"main_squat":["front_squat","ssb_squat","high_bar_squat","box_squat","goblet_squat"],"main_hinge":["trap_bar_deadlift","romanian_deadlift"],"main_push":["db_bench_press","weighted_push_up","bench_press","floor_press"],"main_pull":["pull_up","chin_up","weighted_pull_up","inverted_row"],"push_2":["landmine_press","db_overhead_press","weighted_push_up","incline_db_press"],"pull_2":["db_row","chest_supported_db_row","inverted_row"],"single_leg":["high_step_up","bulgarian_split_squat","reverse_lunge","lateral_lunge"],"posterior":["nordic_hamstring","db_single_leg_rdl","hip_thrust","romanian_deadlift","back_extension_45"],"lateral_adductor":["copenhagen_plank","lateral_lunge","adductor_machine"],"trunk":["side_plank","pallof_press","dead_bug","hanging_knee_raise","landmine_rotation"],"carry_contact":["plate_pinch","farmer_hold","suitcase_carry","farmer_carry"],"prehab_lower":["db_single_leg_calf_raise","banded_hip_flexor_march","tibialis_raise","copenhagen_plank"],"prehab_upper":["band_pull_apart","prone_ytw","db_reverse_fly","band_external_rotation"]},"sd":{"P1":0,"P2":0,"P3":-1,"P4":-1,"P5":0,"IN":0},"sf":["main_squat","main_hinge"],"w":[5,8],"kf":1.0,"sprint":{"P3":"10–40 m, fliegende Sprints","P4":"Höchstgeschwindigkeit, Release, Routenbrüche (Cuts), wiederholte Sprints","P5":"kurz, schnell, volle Pausen","IN":"Erhalt über Teamtraining"},"p":[["nordic_hamstring",2],["db_single_leg_calf_raise",2],["banded_hip_flexor_march",2],["copenhagen_plank",1]],"x":[],"sp":{"posterior":1,"prehab_lower":2}},
+    DB:{"k":{"field":["backpedal_turn","press_jam_drill","flying_10m","cut_45_90","accel_10_20m","pro_agility","repeated_sprint"],"jump":["lateral_bound","skater_hop","single_leg_broad_jump","pogo_jumps","broad_jump","box_jump","depth_jump"],"power_lower":["trap_bar_jump","hang_power_clean","kb_swing","trap_bar_speed_pull","hang_power_clean_bk"],"throw":["mb_rotational_throw","mb_scoop_toss","mb_slam","mb_split_stance_punch"],"power_upper":["explosive_push_up","landmine_push_press","db_push_press_single_arm"],"main_squat":["front_squat","ssb_squat","high_bar_squat","box_squat","goblet_squat"],"main_hinge":["trap_bar_deadlift","romanian_deadlift"],"main_push":["db_bench_press","bench_press","weighted_push_up","floor_press"],"main_pull":["pull_up","weighted_pull_up","chin_up","inverted_row"],"push_2":["landmine_press","db_overhead_press","weighted_push_up","incline_db_press"],"pull_2":["db_row","chest_supported_db_row","inverted_row"],"single_leg":["lateral_lunge","bulgarian_split_squat","reverse_lunge","high_step_up"],"posterior":["nordic_hamstring","db_single_leg_rdl","hip_thrust","romanian_deadlift","back_extension_45"],"lateral_adductor":["copenhagen_plank","lateral_lunge","adductor_machine"],"trunk":["pallof_press","side_plank","landmine_rotation","dead_bug"],"carry_contact":["suitcase_carry","plate_pinch","neck_plate_isometric","farmer_carry"],"prehab_lower":["copenhagen_plank","db_single_leg_calf_raise","banded_hip_flexor_march","tibialis_raise"],"prehab_upper":["band_pull_apart","prone_ytw","db_reverse_fly","band_external_rotation"]},"sd":{"P1":0,"P2":0,"P3":-1,"P4":-1,"P5":0,"IN":0},"sf":["main_squat","main_hinge"],"w":[5,8],"kf":1.0,"sprint":{"P3":"10–40 m, Backpedal-Technik","P4":"Backpedal + Turn, Press/Jam, Cuts, Höchstgeschwindigkeit, wiederholte Sprints","P5":"kurz, schnell, volle Pausen","IN":"Erhalt über Teamtraining"},"p":[["nordic_hamstring",2],["copenhagen_plank",2],["db_single_leg_calf_raise",2],["banded_hip_flexor_march",1]],"x":[],"sp":{"lateral_adductor":2,"posterior":1},"v":{"S":{"kontakte_faktor":1.0,"kandidaten_vorne":{"throw":["mb_split_stance_punch","mb_rotational_throw"]},"p":[["neck_plate_isometric",1]]},"CB":{"kandidaten_vorne":{"field":["backpedal_turn","press_jam_drill","flying_10m"]}}}},
+    QB:{"k":{"field":["drop_back_start","accel_10_20m","pro_agility","two_point_start"],"jump":["broad_jump","box_jump","countermovement_jump","lateral_bound","skater_hop"],"power_lower":["trap_bar_jump","trap_bar_speed_pull","kb_swing","hang_power_clean"],"throw":["mb_rotational_throw","mb_scoop_toss"],"power_upper":["landmine_push_press","explosive_push_up"],"main_squat":["ssb_squat","front_squat","high_bar_squat","box_squat","goblet_squat"],"main_hinge":["trap_bar_deadlift","romanian_deadlift"],"main_push":["db_bench_press","weighted_push_up","floor_press"],"main_pull":["chin_up","pull_up","inverted_row","lat_pulldown"],"push_2":["landmine_press","weighted_push_up","incline_db_press"],"pull_2":["chest_supported_db_row","db_row","inverted_row","seated_cable_row"],"single_leg":["reverse_lunge","bulgarian_split_squat","high_step_up","lateral_lunge"],"posterior":["db_single_leg_rdl","nordic_hamstring","romanian_deadlift","hip_thrust"],"lateral_adductor":["lateral_lunge","copenhagen_plank"],"trunk":["landmine_rotation","pallof_press","side_plank","dead_bug","suitcase_carry"],"carry_contact":["suitcase_carry","farmer_carry"],"prehab_lower":["db_single_leg_calf_raise","tibialis_raise","banded_hip_flexor_march"],"prehab_upper":["band_external_rotation","prone_ytw","band_pull_apart","db_reverse_fly","db_hammer_curl","face_pull"]},"sd":{"P1":0,"P2":0,"P3":-1,"P4":-1,"P5":-1,"IN":-1},"sf":["main_squat","main_hinge"],"w":[6,10],"kf":0.8,"sprint":{"P3":"5–20 m, Drop-Back-Starts","P4":"Drop-Back + Scramble, Richtungswechsel","P5":"kurz, frisch","IN":"Erhalt über Teamtraining"},"p":[["band_external_rotation",3],["throw",2]],"x":[["bb_push_press","immer"],["db_overhead_press","immer"],["db_push_press_single_arm","immer"],["shoulder_press_machine","immer"],["dips","immer"]],"sp":{"prehab_upper":1,"trunk":2}}
+  } };
+/* TP-END */
+const EXP_LIST=[['einsteiger','Einsteiger'],['fortgeschritten','Fortgeschritten'],['erfahren','Erfahren']];
+const TP_VARIANT={ DE:'DE', DT:'DT', NT:'DT', CB:'CB', S:'S', FB:'FB' };
+const TP_SPEC={ main_squat:{ k:'squat', role:'main', main:'main' }, main_push:{ k:'bench', role:'main', main:'main' }, main_hinge:{ k:'hinge', role:'main', main:'hinge' },
+  main_pull:{ k:'pull', role:'main', main:'pull' }, push_2:{ k:'push2', role:'main', second:true, var:true }, field:{ k:'field', role:'power', field:true },
+  jump:{ role:'power' }, power_lower:{ role:'power' }, throw:{ role:'power' }, power_upper:{ role:'power' },
+  single_leg:{ role:'assistance' }, posterior:{ role:'assistance' }, pull_2:{ role:'assistance' }, lateral_adductor:{ role:'assistance' }, trunk:{ role:'assistance' },
+  carry_contact:{ role:'assistance', grip:true }, prehab_lower:{ role:'optional' }, prehab_upper:{ role:'optional' } };
+/* Saison: bisherige Kurz-Einheiten, Übungen aber nach Gruppe */
+const TP_IN_MAP={ jumpH:'jump', squat:'main_squat', bench:'main_push', hinge:'main_hinge', pull:'main_pull', ham:'posterior', oly:'power_lower', lateral:'jump', press:'power_upper', row:'pull_2', add:'lateral_adductor', prehab:'carry_contact' };
+const TP_POS_SLOTS=['field','throw','carry_contact'];
+function apUseGroups(phase){ const p=typeof S!=='undefined'&&S&&S.profile; return !!(p && p.planEngine==='gruppen' && phase.start>=(p.planEngineSince||'')); }
+function tpGroupVar(g, code){ const V=(TP.gruppen[g]||{}).v||{}; let v=V[TP_VARIANT[code]]; if(v&&v.wie) v=V[v.wie]; return v||null; }
+/* Kontext des Athleten: Gruppen mit Anteil, Varianten, Ausschlüsse, Pflicht, gemittelte Zahlen */
+function tpContext(){
+  const pm=posMix(); const p=S.profile||{}; const exp=p.experience||'fortgeschritten'; const E=exp==='einsteiger'?TP.mod.einsteiger:null;
+  const pos=pm.length ? pm.map(x=>({ code:x.code, group:x.group, share:x.share, v:tpGroupVar(x.group,x.code) }))
+                      : Object.keys(TP.gruppen).map(g=>({ code:null, group:g, share:100/Object.keys(TP.gruppen).length, v:null }));
+  const gm={}; pos.forEach(x=>{ (gm[x.group]=gm[x.group]||{ id:x.group, share:0, pos:[] }).share+=x.share; gm[x.group].pos.push(x); });
+  const groups=Object.values(gm).sort((a,b)=>b.share-a.share); const main=pm.length?groups[0]:null;
+  groups.forEach(g=>{ g.v=g.pos.slice().sort((a,b)=>b.share-a.share)[0].v; });   // Variante mit dem größten Anteil zieht Kandidaten nach vorn
+  const sum=f=>pos.reduce((a,x)=>a+x.share*f(x),0)/100;
+  let kf=sum(x=>(x.v&&x.v.kontakte_faktor!=null)?x.v.kontakte_faktor:TP.gruppen[x.group].kf); if(E) kf*=E.kf;
+  const bw=bwNow(); const heavy=bw!=null && bw>=TP.mod.schwer.kg; if(heavy) kf*=TP.mod.schwer.kf; kf=Math.max(0.5, Math.min(1, kf));
+  const w=[0,1].map(i=>Math.round(sum(x=>TP.gruppen[x.group].w[i])));
+  const excl=new Set(); const why={};
+  groups.forEach(g=>{ (TP.gruppen[g.id].x||[]).forEach(([id,when])=>{ if(when==='immer' || g===main){ excl.add(id); why[id]=GROUP_NAME[g.id]; } });
+    g.pos.forEach(x=>((x.v&&x.v.x)||[]).forEach(id=>{ excl.add(id); why[id]=x.code; })); });
+  if(E) E.x.forEach(id=>{ excl.add(id); why[id]='Einsteiger'; });
+  if(heavy) TP.mod.schwer.x.forEach(id=>{ excl.add(id); why[id]='hohes Körpergewicht'; });
+  if(p.cleanSafe===false) TP.mod.clean.ausgeschlossen.forEach(id=>{ excl.add(id); why[id]='Umsetzen noch nicht technisch sicher'; });
+  // Pflicht pro Woche: Hauptgruppe voll, Nebengruppe ab 30 % mit halber Häufigkeit (aufgerundet); gleiche Übung zählt einmal (höhere Häufigkeit)
+  const req={}; const add=(id,n)=>{ req[id]=Math.max(req[id]||0, n); };
+  groups.forEach(g=>{ const full=g===main||!main; if(!full && g.share<30) return; const f=n=>full?n:Math.ceil(n/2);
+    (TP.gruppen[g.id].p||[]).forEach(([id,n])=>add(id,f(n)));
+    g.pos.forEach(x=>{ if(!x.v||!x.v.p) return; if(x.share<30 && !(g===main && x===g.pos[0])) return; x.v.p.forEach(([id,n])=>add(id, x===((main||{}).pos||[])[0]?n:Math.ceil(n/2))); }); });
+  const setsDelta=(type,ph)=>{ const ap=x=>{ const sf=TP.gruppen[x.group].sf; return !sf || sf.includes(type); };
+    const val=x=>{ if(!ap(x)) return 0; const vd=x.v&&x.v.hauptuebungen_saetze_delta; return (vd&&vd[ph]!=null)?vd[ph]:(TP.gruppen[x.group].sd[ph]||0); };
+    const v=sum(val); const fl=Math.floor(v); if(Math.abs(v-fl-0.5)<1e-9){ const mv=main?val(main.pos[0]):0; return mv>v?fl+1:fl; } return Math.round(v); };
+  const label=pm.length ? groups.map(g=>g.id+(groups.length>1?' '+Math.round(g.share)+' %':'')).join(' / ') : 'ohne Position (alle Gruppen gleich)';
+  return { groups, main, pos, exp, E, kf, w, excl, why, req, setsDelta, label, clean:p.cleanSafe!==false, heavy };
+}
+function tpRel(e, g){ const r=(e&&e.position_relevance)||{}; return r[g]!=null ? r[g] : 2; }
+function tpList(g, type){ const G=TP.gruppen[g.id]; const base=(G.k[type]||[]).slice(); const front=(g.v&&g.v.kandidaten_vorne&&g.v.kandidaten_vorne[type])||[];
+  return front.concat(base.filter(id=>!front.includes(id))); }
+/* Rangliste der Kandidaten eines Slots (ohne Filter) */
+function tpRank(C, type, only){
+  const groups=only ? [Object.assign({}, only, { share:100 })] : C.groups; const main=only ? groups[0] : C.main;
+  const lists=groups.map(g=>tpList(g,type)); const ids=[...new Set(lists.flat())]; const ml=main?tpList(main,type):[];
+  const pref=(C.E&&C.E.pref[type])||[];
+  const sc=id=>{ const e=REF.exMap[id]; if(!e) return -99; let s=groups.reduce((a,g)=>a+g.share/100*tpRel(e,g.id),0)-(e.selection_penalty||0);
+    const i=ml.indexOf(id); if(i===0) s+=0.5; else if(i===1) s+=0.25; const j=pref.indexOf(id); if(j>=0) s+=2-0.25*j; return s; };
+  const ord=id=>{ const i=ml.indexOf(id); return i<0?99:i; };
+  return ids.filter(id=>REF.exMap[id]).map(id=>({ id, s:sc(id), o:ord(id), a:ids.indexOf(id) })).sort((x,y)=>y.s-x.s || x.o-y.o || x.a-y.a).map(x=>x.id);
+}
+function tpAllowed(C, id, phaseId){ const e=REF.exMap[id]; if(!e || /snatch/.test(id) || C.excl.has(id)) return false;
+  if(e.phases && !e.phases.includes(phaseId)) return false;
+  const chk=(e.equipment_check||[]).filter(x=>!(e.role==='field' && ['cones','partner'].includes(x)));   // Hütchen und Partner gibt es an Feldtagen
+  return !chk.length; }
+/* Auswahl (Sessionplaner 3.9): Hauptübungen je Phase – Grundübung in P1/P2/P5 und Saison, Variante in P3 und P4;
+   alles andere rotiert (nicht im vorherigen Block); keine Doppelung in der Woche */
+function tpPick(spec, phaseId, prev, taken, C){
+  const only=spec.grp ? C.groups.find(g=>g.id===spec.grp) : null; const R=tpRank(C, spec.tp, only);
+  if(spec.main) return tpPickMain(spec, phaseId, taken, C, R);
+  let free=R.filter(id=>tpAllowed(C,id,phaseId) && !taken.has(id)); if(!free.length) return null;
+  const groups=only?[Object.assign({},only,{share:100})]:C.groups; const wrel=id=>groups.reduce((a,g)=>a+g.share/100*tpRel(REF.exMap[id],g.id),0);
+  const good=free.filter(id=>!(REF.exMap[id].selection_penalty>0) && wrel(id)>=1); if(good.length) free=good.concat(free.filter(id=>!good.includes(id)));   // Maschinen und für die Gruppe kaum relevante Übungen nur als letzte Wahl
+  const rot=!['power_lower','power_upper','field'].includes(spec.tp);   // Gewichtheben und Drücken folgen der Phase (3.9), Feld der Gruppe
+  const pick=(rot && good.find(id=>!prev.used.has(id))) || good[0] || free[0];
+  return [pick].concat(free.filter(id=>id!==pick).slice(0,1));
+}
+function tpPickMain(spec, phaseId, taken, C, R){
+  const pref=(C.E&&C.E.pref[spec.tp])||[];
+  const ok=R.filter(id=>{ const e=REF.exMap[id]; return !taken.has(id) && tpAllowed(C,id,(e.phases||[])[0]||phaseId) && (e.role==='main' || pref.includes(id) || spec.tp==='main_pull'); });
+  const inP=ph=>ok.filter(id=>{ const e=REF.exMap[id]; return !e.phases || e.phases.includes(ph); });
+  const g2=inP('P2')[0]||ok[0]; let pick;
+  if(spec.tp==='main_pull') pick=inP(phaseId)[0];   // Klimmzug/Untergriff wechseln über die Woche, nicht über die Phase
+  else if(phaseId==='P1') pick=inP('P1')[0];
+  else if(phaseId==='P3') pick=inP('P3').find(id=>id!==g2);
+  else if(phaseId==='P4'){ const v3=inP('P3').find(id=>id!==g2); pick=inP('P4').find(id=>id!==g2 && id!==v3) || inP('P4').find(id=>id!==g2); }
+  else if(phaseId==='IN') pick=inP('IN')[0];
+  pick=pick||g2; if(!pick) return null;
+  return [pick].concat(inP(phaseId).filter(id=>id!==pick).slice(0,1));
+}
+/* Feldzugang an einem Wochentag (Ort „Feld“ mit diesem Tag im Profil) */
+function tpFieldDay(day){ const wd=WDKEY.indexOf(day); return ((S.profile&&S.profile.locations)||[]).some(l=>(l.id==='loc-field' || /feld|field/i.test(l.name||'')) && (l.days||[]).includes(wd)); }
+/* Vorlagen für den Block: Slots mit Gruppen-Priorität, Feld-Slot nur an Feldtagen, Positionsslots der Nebengruppe */
+function tpTemplates(phase, C){
+  if(phase.id==='IN') return Object.entries(AP_SLOTS_IN).map(([tid,T])=>({ tid, name:T.name, group:T.group, time:T.time,
+    slots:T.slots.map(s=>Object.assign({}, s, { tp:TP_IN_MAP[s.k] }, TP_IN_MAP[s.k]==='carry_contact'?{ role:'assistance', grip:true }:{})).filter(s=>s.tp) }));
+  const n=Math.min(4, Math.max(2, trainingDays().length)); const V=TP.vorlagen[n];
+  const sched=schedFromDays(V.map(t=>t.id)); const dayOf=tid=>Object.keys(sched).find(d=>sched[d]===tid);
+  const prio=type=>Math.min(TP.slots[type].p, ...C.groups.map(g=>(TP.gruppen[g.id].sp||{})[type]).filter(x=>x!=null));
+  const out=V.map(t=>({ tid:t.id, name:t.name, group:t.half, time:60, slots:t.slots.filter(type=>{
+      if(type!=='field') return true; const ph=TP.slots.field.ph||[]; return ph.includes(phase.id) && tpFieldDay(dayOf(t.id)); })
+    .map(type=>Object.assign({ tp:type, prio:prio(type) }, TP_SPEC[type])) }));
+  // Positionsslots: Anteil der Nebengruppe = Anzahl × Anteil, gerundet; ab 30 % mindestens 1 (verteilt auf die letzten Vorkommen)
+  const sec=C.main && C.groups[1];
+  if(sec) TP_POS_SLOTS.forEach(type=>{ const occ=out.flatMap(t=>t.slots.filter(s=>s.tp===type)); let k=Math.round(occ.length*sec.share/100); if(sec.share>=30) k=Math.max(1,k);
+    occ.slice(occ.length-Math.min(k,occ.length)).forEach(s=>{ s.grp=sec.id; }); });
+  return out;
+}
+/* Gruppenbezogene Anpassung der Dosierung */
+function tpDose(d, spec, ex, C, phaseId, wt){
+  const D=(wt==='D'||wt==='DT'||wt==='V30'||wt==='V50');
+  if(spec.main==='main'||spec.main==='hinge'){ const dl=C.setsDelta(spec.tp, phaseId); if(dl && !D) d.dose=[Math.max(1,Math.min(6,d.dose[0]+dl)), d.dose[1]];
+    if(C.E){ const r=parseInt(d.dose[1],10); if(r && r<C.E.minReps) d.dose=[d.dose[0], String(C.E.minReps)]; if(typeof d.rpe==='number') d.rpe=Math.max(6,d.rpe+C.E.cap); } }
+  if(ex.pattern==='jump' && C.kf<1) d.dose=[Math.max(1,Math.round(d.dose[0]*C.kf)), d.dose[1]];
+  if(d.range && !spec.main && !spec.second && spec.role==='assistance' && ex.role==='assistance' && d.range[1]<=8){ const ex2=C.E?C.E.wd:0; const lo=d.range[0]+(C.w[0]-5)+ex2, hi=d.range[1]+(C.w[1]-8)+ex2;
+    if(lo!==d.range[0]||hi!==d.range[1]){ d.range=[lo,hi]; d.dose=[d.dose[0], lo+'–'+hi+(/\/S$/.test(String(d.dose[1]))?'/S':'')]; } }
+  return d;
+}
+function tpFieldDose(phaseId, wt){ const D=(wt==='D'||wt==='DT'); const n={ P3:4, P4:5, P5:3, IN:3 }[phaseId]||4; return { dose:[D?Math.max(2,n-2):(wt==='V50'?2:n), '1'], rpe:'schnell, volle Pause' }; }
+/* Pflicht pro Woche (Gruppe, Variante): fehlende Slot-Arten ergänzen, fehlende Übungen in passende Slots tauschen oder anhängen */
+const TP_LOWER_PAT=['knee_flexion','adductor','ankle','hip_flexion','hinge','squat','lunge','jump'];
+function tpPflicht(templates, TPL, C, phase, buildSlot){
+  let n=0; const half=e=>TP_LOWER_PAT.includes(e.pattern)?'lower':'upper';
+  const fits=(t,h)=>t.group===h || t.group==='full';
+  const slotTypeOf=id=>{ const order=['prehab_lower','prehab_upper','posterior','lateral_adductor','carry_contact','trunk','single_leg','pull_2','push_2','throw','jump'];
+    return order.find(ty=>C.groups.some(g=>tpList(g,ty).includes(id))) || order.find(ty=>Object.keys(TP.gruppen).some(g=>(TP.gruppen[g].k[ty]||[]).includes(id))) || null; };
+  Object.entries(C.req).forEach(([key,need])=>{
+    if(TP.slots[key]){   // Slot-Art (z. B. throw, carry_contact)
+      let have=templates.reduce((a,t)=>a+t.slots.filter(s=>s.tp===key).length,0);
+      const order=templates.slice().sort((a,b)=>a.slots.length-b.slots.length);
+      for(const t of order){ if(have>=need) break; if(t.slots.some(s=>s.tp===key)) continue;
+        const spec=Object.assign({ tp:key, prio:2, pflicht:true }, TP_SPEC[key]); const taken=new Set(templates.flatMap(x=>x.slots.map(s=>s.candidates[0])));
+        const c=tpPick(spec, phase.id, { b1:null, b2:null, used:new Set() }, taken, C); if(!c) continue;
+        t.slots.push(buildSlot(t.id, spec, t.id+'-P'+(++n), c)); have++; }
+      return; }
+    const e=REF.exMap[key]; if(!e || !tpAllowed(C,key,phase.id)) return;
+    let have=templates.reduce((a,t)=>a+t.slots.filter(s=>s.candidates[0]===key).length,0);
+    const h=half(e); const isReq=id=>!!C.req[id];
+    // 1. tauschen: Slot, dessen Kandidatenliste die Übung enthält (keine Haupt- oder Feldübung, nicht selbst Pflicht)
+    const cand=[]; templates.forEach(t=>t.slots.forEach(s=>{ if(!s.tp || s.role==='main' || s.tp==='field' || isReq(s.candidates[0])) return;
+      if(!C.groups.some(g=>tpList(g,s.tp).includes(key))) return; cand.push({ t, s }); }));
+    cand.sort((a,b)=>(fits(b.t,h)?1:0)-(fits(a.t,h)?1:0) || (b.s.prio||0)-(a.s.prio||0));
+    for(const {t,s} of cand){ if(have>=need) break; if(t.slots.some(x=>x.candidates[0]===key)) continue;
+      const spec=Object.assign({ tp:s.tp }, TP_SPEC[s.tp], { prio:Math.min(s.prio||3,2), pflicht:true, role:'assistance' }); if(s.grp) spec.grp=s.grp;
+      t.slots[t.slots.indexOf(s)]=buildSlot(t.id, spec, s.id, [key].concat(s.candidates.filter(x=>x!==key).slice(0,1))); have++; }
+    // 2. anhängen: Einheit mit passender Körperhälfte und den wenigsten Slots
+    const ty=slotTypeOf(key); const order=templates.filter(t=>fits(t,h)).concat(templates.filter(t=>!fits(t,h))).sort((a,b)=>(fits(b,h)?1:0)-(fits(a,h)?1:0) || a.slots.length-b.slots.length);
+    for(const t of order){ if(have>=need) break; if(t.slots.some(x=>x.candidates[0]===key)) continue;
+      const spec=Object.assign({ tp:ty }, TP_SPEC[ty]||{}, { prio:2, pflicht:true, role:'assistance' });
+      t.slots.push(buildSlot(t.id, spec, t.id+'-P'+(++n), [key])); have++; }
+  });
+}
+function tpSprintNote(C, phaseId){ const g=C.main||C.groups[0]; return (TP.gruppen[g.id].sprint||{})[phaseId]||''; }
 
 /* ---------- Kalender ---------- */
 const WDKEY=['SUN','MON','TUE','WED','THU','FRI','SAT'];
@@ -3161,7 +3362,7 @@ function viewPlan(){
         (alt.length?'<br><span class="muted">Ersatz: '+esc(alt.join(' / '))+'</span>':'')+'<br><span class="muted">'+esc(METHOD_LABEL[s.method]||s.method)+(s.range?' '+s.range[0]+'–'+s.range[1]:'')+' · Pause '+s.rest[0]+(s.rest[1]!==s.rest[0]?'–'+s.rest[1]:'')+' s'+(s.rpe?' · RPE '+esc(s.rpe):'')+'</span></td>'+
         weeks.map(w=>{ const d=(s.dose||{})[w]; const rw=(s.rpe_wave||{})[w]; return '<td>'+(d?d[0]+'×'+esc(d[1])+(rw!=null?' @'+fmtNum(rw):''):'–')+'</td>'; }).join('')+
         '<td>'+esc(plCurrentLoad(s, s.candidates[0], b))+'</td></tr>'; });
-    h+=pdet('tpl-'+t.id, t.id+' – '+t.name, (t.group==='lower'?'Unterkörper':'Oberkörper')+' · ca. '+t.time_min+' min', tb+'</tbody></table></div>');
+    h+=pdet('tpl-'+t.id, t.id+' – '+t.name, (t.group==='lower'?'Unterkörper':t.group==='full'?'Ganzkörper':'Oberkörper')+' · ca. '+t.time_min+' min', tb+'</tbody></table></div>');
   });
   h+='<p class="small muted">Kern: hat Vorrang, wenn Einheiten ausfallen</p>';
   return h;
