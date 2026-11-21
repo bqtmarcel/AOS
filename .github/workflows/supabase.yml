@@ -49,5 +49,5 @@ jobs:
             | jq -r '[.[] | select(.type=="secret" or .name=="service_role")][0].api_key // empty')
           if [ -z "$key" ]; then echo "::error::Geheimer Schlüssel nicht abrufbar"; exit 1; fi
           echo "::add-mask::$key"
-          supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" AOS_SECRET_KEY="$key" >/dev/null
-          supabase functions deploy admin --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt --use-api
+          supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" --yes AOS_SECRET_KEY="$key" >/dev/null
+          supabase functions deploy admin --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt --use-api --yes
