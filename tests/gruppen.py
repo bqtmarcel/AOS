@@ -83,24 +83,39 @@ async def main():
     print('Fehler:', bad); sys.exit(1 if bad else 0)
 
 def write_html(res, path):
-    ph = ['P2', 'P3', 'P4', 'P5']
-    rows = []
+    ph = ['P2', 'P3', 'P4', 'P5']; NAME = {'P2': 'Maximalkraft', 'P3': 'Kraft → Power', 'P4': 'Position Power / Speed', 'P5': 'Peak'}
+    nav = ''.join('<a href="#' + P.lower() + '">' + P + ' · ' + NAME[P] + '</a>' for P in ph)
+    secs = []
     for P in ph:
-        rows.append('<h2>' + P + '</h2><div class="grid">')
+        cards = []
         for r in res:
             bl = next((x for x in r['blocks'] if x['phase'] == P), None)
             if not bl: continue
-            c = '<section><h3>' + H.escape(r['name']) + '</h3><p class="m">' + H.escape(bl['label'] or '') + ' · RPE ≤ ' + str(bl['cap']) + ' · Kontakte ' + '–'.join(map(str, bl['contacts'])) + '</p>'
+            c = '<article><h3>' + H.escape(r['name']) + '</h3><p class="m">RPE ≤ ' + str(bl['cap']).replace('.', ',') + ' · Sprungkontakte ' + '–'.join(map(str, bl['contacts'])) + '</p>'
             for t in bl['t']:
-                c += '<h4>' + t['id'] + ' ' + H.escape(t['name']) + '</h4><ul>' + ''.join(
-                    '<li class="' + s['role'] + '">' + H.escape(s['n']) + ' <span>' + H.escape(s['d']) + '</span>' + (' <b>' + s['grp'] + '</b>' if s['grp'] else '') + (' <i>Pflicht</i>' if s['p'] else '') + '</li>' for s in t['s']) + '</ul>'
-            rows.append(c + '</section>')
-        rows.append('</div>')
-    css = ('body{font:14px/1.4 -apple-system,system-ui,sans-serif;margin:16px;background:#16181b;color:#e6e6e6}h1{font-size:20px}h2{margin-top:28px;border-bottom:1px solid #333}'
-           '.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}section{background:#1f2226;border:1px solid #2c3035;border-radius:10px;padding:10px}'
-           'h3{font-size:15px;margin:0 0 4px}h4{font-size:12px;margin:10px 0 2px;color:#aaa;text-transform:uppercase;letter-spacing:.04em}ul{margin:0;padding-left:16px}'
-           'li span{color:#999}li.main{font-weight:600}li b{font-size:11px;color:#bbb;border:1px solid #555;border-radius:4px;padding:0 3px}li i{font-size:11px;color:#bbb}.m{color:#999;font-size:12px;margin:0}')
-    open(path, 'w', encoding='utf-8').write('<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AOS · Positionsgruppen im Vergleich</title><style>' + css +
-        '</style></head><body><h1>AOS · Positionsgruppen im Vergleich (Woche 2 je Phase)</h1><p class="m">Fett: Hauptübung · Kästchen: Slot aus der Nebengruppe · Pflicht: Pflichtübung der Gruppe. Testprofile ohne persönliche Werte.</p>' + ''.join(rows) + '</body></html>')
+                c += '<h4>' + t['id'] + ' · ' + H.escape(t['name']) + '</h4><ul>' + ''.join(
+                    '<li class="' + s['role'] + '"><span class="n">' + H.escape(s['n']) + '</span><span class="d">' + H.escape(s['d']) + '</span>'
+                    + (('<em>' + s['grp'] + '</em>') if s['grp'] else '') + ('<em>Pflicht</em>' if s['p'] else '') + '</li>' for s in t['s']) + '</ul>'
+            cards.append(c + '</article>')
+        secs.append('<section id="' + P.lower() + '" class="band"><h2>' + P + ' · ' + NAME[P] + '</h2><p class="m">Woche 2 des Blocks</p><div class="grid">' + ''.join(cards) + '</div></section>')
+    css = """/* VOICE sachlich, wie ein Trainerordner · IDEA Trainingsplan-Spalten nebeneinander · PICTURE die Einheiten selbst
+   COLOUR AOS anthrazit, eine Akzentfarbe Rot nur für Hauptübungen · TYPE Inter Tight + Inter · LAYOUT Phasen als Abschnitte, Profile als Spalten */
+:root{color-scheme:light dark;--bg:light-dark(#f4f4f2,#16181b);--card:light-dark(#fff,#1f2226);--line:light-dark(#dcdcd8,#2e3237);--ink:light-dark(#1a1c1f,#e8e8e6);--mute:light-dark(#686c72,#9a9ea4);--acc:#d0201b}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,sans-serif;overflow-x:clip}
+header{padding:clamp(24px,4vw,48px) max(4vw,16px) 8px}h1{font:700 clamp(28px,4vw,44px)/1.05 'Inter Tight',Inter,sans-serif;margin:0 0 10px;text-wrap:balance}
+.lead{max-width:70ch;color:var(--mute);margin:0}nav{display:flex;flex-wrap:wrap;gap:8px;padding:14px max(4vw,16px);position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);z-index:2}
+nav a{color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:14px;min-height:40px;display:inline-flex;align-items:center}
+.band{padding:24px max(4vw,16px)}h2{font:700 26px/1.1 'Inter Tight',Inter,sans-serif;margin:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:12px;margin-top:14px}
+article{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}h3{font:600 16px/1.25 'Inter Tight',Inter,sans-serif;margin:0 0 2px}
+h4{font-size:13px;font-weight:600;color:var(--mute);margin:12px 0 4px}ul{list-style:none;margin:0;padding:0}
+li{display:flex;flex-wrap:wrap;gap:2px 8px;padding:4px 0;border-top:1px solid var(--line);font-size:14px}li .n{flex:1 1 60%}li .d{color:var(--mute);white-space:nowrap;font-variant-numeric:tabular-nums}
+li.main .n{font-weight:650}li.main .n::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);margin:0 6px 2px 0}
+em{font-style:normal;font-size:12px;color:var(--mute);border:1px solid var(--line);border-radius:5px;padding:0 5px}.m{color:var(--mute);font-size:13px;margin:2px 0 0}html{scroll-padding-top:72px}"""
+    open(path, 'w', encoding='utf-8').write('<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AOS Positionsgruppen</title>'
+        '<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;650&family=Inter+Tight:wght@600;700&display=swap" rel="stylesheet"><style>' + css + '</style></head><body>'
+        '<header><h1>So plant AOS je Positionsgruppe</h1><p class="lead">Acht Testprofile, Woche 2 jeder Phase. Roter Punkt: Hauptübung. Kästchen mit Gruppe: Slot aus der Nebenposition. „Pflicht“: Pflichtübung der Gruppe pro Woche. '
+        'Am Tag selbst kürzt AOS auf 60–70 Minuten und passt an Ort, Readiness und Beschwerden an. Testprofile ohne persönliche Werte.</p></header><nav>' + nav + '</nav>' + ''.join(secs) + '</body></html>')
 
 asyncio.run(main())
