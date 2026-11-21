@@ -29,6 +29,23 @@ jobs:
         with: { version: latest }
       - name: Mit dem Projekt verbinden
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF" -p "$SUPABASE_DB_PASSWORD"
+      - name: Login einstellen
+        # Adresse der App, keine Selbstregistrierung, Anmeldung per Code (E-Mail-Vorlage aus supabase/auth)
+        run: |
+          body=$(jq -n --rawfile tpl supabase/auth/magic_link.html '{
+            site_url: "https://bqtmarcel.github.io/AOS/",
+            uri_allow_list: "https://bqtmarcel.github.io/AOS/**",
+            disable_signup: true,
+            external_email_enabled: true,
+            mailer_otp_length: 6,
+            mailer_otp_exp: 3600,
+            mailer_subjects_magic_link: "Dein AOS-Code",
+            mailer_templates_magic_link_content: $tpl
+          }')
+          code=$(curl -s -o /tmp/auth.json -w '%{http_code}' -X PATCH "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" -d "$body")
+          if [ "$code" != "200" ]; then echo "::error::Login-Einstellungen nicht gespeichert (HTTP $code)"; jq -r '.message? // empty' /tmp/auth.json; exit 1; fi
+          jq '{site_url, uri_allow_list, disable_signup, external_email_enabled, mailer_otp_length, mailer_otp_exp, mailer_subjects_magic_link}' /tmp/auth.json
       - name: Datenbankstruktur aktualisieren
         run: supabase db push --remote --yes -p "$SUPABASE_DB_PASSWORD"
       - name: Zugriffsregeln prüfen

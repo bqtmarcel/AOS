@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AOS">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src https://api.github.com https://world.openfoodfacts.org https://raw.githubusercontent.com; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src https://sraocwhvkisomjjoqznr.supabase.co https://api.github.com https://world.openfoodfacts.org https://raw.githubusercontent.com; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>AOS – Athlete Operating System</title>
 <style>
@@ -481,6 +481,7 @@ function save(silent){
   pushAgendaUpdate();
   const changed = syncTrack();
   if(changed && typeof ghOnLocalChange==='function') ghOnLocalChange();
+  if(changed && typeof sbOnLocalChange==='function') sbOnLocalChange();
   if(!storageOK) return false;
   try{ localStorage.setItem(AOS_KEY, JSON.stringify(S)); return true; }
   catch(e){ storageOK=false; if(!silent) toast('Speichern auf dem Gerät fehlgeschlagen'+(ghReady()?' – der Abgleich mit GitHub läuft weiter.':' – bitte jetzt eine JSON-Sicherung exportieren.')); return false; }
@@ -1568,7 +1569,8 @@ async function ghRaw(path){
   return res.text();
 }
 async function refLoad(force){
-  if(!ghReady() || REF.loading) return false;
+  if(!ghReady()) return (typeof sbReady==='function' && sbReady()) ? sbRefLoad(force) : false;
+  if(REF.loading) return false;
   if(!force && REF.at && Date.now()-new Date(REF.at).getTime() < 10*60*1000) return true;
   REF.loading=true;
   try{
@@ -3396,6 +3398,7 @@ function viewProfile(){
   h+=calSection();
   h+=pdet('loc','Trainingsorte',(S.profile.locations||[]).length+' Orte',locSection());
   h+=pushSection();
+  h+=sbSection();
   h+=ghSection();
   const le=S.settings.lastExport;
   h+=pdet('backup','Sicherung',le?'zuletzt '+fmtDate(le.slice(0,10)):'',''+
@@ -3602,6 +3605,125 @@ async function ghSync(reason){
 function ghSchedule(ms){ if(!ghReady()) return; clearTimeout(gh.timer); gh.timer=setTimeout(()=>ghSync('auto'), ms); }
 function ghOnLocalChange(){ if(!gh.cfg) return; gh.dirty=true; ghStore(); if(ghReady()){ if(!gh.syncing) ghSetState('ausstehend'); ghSchedule(3000); } }
 
+/* ===== AOS – Supabase: Login und Abgleich (Roadmap M1.3–M1.5) =====
+   Bis zur Umstellung (M1.10) läuft der Abgleich mit Supabase zusätzlich zum Datenrepo: dieselben Datensätze mit Zeitstempeln,
+   jüngste Änderung gewinnt (zusätzlich in der Datenbank erzwungen). Login per Code aus der E-Mail – funktioniert auch in der
+   Home-Bildschirm-App am iPhone (ein Link aus der Mail würde in Safari statt in der App landen). */
+const SB_URL='https://sraocwhvkisomjjoqznr.supabase.co', SB_KEY='sb_publishable_Cvqcna518s5NdlUahoIHcw_TRPfBMXZ', SB_STORE='aos-sb-v1';
+const sb={ sess:null, email:'', state:'aus', syncing:false, again:false, timer:null, lastOk:null, lastError:'', codeSent:false, team:null };
+function sbLoad(){ try{ const c=JSON.parse(localStorage.getItem(SB_STORE)||'null'); if(c){ sb.sess=c.sess||null; sb.email=c.email||''; sb.lastOk=c.lastOk||null; sb.team=c.team||null; } }catch(e){} }
+function sbStore(){ try{ localStorage.setItem(SB_STORE, JSON.stringify({ sess:sb.sess, email:sb.email, lastOk:sb.lastOk, team:sb.team })); }catch(e){} }
+function sbReady(){ return !!(sb.sess && sb.sess.refresh_token && sb.sess.user && sb.sess.user.id); }
+function sbUid(){ return sb.sess && sb.sess.user && sb.sess.user.id; }
+function sbErr(status, msg){ const e=new Error(msg); e.status=status; return e; }
+async function sbRaw(method, path, body, headers, auth){
+  const h=Object.assign({ apikey:SB_KEY, 'Content-Type':'application/json' }, headers||{});
+  if(auth) h.Authorization='Bearer '+auth;
+  let res; try{ res=await fetch(SB_URL+path, { method, headers:h, body:body==null?undefined:JSON.stringify(body), cache:'no-store' }); }
+  catch(e){ const err=sbErr(0,'Keine Verbindung zu Supabase'); err.offline=true; throw err; }
+  const txt=await res.text(); let j=null; try{ j=txt?JSON.parse(txt):null; }catch(e){}
+  if(!res.ok){ const m=(j&&(j.msg||j.message||j.error_description||j.error))||('HTTP '+res.status); throw sbErr(res.status, m); }
+  return j;
+}
+function sbSetSession(j){ if(!j||!j.access_token) throw sbErr(0,'Anmeldung fehlgeschlagen');
+  sb.sess={ access_token:j.access_token, refresh_token:j.refresh_token, expires_at:j.expires_at || (Math.floor(Date.now()/1000)+(j.expires_in||3600)),
+    user:{ id:(j.user||{}).id || (sb.sess&&sb.sess.user&&sb.sess.user.id), email:(j.user||{}).email || sb.email } };
+  if(j.user && j.user.email) sb.email=j.user.email; sbStore(); }
+async function sbToken(){
+  if(!sbReady()) throw sbErr(401,'Nicht angemeldet');
+  if(sb.sess.expires_at - 60 > Date.now()/1000) return sb.sess.access_token;
+  try{ sbSetSession(await sbRaw('POST','/auth/v1/token?grant_type=refresh_token',{ refresh_token:sb.sess.refresh_token })); }
+  catch(e){ if(e.status===400||e.status===401){ sb.sess=null; sbStore(); throw sbErr(401,'Anmeldung abgelaufen – bitte neu anmelden.'); } throw e; }
+  return sb.sess.access_token;
+}
+async function sbApi(method, path, body, headers){ return sbRaw(method, path, body, headers, await sbToken()); }
+/* Login */
+ACT.sbCode = async ()=>{ const email=val('sb-email').trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast('Bitte eine gültige E-Mail-Adresse eingeben.'); return; }
+  sb.email=email; sbStore();
+  try{ await sbRaw('POST','/auth/v1/otp?redirect_to='+encodeURIComponent(location.origin+location.pathname), { email, create_user:false });
+    sb.codeSent=true; render(); toast('Code ist unterwegs – bitte im Postfach nachsehen.'); }
+  catch(e){ toast(e.status===422||e.status===400?'Für diese Adresse gibt es kein AOS-Konto.':e.status===429?'Zu viele Versuche – bitte etwas später nochmal.':e.message); } };
+ACT.sbVerify = async ()=>{ const token=val('sb-otp').replace(/\s/g,''); if(!/^\d{6,10}$/.test(token)){ toast('Bitte den Code aus der E-Mail eingeben.'); return; }
+  try{ sbSetSession(await sbRaw('POST','/auth/v1/verify', { type:'email', email:sb.email, token })); sb.codeSent=false; render(); toast('Angemeldet'); await sbSync('login'); sbRefLoad(true); }
+  catch(e){ toast(e.status===403||e.status===400?'Code falsch oder abgelaufen.':e.message); } };
+ACT.sbLogout = ()=>confirmDlg('Abmelden?','Die Daten bleiben auf diesem Gerät und in Supabase. Der Abgleich mit Supabase pausiert, bis du dich wieder anmeldest.','Abmelden',async ()=>{
+  try{ if(sbReady()) await sbRaw('POST','/auth/v1/logout',{}, null, sb.sess.access_token); }catch(e){}
+  sb.sess=null; sb.state='aus'; sbStore(); render(); });
+ACT.sbSyncNow = async ()=>{ const ok=await sbSync('manuell'); if(ok) toast('Mit Supabase abgeglichen'); };
+ACT.sbBack = ()=>{ sb.codeSent=false; render(); };
+/* Link aus der Mail (im Browser): Anmeldedaten stehen im Adress-Anker */
+function sbFromHash(){ const h=location.hash||''; if(h.indexOf('access_token=')<0) return false;
+  const p=new URLSearchParams(h.slice(1)); try{ sbSetSession({ access_token:p.get('access_token'), refresh_token:p.get('refresh_token'), expires_at:+p.get('expires_at')||0, expires_in:+p.get('expires_in')||3600 }); }catch(e){ return false; }
+  history.replaceState(null,'',location.pathname+location.search);
+  sbRaw('GET','/auth/v1/user',null,null,sb.sess.access_token).then(u=>{ sb.sess.user={ id:u.id, email:u.email }; sb.email=u.email; sbStore(); sbSync('login'); render(); }).catch(()=>{});
+  return true; }
+
+/* Abgleich: alle Datensätze laden, mit dem lokalen Stand zusammenführen, Neueres hochladen */
+function sbIso(t){ const d=new Date(t); return isNaN(d)?'':d.toISOString(); }
+async function sbPullRows(){ const out=[]; for(let start=0;;start+=1000){
+  const rows=await sbApi('GET','/rest/v1/records?select=key,data,updated_at,deleted&athlete_id=eq.'+sbUid()+'&order=key', null, { 'Range-Unit':'items', Range:start+'-'+(start+999) });
+  out.push(...rows); if(rows.length<1000) return out; } }
+function sbDocOf(rows){ const R=seedData(); const m=new Map(); const stamps={}, tombs={};
+  rows.forEach(r=>{ const t=sbIso(r.updated_at); if(r.deleted) tombs[r.key]=t; else { m.set(r.key, r.data); stamps[r.key]=t; } });
+  applyRecords(R, m); R.sync={ stamps, tombstones:tombs, deviceId:'supabase' }; return R; }
+async function sbSync(reason){
+  if(!sbReady()){ sb.state='aus'; return false; }
+  if(sb.syncing){ sb.again=true; return false; }
+  clearTimeout(sb.timer);
+  if(navigator.onLine===false){ sb.state='offline'; return false; }
+  sb.syncing=true; sb.state='laeuft'; sbPaint();
+  try{
+    const rows=await sbPullRows(); const remote=new Map(rows.map(r=>[r.key,{ t:sbIso(r.updated_at), del:r.deleted }]));
+    const res=mergeData(S, sbDocOf(rows));
+    if(syncSig(res.data)!==syncSig(S)) ghApplyMerged(res.data);
+    const up=[]; const uid=sbUid();
+    syncRecords(S).forEach((v,k)=>{ const t=S.sync.stamps[k]||''; const r=remote.get(k); if(!t) return;
+      if(!r || r.del || r.t<t) up.push({ athlete_id:uid, key:k, data:v, updated_at:t, deleted:false }); });
+    Object.entries(S.sync.tombstones||{}).forEach(([k,t])=>{ const r=remote.get(k); if(r && !r.del && r.t<t) up.push({ athlete_id:uid, key:k, data:null, updated_at:t, deleted:true }); });
+    for(let i=0;i<up.length;i+=200) await sbApi('POST','/rest/v1/records?on_conflict=athlete_id,key', up.slice(i,i+200), { Prefer:'resolution=merge-duplicates,return=minimal' });
+    sb.lastOk=new Date().toISOString(); sb.lastError=''; sb.state='ok'; sbStore();
+    return true;
+  }catch(e){ sb.lastError=e.message; sb.state=e.offline?'offline':'fehler'; if(reason==='manuell'||reason==='login') toast('Supabase: '+e.message); return false; }
+  finally{ sb.syncing=false; sbPaint(); if(sb.again){ sb.again=false; sbSchedule(1000); } }
+}
+function sbSchedule(ms){ if(!sbReady()) return; clearTimeout(sb.timer); sb.timer=setTimeout(()=>sbSync('auto'), ms); }
+function sbOnLocalChange(){ if(sbReady()) sbSchedule(3000); }
+/* Referenzdaten aus Supabase (wenn kein Datenrepo verbunden ist): Planer- und Ernährungsregeln aus dem Profil,
+   Datenbanken aus ref_docs, Teamdaten (Saison, Phasen, Feldtraining) aus team_season (M1.5) */
+async function sbRefLoad(force){
+  if(!sbReady() || ghReady() || REF.loading) return false;
+  if(!force && REF.at && Date.now()-new Date(REF.at).getTime() < 10*60*1000) return true;
+  REF.loading=true;
+  try{
+    const [pr, docs, team]=await Promise.all([ sbApi('GET','/rest/v1/profiles?select=planner,nutrition&id=eq.'+sbUid()), sbApi('GET','/rest/v1/ref_docs?select=name,data'), sbTeam() ]);
+    const plan=pr[0]&&pr[0].planner; const D=Object.fromEntries(docs.map(d=>[d.name,d.data]));
+    if(!plan || !D.uebungen) throw new Error('Plan oder Übungsdatenbank fehlen in Supabase.');
+    sbTeamOverlay(plan, team);
+    const more={ nut:pr[0].nutrition||null, food:D.lebensmittel||null, recipes:D.rezepte||null };
+    refSet(plan, D.uebungen, new Date().toISOString(), more); REF.error=''; REF.nutError=more.nut&&more.food?'':'Ernährungsdaten fehlen in Supabase.';
+    try{ localStorage.setItem(REF_KEY, JSON.stringify({ plan, ex:D.uebungen, at:REF.at, nut:REF.nut, food:REF.food, recipes:REF.recipes })); }catch(e){}
+    return true;
+  }catch(e){ REF.error=e.offline?'':e.message; return false; }
+  finally{ REF.loading=false; const dlg=document.getElementById('dlg'); if(['training','uebersicht','plan','ernaehrung'].includes(ui.view) && !logVisible() && !(dlg&&dlg.open)) render(); }
+}
+async function sbTeam(){ const t=await sbApi('GET','/rest/v1/team_season?select=data,updated_at&id=eq.1'); sb.team=(t[0]&&t[0].data)||null; sbStore(); return sb.team; }
+/* Teamweite Daten gelten für alle gleich und ersetzen die entsprechenden Teile der Planerdaten */
+function sbTeamOverlay(plan, team){ if(!plan || !team) return plan; ['season','phases','field'].forEach(k=>{ if(team[k]) plan[k]=team[k]; }); return plan; }
+function sbPaint(){ const el=document.getElementById('sb-status'); if(el) el.textContent=sbStatusText(); }
+function sbStatusText(){ if(!sbReady()) return 'Nicht angemeldet.';
+  const st={ ok:'abgeglichen', laeuft:'gleicht ab …', offline:'offline – gleicht ab, sobald Netz da ist', fehler:'Fehler: '+sb.lastError, aus:'bereit' }[sb.state]||sb.state;
+  return 'Angemeldet als '+(sb.email||'—')+' · '+st+(sb.lastOk?' · zuletzt '+ghTime(sb.lastOk):''); }
+function sbSection(){
+  let b='<p id="sb-status" class="small" aria-live="polite">'+esc(sbStatusText())+'</p>';
+  if(sbReady()) b+='<div class="row"><button data-act="sbSyncNow">Jetzt abgleichen</button><button class="small danger" data-act="sbLogout">Abmelden</button></div>';
+  else if(sb.codeSent) b+='<p class="small">Code aus der E-Mail an '+esc(sb.email)+' eingeben:</p>'+inp('sb-otp','Code','','inputmode="numeric" autocomplete="one-time-code" maxlength="10"')+
+    '<div class="row"><button class="primary" data-act="sbVerify">Anmelden</button><button class="small" data-act="sbBack">Andere Adresse</button></div>';
+  else b+=inp('sb-email','E-Mail-Adresse',sb.email,'type="email" autocomplete="email" inputmode="email"')+'<div class="row"><button class="primary" data-act="sbCode">Code anfordern</button></div>'+
+    '<p class="small muted">Du bekommst einen Code per E-Mail. Nur eingeladene Konten können sich anmelden.</p>';
+  b+='<p class="small muted">Übergangszeit: Bis zur Umstellung speichert AOS weiterhin im Datenrepo und gleicht zusätzlich mit Supabase ab.</p>';
+  return pdet('sb','AOS-Konto (Supabase)', sbReady()?(sb.email||'angemeldet'):'nicht angemeldet', b);
+}
+
 /* ---------- Anzeige ---------- */
 function ghTime(iso){ if(!iso) return ''; const d=new Date(iso); const t=pad(d.getHours())+':'+pad(d.getMinutes()); return isoOf(d)===todayISO()?t:fmtDateShort(isoOf(d))+' '+t; }
 function ghDot(){ const st=(typeof gh!=='undefined'&&gh.state)||'aus'; const c={ok:'ok',laeuft:'run',ausstehend:'run',offline:'off',fehler:'err',aus:'off'}[st]||'off';
@@ -3670,11 +3792,12 @@ ACT.ghForget = ()=>confirmDlg('Token entfernen?', 'AOS speichert auf diesem Ger�
 
 /* Automatisch abgleichen: beim Start, beim Zurückkehren in die App, wenn wieder Netz da ist, und vor dem Verlassen */
 document.addEventListener('visibilitychange', ()=>{
+  if(sbReady()){ if(document.visibilityState==='visible'){ if(!ghReady()) refLoad(); if(!sb.lastOk || Date.now()-new Date(sb.lastOk).getTime()>20000) sbSync('fokus'); } else sbSync('verlassen'); }
   if(!ghReady()) return;
   if(document.visibilityState==='visible'){ refLoad(); if(!gh.lastOk || Date.now()-new Date(gh.lastOk).getTime()>20000 || gh.dirty) ghSync('fokus'); }
   else if(gh.dirty) ghSync('verlassen');
 });
-window.addEventListener('online', ()=>{ if(ghReady()) ghSync('online'); });
+window.addEventListener('online', ()=>{ if(ghReady()) ghSync('online'); if(sbReady()) sbSync('online'); });
 window.addEventListener('offline', ()=>{ if(ghReady()) ghSetState('offline'); });
 
 /* Neue App-Version laden, sobald nichts Ungespeichertes offen ist */
@@ -3686,12 +3809,13 @@ function aosApplyUpdate(){
   if(ghReady() && gh.dirty) ghSync('update').finally(go); else go();
 }
 (function init(){
-  ghLoad(); load(); refInit();
+  ghLoad(); sbLoad(); load(); refInit(); sbFromHash();
   const h=location.hash.slice(1); if(VIEWS.some(v=>v[0]===h)) ui.view=h;
   if(liveRestore()) ui.view='training';   // laufende Einheit nach Neustart der App fortsetzen
   render();
   setInterval(clockTick, 1000);
   if(ghReady()){ ghSync('start'); refLoad(); }
+  if(sbReady()){ sbSync('start'); if(!ghReady()) sbRefLoad(); }
   setTimeout(()=>{ fdbUpdate().catch(()=>{}); }, 4000);
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') && document.querySelector('link[rel=manifest]')){

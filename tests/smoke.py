@@ -168,12 +168,81 @@ async def sync_test(browser):
     await ctx.close()
     return errors
 
+async def supabase_test(browser):
+    """Abgleich mit Supabase gegen eine nachgebaute Datenbank: Login per Code, Hochladen, Änderung eines anderen Geräts,
+    älterer Stand überschreibt keinen neueren (wie der Trigger in der Datenbank)."""
+    uid = '00000000-0000-4000-a000-0000000000aa'
+    db = {}   # key -> {data, updated_at, deleted}
+    sent = {'otp': 0}
+    async def sbr(route):
+        req = route.request; url = req.url; path = url.split('.supabase.co')[1]
+        if path.startswith('/auth/v1/otp'):
+            sent['otp'] += 1; return await route.fulfill(status=200, json={})
+        if path.startswith('/auth/v1/verify'):
+            b = json.loads(req.post_data)
+            if b.get('token') != '123456': return await route.fulfill(status=403, json={'msg': 'Token has expired or is invalid'})
+            return await route.fulfill(status=200, json={'access_token': 'tok', 'refresh_token': 'ref', 'expires_in': 3600, 'user': {'id': uid, 'email': b['email']}})
+        if path.startswith('/rest/v1/records'):
+            if req.method == 'GET':
+                rows = [dict(key=k, **v) for k, v in sorted(db.items())]
+                return await route.fulfill(status=200, json=rows)
+            if req.method == 'POST':
+                for r in json.loads(req.post_data):
+                    if r['athlete_id'] != uid: return await route.fulfill(status=403, json={'message': 'row-level security'})
+                    cur = db.get(r['key'])
+                    if cur and cur['updated_at'] > r['updated_at']: continue   # jüngste Änderung gewinnt
+                    db[r['key']] = {'data': r['data'], 'updated_at': r['updated_at'], 'deleted': r['deleted']}
+                return await route.fulfill(status=201, body='')
+        if path.startswith('/rest/v1/'):
+            return await route.fulfill(status=200, json=[])
+        return await route.fulfill(status=404, json={})
+    ctx = await browser.new_context(viewport={'width': 390, 'height': 900})
+    await ctx.route('**/*', lambda r: r.continue_() if r.request.url.startswith('file:') else r.abort())
+    await ctx.route('https://*.supabase.co/**', sbr)
+    page = await ctx.new_page(); errors = []
+    page.on('pageerror', lambda e: errors.append(str(e)))
+    await page.goto(ROOT.as_uri()); await page.wait_for_timeout(600)
+    # Login über die Oberfläche
+    await page.evaluate("()=>{ ui.view='profil'; ui.profOpen={sb:true}; render(); }")
+    await page.fill('#sb-email', 'athlet@test.invalid'); await page.click('[data-act="sbCode"]'); await page.wait_for_timeout(100)
+    if sent['otp'] != 1: errors.append('Supabase: Code wurde nicht angefordert')
+    await page.fill('#sb-otp', '000000'); await page.click('[data-act="sbVerify"]'); await page.wait_for_timeout(100)
+    if await page.evaluate("sbReady()"): errors.append('Supabase: falscher Code wurde angenommen')
+    await page.fill('#sb-otp', '123456'); await page.click('[data-act="sbVerify"]'); await page.wait_for_timeout(300)
+    if not await page.evaluate("sbReady()"): errors.append('Supabase: Anmeldung mit richtigem Code klappt nicht'); await ctx.close(); return errors
+    # Alles Lokale ist oben
+    n_local = await page.evaluate("syncRecords(S).size")
+    if len([k for k, v in db.items() if not v['deleted']]) < n_local: errors.append(f'Supabase: nicht alle Datensätze hochgeladen ({len(db)} von {n_local})')
+    # Lokale Änderung wird hochgeladen
+    await page.evaluate("async()=>{ S.profile.name='Test'; save(); await sbSync('test'); }")
+    if (db.get('profile:_') or {}).get('data', {}).get('name') != 'Test': errors.append('Supabase: lokale Änderung kam nicht an')
+    # Neuere Änderung eines anderen Geräts kommt an
+    db['profile:_'] = {'data': dict(db['profile:_']['data'], name='anderes Gerät'), 'updated_at': '2099-01-01T00:00:00.000Z', 'deleted': False}
+    if await page.evaluate("async()=>{ await sbSync('test'); return S.profile.name; }") != 'anderes Gerät':
+        errors.append('Supabase: Änderung des anderen Geräts kam nicht an')
+    # Löschung auf einem anderen Gerät wird übernommen
+    k = next((k for k in db if k.startswith('cal:') or k.startswith('food:')), None)
+    if k:
+        db[k] = {'data': None, 'updated_at': '2099-01-01T00:00:00.000Z', 'deleted': True}
+        gone = await page.evaluate("async k=>{ await sbSync('test'); return !syncRecords(S).has(k); }", k)
+        if not gone: errors.append('Supabase: Löschung des anderen Geräts kam nicht an')
+    # Laufende Einheit/Abmelden: Daten bleiben auf dem Gerät
+    await page.evaluate("()=>{ sb.sess=null; sbStore(); render(); }")
+    if await page.evaluate("S.profile.name") != 'anderes Gerät': errors.append('Supabase: Daten nach dem Abmelden weg')
+    await ctx.close()
+    return errors
+
 async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         failed = False
         errors = await sync_test(browser)
         print(f'Abgleich: {len(errors)} Fehler')
+        for e in errors:
+            print('  FEHLER:', e)
+        failed |= bool(errors)
+        errors = await supabase_test(browser)
+        print(f'Supabase: {len(errors)} Fehler')
         for e in errors:
             print('  FEHLER:', e)
         failed |= bool(errors)
