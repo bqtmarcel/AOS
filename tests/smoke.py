@@ -1,6 +1,6 @@
 """Klicktest für AOS – läuft lokal und als GitHub Action.
 
-Öffnet die App mit neutralen Testdaten und einem erfundenen Demo-Plan (ohne Datenrepo) in iPhone- und Laptop-Breite,
+Öffnet die App mit neutralen Testdaten und einem erfundenen Demo-Plan (ohne AOS-Konto) in iPhone- und Laptop-Breite,
 öffnet jede Ansicht, klappt alle Bereiche auf, tippt jeden Button einmal an und
 meldet jeden JavaScript-Fehler. Keine persönlichen Daten, kein Netzzugriff.
 
@@ -114,60 +114,6 @@ async def run(browser, width):
     await ctx.close()
     return clicks, errors
 
-# Abgleich mit dem Datenrepo gegen ein nachgebautes GitHub (nur im Test, kein Netz):
-# 1. Eine lokale Eingabe muss den Abgleich mit einem älteren, noch nicht bereinigten Stand (Altfelder) überstehen.
-# 2. Eine neuere Änderung von einem anderen Gerät muss lokal ankommen.
-async def sync_test(browser):
-    remote = {'text': None, 'sha': 0}
-    async def gh(route):
-        req = route.request; url = req.url
-        if '/branches/' in url:
-            return await route.fulfill(status=200, json={'name': 'main'})
-        if req.method == 'GET':
-            if remote['text'] is None:
-                return await route.fulfill(status=404, json={'message': 'Not Found'})
-            return await route.fulfill(status=200, json={'content': base64.b64encode(remote['text'].encode()).decode(), 'encoding': 'base64', 'sha': str(remote['sha'])})
-        if req.method == 'PUT':
-            body = json.loads(req.post_data)
-            if remote['text'] is not None and body.get('sha') != str(remote['sha']):
-                return await route.fulfill(status=409, json={'message': 'conflict'})
-            remote['text'] = base64.b64decode(body['content']).decode(); remote['sha'] += 1
-            return await route.fulfill(status=200, json={'content': {'sha': str(remote['sha'])}})
-        return await route.fulfill(status=405, json={})
-    ctx = await browser.new_context(viewport={'width': 390, 'height': 900})
-    await ctx.route('**/*', lambda r: r.continue_() if r.request.url.startswith('file:') else r.abort())
-    await ctx.route('https://api.github.com/**', gh)
-    page = await ctx.new_page(); errors = []
-    page.on('pageerror', lambda e: errors.append(str(e)))
-    await page.add_init_script("localStorage.setItem('aos-github-v1', JSON.stringify({cfg:{owner:'demo',repo:'demo',branch:'main',path:'aos-data.json',token:'demo'}}))")
-    await page.goto(ROOT.as_uri()); await page.wait_for_timeout(800)
-    # Älterer Stand im Datenrepo, wie ihn ein Gerät mit alter App-Version geschrieben hätte
-    old = json.loads(await page.evaluate("JSON.stringify(S)"))
-    old['profile']['sex'] = 'x'; old['profile']['positionHistory'] = []
-    for l in old['profile']['locations']: l['equipment'] = ['Langhantel']
-    old['unavailable'] = ['2026-01-07']
-    remote['text'] = json.dumps(old); remote['sha'] = 1
-    loc = await page.evaluate("S.profile.locations[0].id")
-    r = await page.evaluate("""async id=>{ await new Promise(r=>setTimeout(r,50));
-        const t=document.createElement('textarea'); t.id='loc-t-'+id; t.value='Langhantel, Rack, keine Sprünge'; document.body.appendChild(t);
-        CHG.locSave({dataset:{id}}); t.remove(); await ghSync('test'); return locById(id).text; }""", loc)
-    if r != 'Langhantel, Rack, keine Sprünge':
-        errors.append('Abgleich: lokale Eingabe ging verloren (' + repr(r) + ')')
-    R = json.loads(remote['text'])
-    if R['profile']['locations'][0].get('text') != 'Langhantel, Rack, keine Sprünge':
-        errors.append('Abgleich: lokale Eingabe kam nicht im Datenrepo an')
-    if 'equipment' in R['profile']['locations'][0] or 'sex' in R['profile'] or R.get('unavailable'):
-        errors.append('Abgleich: Altfelder stehen noch im Datenrepo')
-    # Neuere Änderung von einem anderen Gerät
-    R['profile']['locations'][0]['text'] = 'anderes Gerät'
-    R['sync']['stamps']['profile:_'] = '2099-01-01T00:00:00.000Z'
-    remote['text'] = json.dumps(R); remote['sha'] += 1
-    r = await page.evaluate("async id=>{ await ghSync('test'); return locById(id).text; }", loc)
-    if r != 'anderes Gerät':
-        errors.append('Abgleich: neuere Änderung des anderen Geräts kam nicht an (' + repr(r) + ')')
-    await ctx.close()
-    return errors
-
 async def supabase_test(browser):
     """Abgleich mit Supabase gegen eine nachgebaute Datenbank: Login per Code, Hochladen, Änderung eines anderen Geräts,
     älterer Stand überschreibt keinen neueren (wie der Trigger in der Datenbank)."""
@@ -252,11 +198,6 @@ async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         failed = False
-        errors = await sync_test(browser)
-        print(f'Abgleich: {len(errors)} Fehler')
-        for e in errors:
-            print('  FEHLER:', e)
-        failed |= bool(errors)
         errors = await supabase_test(browser)
         print(f'Supabase: {len(errors)} Fehler')
         for e in errors:

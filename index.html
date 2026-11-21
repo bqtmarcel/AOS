@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AOS">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src https://sraocwhvkisomjjoqznr.supabase.co https://api.github.com https://world.openfoodfacts.org https://raw.githubusercontent.com; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src https://sraocwhvkisomjjoqznr.supabase.co https://world.openfoodfacts.org https://raw.githubusercontent.com; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>AOS – Athlete Operating System</title>
 <style>
@@ -480,11 +480,10 @@ function save(silent){
   S.meta.updatedAt = new Date().toISOString();
   pushAgendaUpdate();
   const changed = syncTrack();
-  if(changed && typeof ghOnLocalChange==='function') ghOnLocalChange();
   if(changed && typeof sbOnLocalChange==='function') sbOnLocalChange();
   if(!storageOK) return false;
   try{ localStorage.setItem(AOS_KEY, JSON.stringify(S)); return true; }
-  catch(e){ storageOK=false; if(!silent) toast('Speichern auf dem Gerät fehlgeschlagen'+(ghReady()?' – der Abgleich mit GitHub läuft weiter.':' – bitte jetzt eine JSON-Sicherung exportieren.')); return false; }
+  catch(e){ storageOK=false; if(!silent) toast('Speichern auf dem Gerät fehlgeschlagen'+(sbReady()?' – der Abgleich mit deinem AOS-Konto läuft weiter.':' – bitte jetzt eine JSON-Sicherung exportieren.')); return false; }
 }
 function migrate(d){
   // Platz für künftige Schema-Änderungen; fehlende Bereiche ergänzen statt Daten zu verwerfen
@@ -886,7 +885,7 @@ ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f
 /* ---------- Gerüst ---------- */
 function renderShell(){
   document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+' aria-label="'+t+'" title="'+t+'">'+(NAV_ICON[k]||'')+'<span class="sr-only">'+t+'</span></button>').join('');
-  document.getElementById('topinfo').innerHTML = '<div class="sysbar"><button id="hsync" class="sync-btn" data-act="syncInfo" aria-label="Speicherstatus anzeigen">'+ghDot()+'</button></div>';
+  document.getElementById('topinfo').innerHTML = '<div class="sysbar"><button id="hsync" class="sync-btn" data-act="syncInfo" aria-label="Speicherstatus anzeigen">'+syncDot()+'</button></div>';
 }
 /* Tabellen mit 3+ Spalten werden am Handy als Liste untereinander dargestellt (kein Seitwärts-Scrollen) */
 function stackTables(root){
@@ -1258,7 +1257,7 @@ function autoTests(s){ if(!s || !s.planner || !s.log) return 0; const b=blockByI
   return n; }
 function draftBad(dr){ const bad=[]; dr.exercises.forEach(e=>e.sets.forEach((x,j)=>SET_KEYS.forEach(k=>{ if(Number.isNaN(x[k])) bad.push(e.name+' Satz '+(j+1)); })));
   if(Number.isNaN(dr.durationMin)) bad.push('Dauer'); return bad; }
-/* Zwischenspeichern: Stand in der Einheit sichern (geht mit dem Datenrepo auch auf die anderen Geräte), Einheit läuft weiter */
+/* Zwischenspeichern: Stand in der Einheit sichern (geht über das AOS-Konto auch auf die anderen Geräte), Einheit läuft weiter */
 ACT.saveDraft = ()=>{ const s=sessionById(ui.sessionId); if(!s||s.log||!ui.draft) return;
   const d=clone(ui.draft); d.savedAt=new Date().toISOString(); s.draft=d; save(); liveSave();
   toast('Zwischengespeichert '+new Date().toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})+' – die Einheit läuft weiter'); };
@@ -1533,11 +1532,11 @@ CHG.importFile = el=>readBackup(el, (d,f)=>{
     '<div class="note warn"><strong>Achtung:</strong> Der Import ersetzt alle aktuell auf diesem Gerät gespeicherten AOS-Daten ('+S.sessions.length+' Einheiten, '+S.tests.length+' Tests). Wenn du Daten von zwei Geräten behalten willst, nutze stattdessen „Sicherung zusammenführen“.</div>',
     '<button data-act="closeDlg">Abbrechen</button><button data-act="exportJSON">Aktuelle Daten zuerst sichern</button><button class="danger" data-act="importOk">Daten ersetzen</button>');
 });
-ACT.importOk = ()=>{ if(!ui.importData) return; S=migrate(ui.importData); syncInit(); ui.importData=null;  save(); closeDlg(); toast('Sicherung importiert.'+(ghReady()?' Sie wird jetzt mit dem Datenrepo zusammengeführt.':'')); render(); if(ghReady()) ghSync('import'); };
+ACT.importOk = ()=>{ if(!ui.importData) return; S=migrate(ui.importData); syncInit(); ui.importData=null;  save(); closeDlg(); toast('Sicherung importiert.'+(sbReady()?' Sie wird jetzt mit deinem AOS-Konto zusammengeführt.':'')); render(); if(ghReady()) ghSync('import'); };
 ACT.resetAll = ()=>{
   openDlg('Alle Daten zurücksetzen?','<p>Alle Einheiten, Protokolle, Tests, Blöcke und Einstellungen in diesem Browser werden gelöscht. Nur die Ausgangsdaten werden wiederhergestellt.</p><p>Zur Bestätigung <strong>LÖSCHEN</strong> eingeben:</p>'+inp('rs-conf','Bestätigung',''),
     '<button data-act="closeDlg">Abbrechen</button><button data-act="exportJSON">Vorher sichern</button><button class="danger" data-act="resetOk">Zurücksetzen</button>'); };
-ACT.resetOk = ()=>{ if(val('rs-conf')!=='LÖSCHEN'){ toast('Bitte LÖSCHEN eingeben.'); return; } S=freshData(); syncInit(); save(); closeDlg(); toast('Zurückgesetzt.'); render(); if(ghReady()) ghSync('reset'); };
+ACT.resetOk = ()=>{ if(val('rs-conf')!=='LÖSCHEN'){ toast('Bitte LÖSCHEN eingeben.'); return; } S=freshData(); syncInit(); save(); closeDlg(); toast('Zurückgesetzt.'); render(); if(sbReady()) sbSync('reset'); };
 
 'use strict';
 /* ===== AOS – Sessionplaner =====
@@ -1560,35 +1559,7 @@ function plDropStale(){ if(typeof S==='undefined' || !S || !REF.plan || !(REF.pl
   S.sessions=S.sessions.filter(x=>!(x.status==='geplant' && !x.log && x.planner && x.planner.blockId && !ids.has(x.planner.blockId)));
   if(S.sessions.length<n) save(true); }
 function refInit(){ try{ const c=JSON.parse(localStorage.getItem(REF_KEY)||'null'); if(c&&c.plan&&c.ex) refSet(c.plan, c.ex, c.at, c); }catch(e){} }
-async function ghRaw(path){
-  let res;
-  try{ res = await fetch(ghRepoUrl('/contents/'+path.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(gh.cfg.branch)),
-    { cache:'no-store', headers:{ 'Accept':'application/vnd.github.raw+json', 'Authorization':'Bearer '+gh.cfg.token, 'X-GitHub-Api-Version':'2022-11-28' } }); }
-  catch(e){ const err=new Error('Keine Verbindung zu GitHub'); err.offline=true; throw err; }
-  if(!res.ok){ const err=new Error(res.status===404?'„'+path+'“ fehlt im Datenrepo.':'HTTP '+res.status); err.status=res.status; throw err; }
-  return res.text();
-}
-async function refLoad(force){
-  if(!ghReady()) return (typeof sbReady==='function' && sbReady()) ? sbRefLoad(force) : false;
-  if(REF.loading) return false;
-  if(!force && REF.at && Date.now()-new Date(REF.at).getTime() < 10*60*1000) return true;
-  REF.loading=true;
-  try{
-    const [p, x] = await Promise.all([ ghRaw('planner/plan.json'), ghRaw('db/AOS_Uebungsdatenbank.json') ]);
-    let plan, ex; try{ plan=JSON.parse(p); ex=JSON.parse(x); }catch(e){ throw new Error('Planerdaten im Datenrepo sind kein gültiges JSON.'); }
-    if(!plan.blocks || !ex.exercises) throw new Error('Planerdaten unvollständig.');
-    // Ernährungsdaten getrennt laden: Fehlen sie, funktioniert der Trainingsplaner trotzdem
-    const more={ nut:REF.nut, food:REF.food, recipes:REF.recipes };
-    const r=await Promise.allSettled([ ghRaw('planner/nutrition.json'), ghRaw('db/AOS_Lebensmitteldatenbank.json'), ghRaw('db/AOS_Rezeptdatenbank.json') ]);
-    try{ if(r[0].status==='fulfilled') more.nut=JSON.parse(r[0].value); if(r[1].status==='fulfilled') more.food=JSON.parse(r[1].value); if(r[2].status==='fulfilled') more.recipes=JSON.parse(r[2].value);
-      REF.nutError = r.slice(0,2).some(x=>x.status!=='fulfilled') ? 'Ernährungsdaten fehlen im Datenrepo (planner/nutrition.json, db/AOS_Lebensmitteldatenbank.json).' : ''; }
-    catch(e){ REF.nutError='Ernährungsdaten im Datenrepo sind kein gültiges JSON.'; }
-    refSet(plan, ex, new Date().toISOString(), more); REF.error='';
-    try{ localStorage.setItem(REF_KEY, JSON.stringify({ plan, ex, at:REF.at, nut:REF.nut, food:REF.food, recipes:REF.recipes })); }catch(e){}
-    return true;
-  }catch(e){ REF.error = e.offline ? '' : (e.status ? ghErrText(e) : e.message); return false; }
-  finally{ REF.loading=false; const dlg=document.getElementById('dlg'); if(['training','uebersicht','plan','ernaehrung'].includes(ui.view) && !logVisible() && !(dlg&&dlg.open)) render(); }
-}
+async function refLoad(force){ return sbRefLoad(force); }
 
 /* ===== AOS – Automatische Blockplanung (interner Strength Coach) =====
    Für jede Phase ohne eigenen Block in plan.json stellt AOS den Block selbst zusammen – ohne Entscheidung des Athleten:
@@ -2488,7 +2459,7 @@ function nutEnsureMeal(date, slotId){ let m=nutMeal(date, slotId); if(!m){ m={ i
 function viewNutrition(){
   let h='<h1>Ernährung</h1>';
   if(!NUT() || !REF.food){
-    if(!ghReady()) return h+'<div class="note warn">Die Ernährungsplanung braucht deine Ernährungsdaten aus dem Datenrepo. <button class="link" data-act="ghOpen">Mit GitHub verbinden</button></div>';
+    if(!sbReady()) return h+'<div class="note warn">Die Ernährungsplanung braucht deine Ernährungsdaten aus deinem AOS-Konto. <button class="link" data-act="sbOpen">Anmelden</button></div>';
     return h+'<div class="note">'+(REF.loading?'Ernährungsdaten werden geladen …':(REF.nutError||'Ernährungsdaten noch nicht geladen.'))+' <button class="link" data-act="plReload">Neu laden</button></div>';
   }
   const date=ui.nutDate||todayISO(); const T=nutTargets(date); const cfg=nutDayCfg(date);
@@ -3071,7 +3042,7 @@ function plCurrentLoad(slot, exId, b){
 function viewPlan(){
   let h='<h1>Plan</h1>';
   if(!REF.plan){
-    if(!ghReady()) return h+'<div class="note warn">Der Plan liegt in deinem privaten Datenrepo. <button class="link" data-act="ghOpen">Mit GitHub verbinden</button></div>';
+    if(!sbReady()) return h+'<div class="note warn">Der Plan liegt in deinem AOS-Konto. <button class="link" data-act="sbOpen">Anmelden</button></div>';
     return h+'<div class="note">'+(REF.loading?'Plan wird geladen …':(REF.error||'Plan noch nicht geladen.'))+' <button class="link" data-act="plReload">Neu laden</button></div>';
   }
   const P=REF.plan, today=todayISO();
@@ -3135,8 +3106,8 @@ function viewPlan(){
 function viewOverview(){
   const today=todayISO();
   let h='<h1>Übersicht</h1>';
-  h+='<div id="syncwarn">'+ghWarn()+'</div>';
-  if(!ghReady()) h+='<div class="note warn"><strong>Noch nicht verbunden.</strong> Deine Daten liegen im privaten Datenrepo. <button class="link" data-act="ghOpen">Jetzt verbinden</button></div>';
+  h+='<div id="syncwarn">'+syncWarn()+'</div>';
+  if(!sbReady()) h+='<div class="note warn"><strong>Nicht angemeldet.</strong> Melde dich an, dann sind Plan und Daten auf allen Geräten da. <button class="link" data-act="sbOpen">Anmelden</button></div>';
   if(isIOS() && !isStandalone() && location.protocol==='https:' && !S.settings.hideInstallHint)
     h+='<div class="note warn"><strong>Als App installieren:</strong> In Safari auf <em>Teilen</em> → <em>Zum Home-Bildschirm</em>, danach AOS immer über das Symbol öffnen. <button class="link small" data-act="hideInstall">Ausblenden</button></div>';
   h+=deloadNote()+ovToday(today)+ovTestWeek(today)+ovWeek(today);
@@ -3163,7 +3134,7 @@ function ovTestWeek(today){ if(typeof REF==='undefined'||!REF.plan) return ''; c
   return '<div class="note"><strong>Letzte Blockwoche: Standortbestimmung.</strong> '+(notes.length?esc(notes.join(' ')):'Top-Sets innerhalb der RPE-Obergrenze, kein Maximaltest.')+' AOS übernimmt die Ergebnisse beim Speichern der Einheit automatisch unter <button class="link" data-act="go" data-view="tests">Verlauf</button>.</div>'; }
 function ovToday(today){
   const dayLbl='Heute · '+WD[weekdayOf(today)]+' '+fmtDate(today).slice(0,6);
-  if(typeof REF==='undefined' || !REF.plan) return '<div class="section hero"><div class="eyebrow">'+dayLbl+'</div><div class="hero-title">'+(ghReady()?'Plan wird geladen …':'Noch nicht verbunden')+'</div></div>';
+  if(typeof REF==='undefined' || !REF.plan) return '<div class="section hero"><div class="eyebrow">'+dayLbl+'</div><div class="hero-title">'+(sbReady()?'Plan wird geladen …':'Nicht angemeldet')+'</div></div>';
   const due=plDue(today); const T=REF.nut ? nutTargets(today) : null;
   const typ=T ? T.label.replace(/\s*\(.*\)\s*$/,'') : '';
   let state='rest', title='Ruhetag', sub='', btn='';
@@ -3354,7 +3325,7 @@ function pushSection(){
   const P=S.push, here=pushActiveHere(), n=(P.subs||[]).length;
   let b='';
   if(!pushSupported()) b+='<div class="note">'+(pushIsIOS()&&!isStandalone()?'<strong>Erst zum Home-Bildschirm hinzufügen.</strong> Am iPhone gehen Push-Nachrichten nur, wenn AOS über Safari → Teilen → „Zum Home-Bildschirm“ installiert ist und von dort geöffnet wird (ab iOS 16.4).':'Dieser Browser unterstützt keine Push-Nachrichten.')+'</div>';
-  else if(!ghReady()) b+='<div class="note">Erst die Datenspeicherung verbinden – die Erinnerungen werden über dein Datenrepo verschickt.</div>';
+  else if(!sbReady()) b+='<div class="note">Erst im AOS-Konto anmelden – die Erinnerungen werden über dein Konto verschickt.</div>';
   else if(here) b+='<p class="small">Auf diesem Gerät <strong>aktiv</strong>.'+(n>1?' Insgesamt '+n+' Geräte.':'')+' <button class="link" data-act="pushOff">Auf diesem Gerät ausschalten</button></p>';
   else b+=(Notification.permission==='denied'?'<div class="note warn">Mitteilungen für AOS sind in den Einstellungen blockiert. iPhone: Einstellungen → Mitteilungen → AOS → Mitteilungen erlauben.</div>':'')+
     '<p><button class="primary" data-act="pushOn">Erinnerungen auf diesem Gerät aktivieren</button></p>';
@@ -3399,7 +3370,6 @@ function viewProfile(){
   h+=pdet('loc','Trainingsorte',(S.profile.locations||[]).length+' Orte',locSection());
   h+=pushSection();
   h+=sbSection();
-  h+=ghSection();
   const le=S.settings.lastExport;
   h+=pdet('backup','Sicherung',le?'zuletzt '+fmtDate(le.slice(0,10)):'',''+
     '<button data-act="exportJSON">Sicherung herunterladen</button>'+
@@ -3457,7 +3427,7 @@ function goalsSection(){
 
 function plSection(){
   if(!REF.plan){
-    if(!ghReady()) return '<div class="note warn">Verbinde AOS mit deinem Datenrepo, dann stellt AOS hier deine Einheit zusammen. <button class="link" data-act="ghOpen">Verbinden</button></div>';
+    if(!sbReady()) return '<div class="note warn">Melde dich in deinem AOS-Konto an, dann stellt AOS hier deine Einheit zusammen. <button class="link" data-act="sbOpen">Anmelden</button></div>';
     return '<div class="note">'+(REF.loading?'Plan wird geladen …':(REF.error?esc(REF.error):'Plan noch nicht geladen.'))+' <button class="link" data-act="plReload">Neu laden</button></div>';
   }
   ui.pl=ui.pl||plDefaults(); const p=ui.pl; const pin=plInput(); const due=plDue(p.date); const b=due.block; const today=todayISO();
@@ -3493,126 +3463,30 @@ function plSection(){
 }
 
 'use strict';
-/* ===== AOS – Speicherung im privaten GitHub-Datenrepo =====
-   Ablauf eines Abgleichs: Datei aus dem Datenrepo laden → mit dem Stand auf diesem Gerät zusammenführen
-   (pro Datensatz gewinnt die jüngste Änderung, siehe mergeData) → Ergebnis zurückschreiben, falls sich etwas geändert hat.
-   Der Zugriffsschlüssel (Token) bleibt nur auf diesem Gerät (localStorage, nicht in Sicherungen) und wird
-   ausschließlich an api.github.com gesendet. */
 
-const GH_KEY = 'aos-github-v1';
-const GH_DEFAULT = { owner:'bqtmarcel', repo:'AOS_DATA', branch:'main', path:'aos-data.json', token:'' };
-const gh = { cfg:null, state:'aus', syncing:false, again:false, timer:null, lastOk:null, lastError:'', dirty:false };
-
-function ghLoad(){
-  let c=null; try{ c=JSON.parse(localStorage.getItem(GH_KEY)||'null'); }catch(e){}
-  gh.cfg = Object.assign({}, GH_DEFAULT, c&&c.cfg||{});
-  gh.lastOk = c&&c.lastOk || null; gh.dirty = !!(c&&c.dirty);
-  gh.state = ghReady() ? (gh.dirty?'ausstehend':'ok') : 'aus';
-}
-function ghStore(){ try{ localStorage.setItem(GH_KEY, JSON.stringify({ cfg:gh.cfg, lastOk:gh.lastOk, dirty:gh.dirty })); }catch(e){} }
-function ghReady(){ return !!(gh.cfg && gh.cfg.token && gh.cfg.owner && gh.cfg.repo && gh.cfg.branch && gh.cfg.path); }
-
-/* Base64 für UTF-8 (Umlaute) */
-function b64enc(str){ const b=new TextEncoder().encode(str); let bin=''; for(let i=0;i<b.length;i+=0x8000) bin+=String.fromCharCode.apply(null, b.subarray(i,i+0x8000)); return btoa(bin); }
-function b64dec(s){ const bin=atob(String(s).replace(/\s/g,'')); const b=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) b[i]=bin.charCodeAt(i); return new TextDecoder().decode(b); }
-
-function ghRepoUrl(p){ return 'https://api.github.com/repos/'+encodeURIComponent(gh.cfg.owner)+'/'+encodeURIComponent(gh.cfg.repo)+(p||''); }
-function ghFilePath(){ return gh.cfg.path.split('/').filter(Boolean).map(encodeURIComponent).join('/'); }
-async function ghFetch(method, path, body){
-  let res;
-  const headers = { 'Accept':'application/vnd.github+json', 'Authorization':'Bearer '+gh.cfg.token, 'X-GitHub-Api-Version':'2022-11-28' };
-  if(body) headers['Content-Type']='application/json';
-  try{ res = await fetch(ghRepoUrl(path), { method, headers, cache:'no-store', body: body?JSON.stringify(body):undefined }); }
-  catch(e){ const err=new Error('Keine Verbindung zu GitHub'); err.offline=true; throw err; }
-  ghNoteExpiry(res);
-  let data=null; try{ data=await res.json(); }catch(e){}
-  if(!res.ok){ const err=new Error((data&&data.message)||('HTTP '+res.status)); err.status=res.status; throw err; }
-  return data;
-}
-function ghErrText(e){
-  if(e.offline) return 'Keine Verbindung – wird automatisch nachgeholt.';
-  if(e.status===401) return 'Der Zugriffsschlüssel (Token) ist ungültig oder abgelaufen.';
-  if(e.status===403) return 'Der Token darf auf das Datenrepo nicht zugreifen (Berechtigung „Contents: Read and write“ prüfen).';
-  if(e.status===404) return 'Repo oder Branch nicht gefunden – oder der Token hat keinen Zugriff auf dieses Repo.';
-  return e.message||String(e);
-}
-
-/* Datei laden; null, wenn sie noch nicht existiert */
-async function ghPull(){
-  let meta;
-  try{ meta = await ghFetch('GET', '/contents/'+ghFilePath()+'?ref='+encodeURIComponent(gh.cfg.branch)); }
-  catch(e){
-    if(e.status===404){ await ghFetch('GET', '/branches/'+encodeURIComponent(gh.cfg.branch)); return { data:null, sha:null }; } // Branch muss existieren
-    throw e;
-  }
-  if(Array.isArray(meta)) throw new Error('„'+gh.cfg.path+'“ ist im Datenrepo ein Ordner, keine Datei.');
-  const text = (meta.content && meta.encoding==='base64') ? b64dec(meta.content) : b64dec((await ghFetch('GET','/git/blobs/'+meta.sha)).content); // > 1 MB: über Blob laden
-  let d; try{ d=JSON.parse(text); }catch(e){ throw new Error('„'+gh.cfg.path+'“ im Datenrepo ist kein gültiges JSON – nichts überschrieben.'); }
-  const v=validateData(d); if(!v.ok) throw new Error('„'+gh.cfg.path+'“ ist keine gültige AOS-Datei ('+v.errors[0]+') – nichts überschrieben.');
-  return { data: migrate(d), sha: meta.sha };
-}
-
+/* ===== AOS – Speicherung: Gerät + Supabase (Roadmap M1). Bis 21.11.2026 lag alles im privaten Datenrepo per GitHub-Token. ===== */
+const GH_OLD_KEY = 'aos-github-v1';   // alter GitHub-Token: wird beim Start von jedem Gerät entfernt
 /* Vergleichbarer Fingerabdruck des synchronisierten Inhalts (unabhängig von Reihenfolge und Gerät) */
 function canon(v){ if(Array.isArray(v)) return '['+v.map(canon).join(',')+']'; if(v&&typeof v==='object') return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canon(v[k])).join(',')+'}'; return JSON.stringify(v===undefined?null:v); }
 function syncSig(d){ const o={}; syncRecords(d).forEach((v,k)=>o[k]=v); return canon([o, d.sync&&d.sync.stamps||{}, d.sync&&d.sync.tombstones||{}]); }
-
-function ghDevice(){ return isIOS() ? 'iPhone/iPad' : 'Browser'; }
-function ghApplyMerged(d){
+function applyMerged(d){
   S=d; syncInit();
   if(storageOK){ try{ localStorage.setItem(AOS_KEY, JSON.stringify(S)); }catch(e){} }
   // Offene Eingaben (Dialog, Protokoll in Arbeit) nicht unter den Fingern neu zeichnen
   const dlg=document.getElementById('dlg');
-  if((dlg && dlg.open) || logVisible()){ gh.renderPending=true; renderShell(); }
+  if((dlg && dlg.open) || logVisible()){ sb.renderPending=true; renderShell(); }
   else { render(); }
 }
 
-async function ghSync(reason){
-  if(!ghReady()){ ghSetState('aus'); return false; }
-  if(gh.syncing){ gh.again=true; return false; }
-  clearTimeout(gh.timer);
-  if(navigator.onLine===false){ ghSetState('offline'); return false; }
-  gh.syncing=true; ghSetState('laeuft');
-  try{
-    for(let attempt=0; ; attempt++){
-      const { data:R, sha } = await ghPull();
-      if(R){
-        const res = mergeData(S, R);
-        if(syncSig(res.data)!==syncSig(S)) ghApplyMerged(res.data);
-        if(syncSig(S)===syncSig(R)){ gh.dirty=false; break; }   // Datenrepo ist bereits aktuell
-      }
-      try{
-        const body = { message:'AOS-Abgleich ('+ghDevice()+')', content:b64enc(JSON.stringify(S, null, 1)), branch:gh.cfg.branch };
-        if(sha) body.sha=sha;
-        await ghFetch('PUT', '/contents/'+ghFilePath(), body);
-        gh.dirty=false; break;
-      }catch(e){
-        // Ein anderes Gerät hat inzwischen gespeichert → neu laden, zusammenführen, nochmal schreiben
-        if((e.status===409 || e.status===422) && attempt<3) continue;
-        throw e;
-      }
-    }
-    gh.lastOk=new Date().toISOString(); gh.lastError=''; ghStore(); ghSetState(gh.dirty?'ausstehend':'ok');
-    return true;
-  }catch(e){
-    gh.lastError=ghErrText(e); ghStore(); ghSetState(e.offline?'offline':'fehler');
-    if(reason==='manuell' || reason==='einrichten') toast(gh.lastError);
-    return false;
-  }finally{
-    gh.syncing=false;
-    if(gh.again){ gh.again=false; ghSchedule(1000); }
-  }
-}
-function ghSchedule(ms){ if(!ghReady()) return; clearTimeout(gh.timer); gh.timer=setTimeout(()=>ghSync('auto'), ms); }
-function ghOnLocalChange(){ if(!gh.cfg) return; gh.dirty=true; ghStore(); if(ghReady()){ if(!gh.syncing) ghSetState('ausstehend'); ghSchedule(3000); } }
-
 /* ===== AOS – Supabase: Login und Abgleich (Roadmap M1.3–M1.5) =====
-   Bis zur Umstellung (M1.10) läuft der Abgleich mit Supabase zusätzlich zum Datenrepo: dieselben Datensätze mit Zeitstempeln,
-   jüngste Änderung gewinnt (zusätzlich in der Datenbank erzwungen). Login per Code aus der E-Mail – funktioniert auch in der
+   Abgleich pro Datensatz mit Zeitstempeln (seit 21.11.2026 einziger Speicherort neben dem Gerät), jüngste Änderung gewinnt (zusätzlich in der Datenbank erzwungen). Login per Code aus der E-Mail – funktioniert auch in der
    Home-Bildschirm-App am iPhone (ein Link aus der Mail würde in Safari statt in der App landen). */
 const SB_URL='https://sraocwhvkisomjjoqznr.supabase.co', SB_KEY='sb_publishable_Cvqcna518s5NdlUahoIHcw_TRPfBMXZ', SB_STORE='aos-sb-v1';
-const sb={ sess:null, email:'', state:'aus', syncing:false, again:false, timer:null, lastOk:null, lastError:'', codeSent:false, team:null };
-function sbLoad(){ try{ const c=JSON.parse(localStorage.getItem(SB_STORE)||'null'); if(c){ sb.sess=c.sess||null; sb.email=c.email||''; sb.lastOk=c.lastOk||null; sb.team=c.team||null; } }catch(e){} }
-function sbStore(){ try{ localStorage.setItem(SB_STORE, JSON.stringify({ sess:sb.sess, email:sb.email, lastOk:sb.lastOk, team:sb.team })); }catch(e){} }
+const sb={ sess:null, email:'', state:'aus', syncing:false, again:false, timer:null, lastOk:null, lastError:'', codeSent:false, team:null, dirty:false, renderPending:false };
+function sbLoad(){ try{ const c=JSON.parse(localStorage.getItem(SB_STORE)||'null'); if(c){ sb.sess=c.sess||null; sb.email=c.email||''; sb.lastOk=c.lastOk||null; sb.team=c.team||null; sb.dirty=!!c.dirty; } }catch(e){}
+  sb.state=sbReady()?(sb.dirty?'ausstehend':'ok'):'aus';
+  try{ localStorage.removeItem(GH_OLD_KEY); }catch(e){} }
+function sbStore(){ try{ localStorage.setItem(SB_STORE, JSON.stringify({ sess:sb.sess, email:sb.email, lastOk:sb.lastOk, team:sb.team, dirty:sb.dirty })); }catch(e){} }
 function sbReady(){ return !!(sb.sess && sb.sess.refresh_token && sb.sess.user && sb.sess.user.id); }
 function sbUid(){ return sb.sess && sb.sess.user && sb.sess.user.id; }
 function sbErr(status, msg){ const e=new Error(msg); e.status=status; return e; }
@@ -3653,7 +3527,7 @@ ACT.sbVerify = async ()=>{ const token=val('sb-otp').replace(/\s/g,''); if(token
 ACT.sbLogout = ()=>confirmDlg('Abmelden?','Die Daten bleiben auf diesem Gerät und in Supabase. Der Abgleich mit Supabase pausiert, bis du dich wieder anmeldest.','Abmelden',async ()=>{
   try{ if(sbReady()) await sbRaw('POST','/auth/v1/logout',{}, null, sb.sess.access_token); }catch(e){}
   sb.sess=null; sb.state='aus'; sbStore(); render(); });
-ACT.sbSyncNow = async ()=>{ const ok=await sbSync('manuell'); if(ok) toast('Mit Supabase abgeglichen'); };
+ACT.sbSyncNow = async ()=>{ const ok=await sbSync('manuell'); if(ok){ toast('Abgeglichen'); refLoad(true); } };
 ACT.sbBack = ()=>{ sb.codeSent=false; render(); };
 ACT.sbHaveCode = ()=>{ sb.codeSent=true; render(); };
 /* Link aus der Mail: öffnet sich am iPhone in Safari, nicht in der App vom Home-Bildschirm (getrennter Speicher).
@@ -3692,23 +3566,23 @@ async function sbSync(reason){
   try{
     const rows=await sbPullRows(); const remote=new Map(rows.map(r=>[r.key,{ t:sbIso(r.updated_at), del:r.deleted }]));
     const res=mergeData(S, sbDocOf(rows));
-    if(syncSig(res.data)!==syncSig(S)) ghApplyMerged(res.data);
+    if(syncSig(res.data)!==syncSig(S)) applyMerged(res.data);
     const up=[]; const uid=sbUid();
     syncRecords(S).forEach((v,k)=>{ const t=S.sync.stamps[k]||''; const r=remote.get(k); if(!t) return;
       if(!r || r.del || r.t<t) up.push({ athlete_id:uid, key:k, data:v, updated_at:t, deleted:false }); });
     Object.entries(S.sync.tombstones||{}).forEach(([k,t])=>{ const r=remote.get(k); if(r && !r.del && r.t<t) up.push({ athlete_id:uid, key:k, data:null, updated_at:t, deleted:true }); });
     for(let i=0;i<up.length;i+=200) await sbApi('POST','/rest/v1/records?on_conflict=athlete_id,key', up.slice(i,i+200), { Prefer:'resolution=merge-duplicates,return=minimal' });
-    sb.lastOk=new Date().toISOString(); sb.lastError=''; sb.state='ok'; sbStore();
+    sb.lastOk=new Date().toISOString(); sb.lastError=''; sb.dirty=false; sb.state='ok'; sbStore();
     return true;
-  }catch(e){ sb.lastError=e.message; sb.state=e.offline?'offline':'fehler'; if(reason==='manuell'||reason==='login') toast('Supabase: '+e.message); return false; }
+  }catch(e){ sb.lastError=e.message; sb.state=e.offline?'offline':'fehler'; if(reason==='manuell'||reason==='login') toast('Speichern: '+e.message); return false; }
   finally{ sb.syncing=false; sbPaint(); if(sb.again){ sb.again=false; sbSchedule(1000); } }
 }
 function sbSchedule(ms){ if(!sbReady()) return; clearTimeout(sb.timer); sb.timer=setTimeout(()=>sbSync('auto'), ms); }
-function sbOnLocalChange(){ if(sbReady()) sbSchedule(3000); }
-/* Referenzdaten aus Supabase (wenn kein Datenrepo verbunden ist): Planer- und Ernährungsregeln aus dem Profil,
+function sbOnLocalChange(){ if(!sbReady()) return; sb.dirty=true; sbStore(); if(!sb.syncing){ sb.state='ausstehend'; sbPaint(); } sbSchedule(3000); }
+/* Referenzdaten aus Supabase: Planer- und Ernährungsregeln aus dem Profil,
    Datenbanken aus ref_docs, Teamdaten (Saison, Phasen, Feldtraining) aus team_season (M1.5) */
 async function sbRefLoad(force){
-  if(!sbReady() || ghReady() || REF.loading) return false;
+  if(!sbReady() || REF.loading) return false;
   if(!force && REF.at && Date.now()-new Date(REF.at).getTime() < 10*60*1000) return true;
   REF.loading=true;
   try{
@@ -3726,96 +3600,45 @@ async function sbRefLoad(force){
 async function sbTeam(){ const t=await sbApi('GET','/rest/v1/team_season?select=data,updated_at&id=eq.1'); sb.team=(t[0]&&t[0].data)||null; sbStore(); return sb.team; }
 /* Teamweite Daten gelten für alle gleich und ersetzen die entsprechenden Teile der Planerdaten */
 function sbTeamOverlay(plan, team){ if(!plan || !team) return plan; ['season','phases','field'].forEach(k=>{ if(team[k]) plan[k]=team[k]; }); return plan; }
-function sbPaint(){ const el=document.getElementById('sb-status'); if(el) el.textContent=sbStatusText(); }
 function sbStatusText(){ if(!sbReady()) return 'Nicht angemeldet.';
   const st={ ok:'abgeglichen', laeuft:'gleicht ab …', offline:'offline – gleicht ab, sobald Netz da ist', fehler:'Fehler: '+sb.lastError, aus:'bereit' }[sb.state]||sb.state;
-  return 'Angemeldet als '+(sb.email||'—')+' · '+st+(sb.lastOk?' · zuletzt '+ghTime(sb.lastOk):''); }
+  return 'Angemeldet als '+(sb.email||'—')+' · '+st+(sb.lastOk?' · zuletzt '+fmtSyncTime(sb.lastOk):''); }
 function sbSection(){
   let b='<p id="sb-status" class="small" aria-live="polite">'+esc(sbStatusText())+'</p>';
-  if(sbReady()) b+='<div class="row"><button data-act="sbSyncNow">Jetzt abgleichen</button><button class="small danger" data-act="sbLogout">Abmelden</button></div>';
+  if(sbReady()) b+='<p class="small muted">Plan und Datenbanken geladen '+(REF.at?fmtSyncTime(REF.at):'—')+' · <button class="link" data-act="plReload">neu laden</button></p>'+
+    '<div class="row"><button data-act="sbSyncNow">Jetzt abgleichen</button><button class="small danger" data-act="sbLogout">Abmelden</button></div>';
   else if(sb.codeSent) b+='<p class="small">Mail an '+esc(sb.email)+' öffnen und den Link antippen. Nutzt du AOS als App vom Home-Bildschirm, zeigt dir der Link einen Code – den hier eingeben:</p>'+inp('sb-otp','Code','','autocomplete="one-time-code" autocapitalize="off" spellcheck="false"')+
     '<div class="row"><button class="primary" data-act="sbVerify">Anmelden</button><button class="small" data-act="sbBack">Andere Adresse</button></div>';
   else b+=inp('sb-email','E-Mail-Adresse',sb.email,'type="email" autocomplete="email" inputmode="email"')+'<div class="row"><button class="primary" data-act="sbCode">Anmeldelink anfordern</button><button class="small" data-act="sbHaveCode">Ich habe schon einen Code</button></div>'+
     '<p class="small muted">Du bekommst einen Link per E-Mail. Nur eingeladene Konten können sich anmelden.</p>';
-  b+='<p class="small muted">Übergangszeit: Bis zur Umstellung speichert AOS weiterhin im Datenrepo und gleicht zusätzlich mit Supabase ab.</p>';
-  return pdet('sb','AOS-Konto (Supabase)', sbReady()?(sb.email||'angemeldet'):'nicht angemeldet', b);
+  b+='<p class="small muted">Deine Daten liegen auf diesem Gerät und in deinem AOS-Konto (Supabase, Frankfurt). Ohne Netz speichert AOS auf dem Gerät und gleicht später ab.</p>';
+  return pdet('sb','AOS-Konto', sbReady()?(sb.email||'angemeldet'):'nicht angemeldet', '<span id="sb-sec"></span>'+b);
 }
 
 /* ---------- Anzeige ---------- */
-function ghTime(iso){ if(!iso) return ''; const d=new Date(iso); const t=pad(d.getHours())+':'+pad(d.getMinutes()); return isoOf(d)===todayISO()?t:fmtDateShort(isoOf(d))+' '+t; }
-function ghDot(){ const st=(typeof gh!=='undefined'&&gh.state)||'aus'; const c={ok:'ok',laeuft:'run',ausstehend:'run',offline:'off',fehler:'err',aus:'off'}[st]||'off';
-  return '<span class="sd '+c+'" title="'+esc({ok:'gespeichert',laeuft:'speichert',ausstehend:'ausstehend',offline:'offline',fehler:'Fehler beim Speichern',aus:'nicht verbunden'}[st]||st)+'" role="img" aria-label="Speicherstatus: '+esc({ok:'gespeichert',laeuft:'speichert',ausstehend:'ausstehend',offline:'offline',fehler:'Fehler',aus:'nicht verbunden'}[st]||st)+'">●</span>'; }
-function ghChip(){
-  const st=gh.state;
-  const m = { aus:['Nicht mit GitHub verbunden','warn'], laeuft:['Wird gespeichert …','info'], ok:['Gespeichert '+ghTime(gh.lastOk),'ok'],
-    ausstehend:['Änderungen noch nicht gespeichert','warn'], offline:['Offline – wird später gespeichert','warn'], fehler:['Speichern fehlgeschlagen','bad'] }[st] || ['',''];
-  return '<button class="syncchip '+m[1]+'" data-act="ghOpen" title="'+esc(gh.lastError||'Datenspeicherung (GitHub)')+'">'+esc(m[0])+'</button>';
-}
-function ghSetState(st){
-  gh.state=st;
-  const hs=document.getElementById('hsync'); if(hs) hs.innerHTML=ghDot();
-  const el=document.getElementById('syncchip'); if(el) el.innerHTML=ghChip();
-  const box=document.getElementById('gh-status'); if(box) box.innerHTML=ghStatusText();
-  const w=document.getElementById('syncwarn'); if(w) w.innerHTML=ghWarn();
-}
-/* Übersicht: nur melden, wenn Speichern wirklich fehlschlägt (offline ist normal und wird nachgeholt) */
-/* Ablaufdatum des Tokens: aus der GitHub-Antwort (falls der Browser den Header lesen darf) oder von Hand eingetragen */
-function ghNoteExpiry(res){ try{ const ex=res.headers.get('github-authentication-token-expiration'); if(ex){ const d=ex.slice(0,10); if(/^\d{4}-\d{2}-\d{2}$/.test(d) && gh.cfg.tokenExp!==d){ gh.cfg.tokenExp=d; ghStore(); } } }catch(e){} }
-function ghTokenDays(){ const d=gh.cfg&&gh.cfg.tokenExp; if(!d||!ghReady()) return null; return daysBetween(todayISO(), d); }
-function ghTokenWarn(){ const n=ghTokenDays(); if(n==null || n>14) return '';
-  return '<div class="note '+(n<=3?'bad':'warn')+'"><strong>'+(n<0?'GitHub-Token ist abgelaufen.':'GitHub-Token läuft '+(n===0?'heute':n===1?'morgen':'in '+n+' Tagen')+' ab ('+fmtDate(gh.cfg.tokenExp)+').')+'</strong> Neuen Token erstellen und unter Profil → Datenspeicherung eintragen, sonst wird nicht mehr gespeichert. <button class="link" data-act="ghOpen">Öffnen</button></div>'; }
-function ghWarn(){ return ghTokenWarn() + (gh.state==='fehler' ? '<div class="note bad"><strong>Speichern fehlgeschlagen.</strong> '+esc(gh.lastError||'')+' <button class="link" data-act="ghOpen">Details</button></div>' : ''); }
-function ghStatusText(){
-  if(!ghReady()) return '<span class="muted">Noch nicht verbunden.</span>';
-  if(gh.state!=='aus') return ghChip().replace('data-act="ghOpen"','data-act="ghSyncNow"').replace(/title="[^"]*"/,'title="Jetzt abgleichen"')+(gh.lastError?'<br><span style="color:var(--bad)">'+esc(gh.lastError)+'</span>':'');
-  return 'Status: <strong>'+esc({laeuft:'speichert …',ok:'aktuell',ausstehend:'Änderungen ausstehend',offline:'offline',fehler:'Fehler',aus:'aus'}[gh.state]||gh.state)+'</strong>'+
-    (gh.lastOk?' · zuletzt abgeglichen: '+esc(ghTime(gh.lastOk)):'')+(gh.lastError?'<br><span style="color:var(--bad)">'+esc(gh.lastError)+'</span>':'');
-}
-function ghSection(){
-  const c=gh.cfg;
-  return pdet('gh','Datenspeicherung', ghReady()?(gh.cfg.repo):'nicht verbunden', '<span id="gh-sec"></span>'+
-    '<p id="gh-status" class="small" aria-live="polite">'+ghStatusText()+'</p>'+
-    (ghReady()?'<p class="small muted">Plan & Datenbanken geladen '+(REF.at?ghTime(REF.at):'—')+' · <button class="link" data-act="plReload">neu laden</button></p>':'')+
-    '<div class="fields">'+inp('gh-owner','GitHub-Konto',c.owner)+inp('gh-repo','Datenrepo',c.repo)+'</div>'+
-    '<div class="fields">'+inp('gh-branch','Branch',c.branch)+inp('gh-path','Datei',c.path)+'</div>'+
-    inp('gh-token','Zugriffsschlüssel (Fine-grained Token)','','type="password" autocomplete="off" spellcheck="false" placeholder="'+(c.token?'gespeichert – leer lassen, um ihn zu behalten':'github_pat_…')+'"')+
-    inp('gh-exp','Token gültig bis (für die Erinnerung)',c.tokenExp||'','type="date"')+
-    '<div class="row"><button class="primary" data-act="ghSave">Speichern & verbinden</button>'+(ghReady()?'<button data-act="ghSyncNow">Jetzt abgleichen</button><button class="small danger" data-act="ghForget">Token von diesem Gerät entfernen</button>':'')+'</div>'+
-    '<details><summary class="small">So erstellst du den Token (einmal pro Gerät eintragen)</summary><ol class="small">'+
-      '<li>GitHub → Settings → Developer settings → Personal access tokens → <strong>Fine-grained tokens</strong> → Generate new token.</li>'+
-      '<li>Repository access: <strong>Only select repositories</strong> → <code>'+esc(c.repo)+'</code>.</li>'+
-      '<li>Permissions → Repository permissions → <strong>Contents: Read and write</strong> (sonst nichts).</li>'+
-      '<li>Ablaufdatum wählen, Token kopieren und hier einfügen. Das Ablaufdatum oben eintragen – AOS erinnert dich zwei Wochen vorher.</li></ol>'+'</details>'+
-    '');
-}
-ACT.ghOpen = ()=>{ ui.view='profil'; location.hash='profil'; ui.profOpen=ui.profOpen||{}; ui.profOpen.gh=true; render(); const el=document.getElementById('gh-sec'); if(el) el.scrollIntoView(); };
-ACT.ghSave = async ()=>{
-  const owner=val('gh-owner'), repo=val('gh-repo'), branch=val('gh-branch')||'main', path=val('gh-path')||'aos-data.json', token=val('gh-token');
-  if(!owner||!repo){ toast('Bitte Konto und Repo eintragen.'); return; }
-  if(!token && !gh.cfg.token){ toast('Bitte den Token einfügen.'); return; }
-  if(token && !/^(github_pat_|ghp_)[A-Za-z0-9_]+$/.test(token)){ toast('Das sieht nicht nach einem GitHub-Token aus (beginnt mit github_pat_).'); return; }
-  Object.assign(gh.cfg, { owner, repo, branch, path, tokenExp:val('gh-exp')||null }); if(token) gh.cfg.token=token;
-  ghStore(); render();
-  const ok = await ghSync('einrichten');
-  if(ok){ toast('Verbunden. Deine Daten sind jetzt im Datenrepo gespeichert.'); refLoad(true); }
-  render();
-};
-ACT.syncInfo = ()=>{ if(!ghReady()){ toast('Nicht mit dem Datenrepo verbunden – Profil → Datenspeicherung.'); return; }
-  const st=gh.state; const last=gh.lastOk?'zuletzt gespeichert '+ghTime(gh.lastOk):'noch nie gespeichert';
-  const t={ ok:'Alles gespeichert'+(gh.lastOk?' · '+ghTime(gh.lastOk):''), laeuft:'Wird gerade gespeichert …', ausstehend:'Änderungen werden gleich gespeichert · '+last, offline:'Offline – wird gespeichert, sobald Netz da ist · '+last, fehler:'Speichern fehlgeschlagen – neuer Versuch läuft · '+last }[st]||last;
-  toast(t); if(['ausstehend','fehler','offline'].includes(st) && !gh.syncing) ghSync('manuell'); };
-ACT.ghSyncNow = async ()=>{ const ok=await ghSync('manuell'); if(ok){ toast('Abgeglichen.'); refLoad(true); } };
-ACT.ghForget = ()=>confirmDlg('Token entfernen?', 'AOS speichert auf diesem Gerät dann nur noch lokal, bis du wieder einen Token einträgst. Die Daten im Datenrepo bleiben unverändert.'+(gh.dirty?' <strong>Achtung: Es gibt noch nicht abgeglichene Änderungen.</strong>':''), 'Entfernen', ()=>{ gh.cfg.token=''; ghStore(); ghSetState('aus'); render(); }, true);
+function fmtSyncTime(iso){ if(!iso) return ''; const d=new Date(iso); const t=pad(d.getHours())+':'+pad(d.getMinutes()); return isoOf(d)===todayISO()?t:fmtDateShort(isoOf(d))+' '+t; }
+const SYNC_LABEL={ ok:'gespeichert', laeuft:'speichert', ausstehend:'ausstehend', offline:'offline', fehler:'Fehler beim Speichern', aus:'nicht angemeldet' };
+function syncDot(){ const st=sbReady()?sb.state:'aus'; const c={ok:'ok',laeuft:'run',ausstehend:'run',offline:'off',fehler:'err',aus:'off'}[st]||'off';
+  return '<span class="sd '+c+'" title="'+esc(SYNC_LABEL[st]||st)+'" role="img" aria-label="Speicherstatus: '+esc(SYNC_LABEL[st]||st)+'">●</span>'; }
+function syncWarn(){ if(!sbReady()) return '';
+  return sb.state==='fehler' ? '<div class="note bad"><strong>Speichern fehlgeschlagen.</strong> '+esc(sb.lastError||'')+' <button class="link" data-act="sbOpen">Details</button></div>' : ''; }
+function sbPaint(){ const el=document.getElementById('sb-status'); if(el) el.textContent=sbStatusText();
+  const hs=document.getElementById('hsync'); if(hs) hs.innerHTML=syncDot(); const w=document.getElementById('syncwarn'); if(w) w.innerHTML=syncWarn(); }
+ACT.sbOpen = ()=>{ ui.view='profil'; location.hash='profil'; ui.profOpen=ui.profOpen||{}; ui.profOpen.sb=true; render(); const el=document.getElementById('sb-sec'); if(el) el.scrollIntoView(); };
+ACT.syncInfo = ()=>{ if(!sbReady()){ toast('Nicht angemeldet – Profil → AOS-Konto.'); ACT.sbOpen(); return; }
+  const last=sb.lastOk?'zuletzt gespeichert '+fmtSyncTime(sb.lastOk):'noch nicht gespeichert';
+  const t={ ok:'Alles gespeichert'+(sb.lastOk?' · '+fmtSyncTime(sb.lastOk):''), laeuft:'Wird gerade gespeichert …', ausstehend:'Änderungen werden gleich gespeichert · '+last,
+    offline:'Offline – wird gespeichert, sobald Netz da ist · '+last, fehler:'Speichern fehlgeschlagen: '+(sb.lastError||''), aus:last }[sb.state]||last;
+  toast(t); if(['ausstehend','fehler','offline'].includes(sb.state) && !sb.syncing) sbSync('manuell'); };
 
 /* Automatisch abgleichen: beim Start, beim Zurückkehren in die App, wenn wieder Netz da ist, und vor dem Verlassen */
 document.addEventListener('visibilitychange', ()=>{
-  if(sbReady()){ if(document.visibilityState==='visible'){ if(!ghReady()) refLoad(); if(!sb.lastOk || Date.now()-new Date(sb.lastOk).getTime()>20000) sbSync('fokus'); } else sbSync('verlassen'); }
-  if(!ghReady()) return;
-  if(document.visibilityState==='visible'){ refLoad(); if(!gh.lastOk || Date.now()-new Date(gh.lastOk).getTime()>20000 || gh.dirty) ghSync('fokus'); }
-  else if(gh.dirty) ghSync('verlassen');
+  if(!sbReady()) return;
+  if(document.visibilityState==='visible'){ refLoad(); if(!sb.lastOk || Date.now()-new Date(sb.lastOk).getTime()>20000 || sb.dirty) sbSync('fokus'); }
+  else if(sb.dirty) sbSync('verlassen');
 });
-window.addEventListener('online', ()=>{ if(ghReady()) ghSync('online'); if(sbReady()) sbSync('online'); });
-window.addEventListener('offline', ()=>{ if(ghReady()) ghSetState('offline'); });
+window.addEventListener('online', ()=>{ if(sbReady()) sbSync('online'); });
+window.addEventListener('offline', ()=>{ if(sbReady()){ sb.state='offline'; sbPaint(); } });
 
 /* Neue App-Version laden, sobald nichts Ungespeichertes offen ist */
 function aosApplyUpdate(){
@@ -3823,16 +3646,15 @@ function aosApplyUpdate(){
   const dlg=document.getElementById('dlg');
   if(ui.draft || (dlg && dlg.open)){ if(!window.__aosUpdateToast){ window.__aosUpdateToast=true; toast('Neue AOS-Version verfügbar – sie wird geladen, sobald du gespeichert hast.'); } return; }
   const go=()=>location.reload();
-  if(ghReady() && gh.dirty) ghSync('update').finally(go); else go();
+  if(sbReady() && sb.dirty) sbSync('update').finally(go); else go();
 }
 (function init(){
-  ghLoad(); sbLoad(); load(); refInit(); sbFromHash();
+  sbLoad(); load(); refInit(); sbFromHash();
   const h=location.hash.slice(1); if(VIEWS.some(v=>v[0]===h)) ui.view=h;
   if(liveRestore()) ui.view='training';   // laufende Einheit nach Neustart der App fortsetzen
   render();
   setInterval(clockTick, 1000);
-  if(ghReady()){ ghSync('start'); refLoad(); }
-  if(sbReady()){ sbSync('start'); if(!ghReady()) sbRefLoad(); }
+  if(sbReady()){ sbSync('start'); refLoad(); }
   setTimeout(()=>{ fdbUpdate().catch(()=>{}); }, 4000);
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') && document.querySelector('link[rel=manifest]')){
