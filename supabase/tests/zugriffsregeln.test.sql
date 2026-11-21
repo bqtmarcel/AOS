@@ -1,6 +1,6 @@
 -- AOS · automatischer Test der Zugriffsregeln (Roadmap M1.2). Läuft in einer Transaktion und wird zurückgerollt.
 begin;
-select plan(16);
+select plan(22);
 
 -- Hilfsfunktion: Anzahl der Zeilen, die eine Änderung tatsächlich betroffen hat (Zugriffsregeln filtern still)
 create function pg_temp.zeilen(q text) returns int language plpgsql as $f$
@@ -58,5 +58,18 @@ reset role; set local role anon;
 select throws_ok($$ select count(*) from public.records $$, '42501', null, 'Ohne Anmeldung kein Zugriff');
 
 reset role;
+
+-- ---- Ranglisten, Admin-Übersicht, Konto löschen (M4/M6) ----
+reset role; set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000a","role":"authenticated"}', true);
+select lives_ok($$ insert into public.rankings (athlete_id, discipline, name, grp, value, score) values ('00000000-0000-4000-a000-00000000000a','squat','A','RB',150,100) $$, 'Athlet trägt sich in die Rangliste ein');
+select throws_ok($$ insert into public.rankings (athlete_id, discipline, value) values ('00000000-0000-4000-a000-00000000000b','squat',200) $$, '42501', null, 'Athlet trägt niemand anderen ein');
+select throws_ok($$ select * from public.admin_users() $$, '42501', null, 'Admin-Übersicht nur für den Admin');
+reset role; set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000b","role":"authenticated"}', true);
+select is((select count(*)::int from public.rankings), 1, 'Andere Athleten sehen die Rangliste');
+select is(pg_temp.zeilen($q$ update public.rankings set value = 1 where athlete_id = '00000000-0000-4000-a000-00000000000a' $q$), 0, 'Fremde Ranglisten-Einträge bleiben unverändert');
+select lives_ok($$ select public.delete_me() $$, 'Athlet löscht sein Konto');
+
 select * from finish();
 rollback;

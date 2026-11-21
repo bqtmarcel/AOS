@@ -42,3 +42,12 @@ jobs:
         run: supabase db push --remote --yes -p "$SUPABASE_DB_PASSWORD"
       - name: Zugriffsregeln prüfen
         run: supabase test db --remote --yes
+      - name: Admin-Funktion bereitstellen (Einladungen)
+        # Den geheimen Schlüssel holt die Action über das Access Token und gibt ihn nur an die Funktion weiter (nie ins Log, nie in die App).
+        run: |
+          key=$(curl -s "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            | jq -r '[.[] | select(.type=="secret" or .name=="service_role")][0].api_key // empty')
+          if [ -z "$key" ]; then echo "::error::Geheimer Schlüssel nicht abrufbar"; exit 1; fi
+          echo "::add-mask::$key"
+          supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" AOS_SECRET_KEY="$key" >/dev/null
+          supabase functions deploy admin --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt --use-api
