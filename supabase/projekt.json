@@ -1,0 +1,7 @@
+{
+  "hinweis": "Öffentliche Verbindungsdaten (dürfen in die App). Secret key, Access Token und Datenbank-Passwort liegen nur in den GitHub-Secrets.",
+  "url": "https://sraocwhvkisomjjoqznr.supabase.co",
+  "projectRef": "sraocwhvkisomjjoqznr",
+  "region": "eu-central-1 (Frankfurt)",
+  "publishableKey": "sb_publishable_Cvqcna518s5NdlUahoIHcw_TRPfBMXZ"
+}

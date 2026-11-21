@@ -1,6 +1,6 @@
 # AOS – Roadmap: Mehrbenutzer, Positionsgruppen, Coach, Ranglisten
 
-Stand: 16.11.2026 · Version 1
+Stand: 21.11.2026 · Version 1
 Fachliche Details: Mehrbenutzer-Spezifikation v1 (Rollen, Datenmodell, Positionsgruppen, Coach-Übersicht, Ranglisten mit DOTS, Datenschutz).
 Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persönlichen Werte.
 
@@ -17,7 +17,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 
 | # | Zeitraum | Meilenstein | Ergebnis | Stand |
 |---|---|---|---|---|
-| **0** | 17.–22.11.2026 | Vorbereitung | Zugänge da | 1 / 2 |
+| **0** | 17.–22.11.2026 | Vorbereitung | Zugänge da | 2 / 2 ✅ |
 | **M1** | 23.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 0 / 12 |
 | **M2** | 07.–13.12.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 0 / 6 |
 | **M3** | 14.–27.12.2026 | Positionsgruppen | Planung für alle Positionen | 0 / 9 |
@@ -35,7 +35,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 ## 0 · Vorbereitung (17.–22.11.2026)
 
 - [x] **0.1** Anleitung für die Supabase-Einrichtung schreiben: [`docs/SUPABASE_EINRICHTUNG.md`](docs/SUPABASE_EINRICHTUNG.md) ✅ 16.11.2026
-- [ ] **0.2** 👤 Supabase einrichten nach der Anleitung (Konto, Projekt in Frankfurt, Login-Einstellungen, GitHub-Secrets), Projekt-URL und Publishable key an Claude geben
+- [x] **0.2** 👤 Supabase einrichten nach der Anleitung (Konto, Projekt in Frankfurt, Login-Einstellungen, GitHub-Secrets), Projekt-URL und Publishable key an Claude geben ✅ 21.11.2026 (Projekt `sraocwhvkisomjjoqznr`, Frankfurt; öffentliche Verbindungsdaten in `supabase/projekt.json`)
 
 ## M1 · Neue Basis (23.11.–06.12.2026)
 
