@@ -30,6 +30,6 @@ jobs:
       - name: Mit dem Projekt verbinden
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF" -p "$SUPABASE_DB_PASSWORD"
       - name: Datenbankstruktur aktualisieren
-        run: supabase db push --yes -p "$SUPABASE_DB_PASSWORD"
+        run: supabase db push --remote --yes -p "$SUPABASE_DB_PASSWORD"
       - name: Zugriffsregeln prüfen
-        run: supabase test db --linked || supabase test db --remote
+        run: supabase test db --remote
