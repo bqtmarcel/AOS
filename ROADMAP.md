@@ -21,7 +21,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 | **M1** | 21.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 12 / 12 ✅ |
 | **M2** | 21.11.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 6 / 6 ✅ |
 | **M3** | 21.11.2026 | Positionsgruppen | Planung für alle Positionen | 8 / 9 |
-| **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 5 / 13 |
+| **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 6 / 13 |
 | **Start** | ab 11.01.2027 | Teamstart | alle eingeladenen Spieler | 0 / 2 |
 | **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 4 / 5 |
 | **M6** | 25.01.–07.02.2027 | Ranglisten mit DOTS | erste Ranglisten nach der Testwoche Anfang Februar | 5 / 6 |
@@ -78,9 +78,9 @@ Hinweis: Bestehende Profile planen weiter mit den bisherigen Vorlagen, bis der A
 ## M4 · Einladungen, Onboarding, Pilot (28.12.2026–10.01.2027)
 
 - [x] **M4.1** Admin-Bereich: Spieler per E-Mail einladen, Rollen vergeben, Konten deaktivieren (Team → Verwaltung: Einladen per Admin-Funktion auf dem Server, Rollen Spieler/Coach/Admin, Sperren; Mails erreichen Spieler erst mit M4.12) ✅ 21.11.2026
-- [ ] **M4.2** Onboarding in 8 Schritten (Einwilligung, Position, Körperdaten, Erfahrung, Ort, Trainingstage, Einschränkungen, Eingangstests in Woche 1)
+- [ ] **M4.2** Onboarding in 7 Schritten (Position, Körperdaten, Erfahrung, Ort, Trainingstage, Einschränkungen, Eingangstests in Woche 1)
 - [x] **M4.2a** Gegebenheiten im Profil und in der Planung (vor dem Onboarding): Zeit pro Einheit, Verletzungen der letzten 12 Monate, Mobilitäts-Check, Körpergewichtsziel, Außenbelastung, Alter und Größe; wirken auf Übungswahl, Pflicht, Kontakte und Aufwärmen ✅ 21.11.2026
-- [ ] **M4.3** Einwilligung und Datenschutzinfo in der App (Text abgestimmt mit dem Vorstand)
+- [x] **M4.3** ~~Einwilligung und Datenschutzinfo in der App~~ entfällt: Datenschutz ist außerhalb der App geregelt, in der App keine Bestätigung (Entscheidung Marcel) ✅ 21.11.2026
 - [x] **M4.4** Konto löschen und eigene Daten exportieren (Profil → AOS-Konto: Daten herunterladen, Konto samt Daten löschen; der letzte Admin kann sich nicht löschen) ✅ 21.11.2026
 - [ ] **M4.5** Einstieg für spätere Starter: 2 Wochen Einstieg, dann im Teamkalender
 - [x] **M4.6** Teamkalender (Spiele, Feldtraining, Saisonstart) durch den Admin in der App pflegen (Team → Verwaltung → Teamkalender: Spiele, Feldtraining-Tage, Start und Dauer) ✅ 21.11.2026
