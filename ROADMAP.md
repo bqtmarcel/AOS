@@ -18,7 +18,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 | # | Zeitraum | Meilenstein | Ergebnis | Stand |
 |---|---|---|---|---|
 | **0** | 17.–22.11.2026 | Vorbereitung | Zugänge da | 2 / 2 ✅ |
-| **M1** | 23.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 0 / 12 |
+| **M1** | 23.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 6 / 12 |
 | **M2** | 07.–13.12.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 0 / 6 |
 | **M3** | 14.–27.12.2026 | Positionsgruppen | Planung für alle Positionen | 0 / 9 |
 | **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 0 / 12 |
@@ -39,14 +39,14 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 
 ## M1 · Neue Basis (23.11.–06.12.2026)
 
-- [ ] **M1.1** Datenbankschema `team_season`, `profiles`, `records` als SQL-Migration im Repo (`supabase/migrations/`)
-- [ ] **M1.2** Zugriffsregeln (Row Level Security): Athlet nur eigene Daten, Coach alle lesen, nichts schreiben, Admin Rollen und Teamdaten; automatischer Test der Regeln
-- [ ] **M1.3** Login per Magic Link in der App: Anmelden, Abmelden, Sitzung auf iPhone und Laptop merken
-- [ ] **M1.4** Abgleich auf Supabase umstellen: pro Datensatz, jüngste Änderung gewinnt, Löschungen übertragen, offline Warteschlange
-- [ ] **M1.5** Teamdaten (Saisonstart, Phasenkalender, Feldtraining, Spiele) aus `team_season` statt aus der Plandatei lesen
-- [ ] **M1.6** Einmaliges Migrationsskript `tools/`: bestehende Daten aus `AOS_DATA` nach Supabase (Daten selbst nie in diesem Repo)
-- [ ] **M1.7** Klicktest erweitern: nachgebaute Datenbank statt Datenrepo, Login, Abgleich, „Coach kann nichts ändern“
-- [ ] **M1.8** Wöchentlicher Export der Datenbank als Backup nach `AOS_DATA` (GitHub Action); hält das Free-Projekt zugleich aktiv (Pause nach 7 Tagen ohne Nutzung)
+- [x] **M1.1** Datenbankschema `team_season`, `profiles`, `records` als SQL-Migration im Repo (`supabase/migrations/`) ✅ 21.11.2026 (`supabase/migrations`, wird per GitHub Action „Datenbank“ eingespielt)
+- [x] **M1.2** Zugriffsregeln (Row Level Security): Athlet nur eigene Daten, Coach alle lesen, nichts schreiben, Admin Rollen und Teamdaten; automatischer Test der Regeln ✅ 21.11.2026 (16 automatische Prüfungen in `supabase/tests`, laufen bei jeder Änderung)
+- [ ] **M1.3** Login per Magic Link in der App: Anmelden, Abmelden, Sitzung auf iPhone und Laptop merken — umgesetzt: Anmeldelink per E-Mail; für die App vom Home-Bildschirm zeigt der Link einen Übergabecode. Ein Code direkt in der Mail geht im Free-Plan erst mit eigenem E-Mail-Versand (M4.12). Wartet auf deinen ersten echten Login (M1.12)
+- [x] **M1.4** Abgleich auf Supabase umstellen: pro Datensatz, jüngste Änderung gewinnt, Löschungen übertragen, offline Warteschlange ✅ 21.11.2026 (läuft bis zur Umstellung zusätzlich zum Datenrepo; Klicktest mit nachgebauter Datenbank)
+- [ ] **M1.5** Teamdaten (Saisonstart, Phasenkalender, Feldtraining, Spiele) aus `team_season` statt aus der Plandatei lesen — umgesetzt: Saison, Phasen und Feldtraining kommen aus `team_season`, sobald AOS ohne Datenrepo läuft; aktiv ab der Umstellung
+- [x] **M1.6** Einmaliges Migrationsskript `tools/`: bestehende Daten aus `AOS_DATA` nach Supabase (Daten selbst nie in diesem Repo) ✅ 21.11.2026 (`AOS_DATA/tools/supabase_sync.py`, GitHub Action „Supabase“: 105 Datensätze + 28 Löschmarken übertragen und geprüft, wiederholbar)
+- [x] **M1.7** Klicktest erweitern: nachgebaute Datenbank statt Datenrepo, Login, Abgleich, „Coach kann nichts ändern“ ✅ 21.11.2026 (Klicktest: Login, Übergabecode, Abgleich, Löschung, jüngste Änderung gewinnt; „Coach kann nichts ändern“ prüft der Datenbanktest)
+- [x] **M1.8** Wöchentlicher Export der Datenbank als Backup nach `AOS_DATA` (GitHub Action); hält das Free-Projekt zugleich aktiv (Pause nach 7 Tagen ohne Nutzung) ✅ 21.11.2026 (sonntags nachts nach `AOS_DATA/backup/supabase.json`; Erinnerungen können schon aus Supabase lesen (Umschalter `AOS_SOURCE`))
 - [ ] **M1.9** Speicherung über GitHub-Token entfernen (inkl. Ablaufwarnung W6)
 - [ ] **M1.10** Umstellung am Wochenende 05./06.12. durchführen
 - [ ] **M1.11** Prüfung: alle Einheiten, Tests und Verläufe vollständig; geplante Einheit für Mo 07.12. vor und nach der Umstellung identisch; Coach-Testkonto kann nichts ändern
