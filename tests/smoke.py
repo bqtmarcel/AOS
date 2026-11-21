@@ -268,6 +268,9 @@ async def supabase_test(browser):
     # Gerätewechsel: anderer Athlet meldet sich an → lokale Daten des vorherigen Kontos verschwinden
     await page.evaluate("()=>{ sb.sess={access_token:'t',refresh_token:'r',expires_at:9e9,user:{id:'00000000-0000-4000-a000-0000000000cc'}}; sbOwnerCheck(); }")
     if await page.evaluate("S.profile.name") == 'anderes Gerät': errors.append('Gerätewechsel: Daten des vorherigen Kontos bleiben stehen')
+    # Zurück zum ersten Konto: sein Stand ist wieder da
+    await page.evaluate("()=>{ sb.sess.user.id='%s'; sbOwnerCheck(); }" % uid)
+    if await page.evaluate("S.profile.name") != 'anderes Gerät': errors.append('Gerätewechsel: Stand des ersten Kontos kommt nicht zurück')
     await ctx.close()
     return errors
 

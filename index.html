@@ -3807,7 +3807,12 @@ function sbStore(){ try{ localStorage.setItem(SB_STORE, JSON.stringify({ sess:sb
 /* Gerät wechselt den Besitzer (anderer Athlet meldet sich an): lokale Daten des vorherigen Kontos nie in das neue übernehmen */
 const OWNER_KEY='aos-owner-v1';
 function sbOwnerCheck(){ const uid=sbUid(); if(!uid) return; let prev=null; try{ prev=localStorage.getItem(OWNER_KEY); }catch(e){}
-  if(prev && prev!==uid){ S=freshData(); syncInit(); save(true); TEAM.users=null; TEAM.athletes=null; TEAM.rank=null; ui.sessionId=null; ui.draft=null; try{ localStorage.removeItem(LIVE_KEY); }catch(e){} }
+  if(prev && prev!==uid){
+    // Stand des vorherigen Kontos auf dem Gerät beiseitelegen (inkl. noch nicht abgeglichener Änderungen) und den des neuen Kontos holen, falls vorhanden
+    try{ localStorage.setItem(AOS_KEY+'-'+prev, JSON.stringify(S)); }catch(e){}
+    let next=null; try{ next=JSON.parse(localStorage.getItem(AOS_KEY+'-'+uid)||'null'); localStorage.removeItem(AOS_KEY+'-'+uid); }catch(e){}
+    if(next && validateData(next).ok){ S=migrate(next); syncInit(); } else { S=freshData(); syncInit(); }
+    save(true); TEAM.users=null; TEAM.athletes=null; TEAM.rank=null; ui.sessionId=null; ui.draft=null; try{ localStorage.removeItem(LIVE_KEY); }catch(e){} }
   try{ localStorage.setItem(OWNER_KEY, uid); }catch(e){} }
 function sbReady(){ return !!(sb.sess && sb.sess.refresh_token && sb.sess.user && sb.sess.user.id); }
 function sbUid(){ return sb.sess && sb.sess.user && sb.sess.user.id; }
@@ -3847,6 +3852,7 @@ ACT.sbVerify = async ()=>{ const token=val('sb-otp').replace(/\s/g,''); if(token
     sb.codeSent=false; sbOwnerCheck(); render(); toast('Angemeldet'); await teamMe(); await sbSync('login'); sbRefLoad(true);
   }catch(e){ toast(e.status===403||e.status===400?'Code falsch, abgelaufen oder schon verwendet.':e.message); } };
 ACT.sbLogout = ()=>confirmDlg('Abmelden?','Die Daten bleiben auf diesem Gerät und in Supabase. Der Abgleich mit Supabase pausiert, bis du dich wieder anmeldest.','Abmelden',async ()=>{
+  try{ if(sbReady() && sb.dirty) await sbSync('abmelden'); }catch(e){}   // offene Änderungen vorher speichern
   try{ if(sbReady()) await sbRaw('POST','/auth/v1/logout',{}, null, sb.sess.access_token); }catch(e){}
   sb.sess=null; sb.state='aus'; sbStore(); render(); });
 ACT.sbSyncNow = async ()=>{ const ok=await sbSync('manuell'); if(ok){ toast('Abgeglichen'); refLoad(true); } };
