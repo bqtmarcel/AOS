@@ -51,3 +51,8 @@ jobs:
           echo "::add-mask::$key"
           supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" --yes AOS_SECRET_KEY="$key" >/dev/null
           supabase functions deploy admin --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt --use-api --yes
+      - name: Admin-Funktion erreichbar und geschützt?
+        run: |
+          code=$(curl -s -o /tmp/fn.json -w '%{http_code}' -X POST "https://$SUPABASE_PROJECT_REF.supabase.co/functions/v1/admin" -H "apikey: sb_publishable_Cvqcna518s5NdlUahoIHcw_TRPfBMXZ" -H "Content-Type: application/json" -d '{"action":"invite","email":"x@test.invalid"}')
+          cat /tmp/fn.json; echo
+          if [ "$code" != "401" ]; then echo "::error::Admin-Funktion antwortet ohne Anmeldung mit HTTP $code (erwartet 401)"; exit 1; fi
