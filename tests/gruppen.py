@@ -23,6 +23,7 @@ PROFILE = [  # Name, Positionen, Optionen
     ('WR · Home Gym, Umsetzen unsicher', pos(('WR', 100)), {'kg': 80}),
     ('DB · Cornerback, Feld Mo/Do', pos(('CB', 100)), {'field': [1, 4], 'clean': True}),
     ('QB · Einsteiger, 2 Tage', pos(('QB', 100)), {'exp': 'einsteiger', 'days': ['TUE', 'FRI']}),
+    ('WR · Hamstring-Verletzung, 36 Jahre, Feld Mo/Do, Überkopf eingeschränkt', pos(('WR', 100)), {'inj': ['hamstring'], 'by': 1990, 'field': [1, 4], 'mob': {'overhead': False}, 'clean': True}),
 ]
 # Neutraler Saisonplan (Phasen wie im Sessionplaner, Daten frei gewählt)
 PLAN = {'name': 'Testplan', 'version': 'TEST', 'season': {'first_game': ['2027-03-21']}, 'rules': {'pain_threshold': 3, 'max_session_min': 70, 'warmup_min': 10, 'leg_regions': ['knee']},
@@ -32,6 +33,7 @@ PLAN = {'name': 'Testplan', 'version': 'TEST', 'season': {'first_game': ['2027-0
 
 JS = """([plan, ex, pos, opt])=>{
   S=freshData(); S.profile.positions=pos; S.profile.trainingDays=opt.days||['MON','TUE','THU','FRI'];
+  if(opt.inj) S.profile.injuries=opt.inj; if(opt.by) S.profile.birthYear=opt.by; if(opt.mob) S.profile.mobility=opt.mob;
   if(opt.exp) S.profile.experience=opt.exp; if(opt.clean!=null) S.profile.cleanSafe=opt.clean;
   S.bodyweight=[{id:'b1',date:'2026-11-10',kg:opt.kg||90}];
   if(opt.field) S.profile.locations.forEach(l=>{ if(l.id==='loc-field') l.days=opt.field; });
@@ -75,6 +77,8 @@ async def main():
               ('QB: Außenrotation in jeder Einheit (P2)', all(any(s['n'] == 'Außenrotation mit Band' for s in t['s']) for t in next(x for x in res if x['name'].startswith('QB'))['blocks'][1]['t'])),
               ('DT: keine Depth Jumps', not any('Depth' in n for P in ['P2', 'P3', 'P4'] for n in ex('DL', P))),
               ('WR (Umsetzen unsicher): kein Umsetzen', not any('Clean' in n and 'Pull' not in n for P in ['P2', 'P3', 'P4'] for n in ex('WR', P))),
+              ('Hamstring: keine fliegenden Sprints vor P4', not any('Fliegende' in n for n in ex('WR · Hamstring', 'P3'))),
+              ('Überkopf eingeschränkt: kein KH-Schulterdrücken', not any(n in ('KH-Schulterdrücken stehend', 'Push Press Langhantel') for P in ['P2', 'P3', 'P4'] for n in ex('WR · Hamstring', P))),
               ('Einsteiger: kein Power Clean', not any(n == 'Power Clean vom Boden' for P in ['P2', 'P3', 'P4'] for n in ex('QB', P)))]
     for n, ok in checks: print(('OK  ' if ok else 'FEHLER ') + n); bad += not ok
     print('Überschneidung OL/CB in P4: %d %%' % round(same * 100)); bad += same > 0.6

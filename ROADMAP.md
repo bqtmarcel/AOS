@@ -21,7 +21,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 | **M1** | 21.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 12 / 12 ✅ |
 | **M2** | 21.11.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 6 / 6 ✅ |
 | **M3** | 21.11.2026 | Positionsgruppen | Planung für alle Positionen | 8 / 9 |
-| **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 0 / 12 |
+| **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 1 / 13 |
 | **Start** | ab 11.01.2027 | Teamstart | alle eingeladenen Spieler | 0 / 2 |
 | **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 0 / 5 |
 | **M6** | 25.01.–07.02.2027 | Ranglisten mit DOTS | erste Ranglisten nach der Testwoche Anfang Februar | 0 / 6 |
@@ -79,6 +79,7 @@ Hinweis: Bestehende Profile planen weiter mit den bisherigen Vorlagen, bis der A
 
 - [ ] **M4.1** Admin-Bereich: Spieler per E-Mail einladen, Rollen vergeben, Konten deaktivieren
 - [ ] **M4.2** Onboarding in 8 Schritten (Einwilligung, Position, Körperdaten, Erfahrung, Ort, Trainingstage, Einschränkungen, Eingangstests in Woche 1)
+- [x] **M4.2a** Gegebenheiten im Profil und in der Planung (vor dem Onboarding): Zeit pro Einheit, Verletzungen der letzten 12 Monate, Mobilitäts-Check, Körpergewichtsziel, Außenbelastung, Alter und Größe; wirken auf Übungswahl, Pflicht, Kontakte und Aufwärmen ✅ 21.11.2026
 - [ ] **M4.3** Einwilligung und Datenschutzinfo in der App (Text abgestimmt mit dem Vorstand)
 - [ ] **M4.4** Konto löschen und eigene Daten exportieren
 - [ ] **M4.5** Einstieg für spätere Starter: 2 Wochen Einstieg, dann im Teamkalender

@@ -25,7 +25,25 @@ V = {n: [{'id': e['id'], 'name': e['name'], 'half': H[e['koerperhaelfte']], 'slo
 E = tp['modifikatoren']['erfahrung']['einsteiger']
 M = {'einsteiger': {'x': E['ausgeschlossen'], 'cap': E['rpe_cap_delta'], 'minReps': E['hauptuebungen_min_wdh'], 'kf': E['kontakte_faktor'], 'wd': E['ergaenzung_wdh_delta'], 'pref': E['bevorzugt']},
      'clean': tp['modifikatoren']['umsetzen_technisch_sicher']['nein'],
-     'schwer': {'kg': 115, 'kf': tp['modifikatoren']['koerper']['schwer']['kontakte_faktor'], 'x': tp['modifikatoren']['koerper']['schwer']['ausgeschlossen']}}
+     'schwer': {'kg': 115, 'kf': tp['modifikatoren']['koerper']['schwer']['kontakte_faktor'], 'x': tp['modifikatoren']['koerper']['schwer']['ausgeschlossen']},
+     'gross': {'cm': 193, 'pref': tp['modifikatoren']['koerper']['gross']['bevorzugt']}}
+Mo = tp['modifikatoren']
+def verl(v):
+    o = {}
+    if 'pflicht' in v: o['p'] = [[x['uebung_oder_slot'], x['mal']] for x in v['pflicht']]
+    if 'ausgeschlossen' in v: o['x'] = v['ausgeschlossen']
+    if 'bevorzugt' in v: o['pref'] = v['bevorzugt']
+    if 'kontakte_faktor' in v: o['kf'] = v['kontakte_faktor']
+    if 'flying_10m_ab' in v: o['ab'] = {'flying_10m': v['flying_10m_ab']}
+    if 'cod_slots_ab' in v: o['codAb'] = v['cod_slots_ab']
+    if 'hinweis' in v: o['h'] = v['hinweis']
+    return o
+M['verletzung'] = {k: verl(v) for k, v in Mo['verletzungen_12_monate'].items()}
+M['alter'] = {'30': {'kf': Mo['alter']['ab_30']['kontakte_faktor'], 'warm': Mo['alter']['ab_30']['aufwaermen_min']}, '35': {'kf': Mo['alter']['ab_35']['kontakte_faktor'], 'warm': Mo['alter']['ab_35']['aufwaermen_min']}}
+ms = Mo['mobilitaet_screen_woche_1']
+M['mobil'] = {'overhead': {'x': ms['ueberkopf']['nicht_ok']['ausgeschlossen']}, 'ankle': {'pref': ms['sprunggelenk_kniewand_unter_8cm']['bevorzugt'], 'p': [[x['uebung_oder_slot'], x['mal']] for x in ms['sprunggelenk_kniewand_unter_8cm']['pflicht']]}, 'frontRack': {'x': ms['front_rack']['nicht_ok']['ausgeschlossen']}}
+M['gewicht'] = {'aufbauen': {'w': Mo['koerpergewicht_ziel']['aufbauen']['ergaenzung_wdh']}, 'reduzieren': {'sd': {'P2': -1, 'P3': -1}}}
+M['aussen'] = {'sd': Mo['aussenbelastung']['koerperlich_harter_beruf_oder_schicht']['ergaenzung_saetze_delta']}
 j = lambda x: json.dumps(x, ensure_ascii=False, separators=(',', ':'))
 body = ('const TP={ version:' + j(tp['version']) + ',\n  slots:' + j(S) + ',\n  vorlagen:' + j(V) + ',\n  mod:' + j(M) + ',\n  gruppen:{\n' +
         ',\n'.join('    ' + k + ':' + j(v) for k, v in G.items()) + '\n  } };')

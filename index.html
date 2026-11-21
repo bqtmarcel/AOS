@@ -1633,6 +1633,26 @@ CHG.apPos = ()=>{ const m=val('ap-main'), s=val('ap-sec'); const old=S.profile.p
   S.profile.positions=[{ id:keep(m)||uid('pos'), code:m, name:name(m), weight:100-share }].concat(share?[{ id:keep(s)||uid('pos'), code:s, name:name(s), weight:share }]:[]);
   save(); render(); };
 ACT.apShare = el=>{ const P=S.profile.positions||[]; if(P.length<2) return; const v=+el.dataset.v; const mi=P[0].weight>=P[1].weight?0:1; P[mi].weight=100-v; P[1-mi].weight=v; save(); render(); };
+/* Profil: Rahmen und Belastbarkeit (Trainingspfade, Modifikatoren) */
+function loadSection(){ const p=S.profile; const inj=p.injuries||[]; const mob=p.mobility||{}; const sm=sessionMax();
+  const chips=(act,list,on)=>'<div>'+list.map(([v,n])=>'<button class="chip" data-act="'+act+'" data-v="'+v+'" aria-pressed="'+on(v)+'">'+n+'</button>').join('')+'</div>';
+  const yn=k=>chips('apMob',[[k+':1','ok'],[k+':0','eingeschränkt']],v=>(mob[k]!==false)===(v.slice(-1)==='1'));
+  let b='<label>Zeit pro Einheit (inkl. Aufwärmen)</label>'+chips('apTime',[45,60,70,75,90].map(m=>[m,m+' min']),v=>+v===sm)+
+    '<label>Verletzungen der letzten 12 Monate</label>'+chips('apInj',Object.entries(INJ_NAME),v=>inj.includes(v))+
+    '<p class="small muted">AOS plant dafür Pflicht- und Schutzübungen ein und lässt riskante Übungen weg. Aktuelle Beschwerden gibst du wie bisher beim Start der Einheit an.</p>'+
+    '<label>Mobilitäts-Check (beim Aufwärmen in Woche 1)</label><p class="small muted">Überkopf an der Wand · Knie zur Wand (mind. 8 cm) · Front-Rack-Position</p>'+
+    '<p class="small">Überkopf</p>'+yn('overhead')+'<p class="small">Sprunggelenk</p>'+yn('ankle')+'<p class="small">Front-Rack</p>'+yn('frontRack')+
+    '<label>Körpergewicht</label>'+chips('apWg',[['aufbauen','aufbauen'],['halten','halten'],['reduzieren','reduzieren']],v=>(p.weightGoal||'halten')===v)+
+    '<label>Körperlich harter Beruf oder Schichtarbeit</label>'+chips('apExt',[['1','ja'],['0','nein']],v=>!!p.extLoad===(v==='1'));
+  if(p.planEngine!=='gruppen') b+='<p class="small muted">Verletzungen, Mobilität, Körpergewicht und Beruf wirken in der Planung nach Positionsgruppe (oben umstellen). Die Zeit pro Einheit gilt immer.</p>';
+  const sum=[sm+' min', inj.length?inj.length+' Verletzung'+(inj.length>1?'en':''):''].filter(Boolean).join(' · ');
+  return pdet('rahmen','Belastbarkeit & Rahmen', sum, b); }
+const apSet=(f,msg)=>{ f(S.profile); save(); apReplan(); render(); if(msg) toast(msg); };
+ACT.apTime = el=>apSet(p=>{ p.sessionMin=+el.dataset.v; });
+ACT.apInj = el=>apSet(p=>{ const v=el.dataset.v; const l=p.injuries||[]; p.injuries=l.includes(v)?l.filter(x=>x!==v):l.concat([v]); });
+ACT.apMob = el=>apSet(p=>{ const [k,v]=el.dataset.v.split(':'); p.mobility=Object.assign({}, p.mobility||{}, { [k]:v==='1' }); });
+ACT.apWg = el=>apSet(p=>{ p.weightGoal=el.dataset.v; });
+ACT.apExt = el=>apSet(p=>{ p.extLoad=el.dataset.v==='1'; });
 ACT.apExp = el=>{ S.profile.experience=el.dataset.v; save(); apReplan(); render(); };
 ACT.apClean = el=>{ S.profile.cleanSafe=el.dataset.v==='true'; save(); apReplan(); render(); };
 ACT.apEngine = el=>{ const v=el.dataset.v; const t=todayISO();
@@ -1817,7 +1837,8 @@ function apBuildBlock(phase, prev, prev2){
   (P.notes||[]).forEach(n=>week_notes[1].push(n));
   if(emph) week_notes[1].push('Schwerpunkt: '+emph.name+' +1 Satz (erst '+Math.round(emph.p*100)+' % vom Ziel).');
   if(C){ week_notes[1].push('Positionsgruppe: '+C.label+(C.exp!=='fortgeschritten'?' · '+(EXP_LIST.find(e=>e[0]===C.exp)||['',''])[1]:'')+(C.clean?'':' · Umsetzen ersetzt durch Trap-Bar-Sprung/Speed Pull')+'.');
-    if(phase.id!=='IN' && phase.id!=='P1' && phase.id!=='P2' && !templates.some(t=>t.slots.some(s=>s.tp==='field'))) week_notes[1].push('Sprints und Positionsarbeit über das Teamtraining (kein Feldtag im Profil).'); }
+    if(phase.id!=='IN' && phase.id!=='P1' && phase.id!=='P2' && !templates.some(t=>t.slots.some(s=>s.tp==='field'))) week_notes[1].push('Sprints und Positionsarbeit über das Teamtraining (kein Feldtag im Profil).');
+    C.notes.forEach(n=>week_notes[1].push(n)); }
   types.forEach((t,w)=>{ if(t==='D') week_overrides[w+1]={ note:'Entlastung: weniger Sätze, gleiche Last'+(addDays(phase.start,w*7).slice(5)<='12-31'&&addDays(phase.start,w*7).slice(5)>='12-18'?' · Feiertage: Tage frei setzen':'') };
     if(t==='H'||t==='DT') (week_notes[w+1]=week_notes[w+1]||[]).push('Standortbestimmung: Broad Jump (D1), Top-Sets Kniebeuge, Kreuzheben, Bank bis RPE '+fmtNum(P.cap)+', kein Maxtest. Ergebnisse gehen automatisch in den Verlauf.'); });
   // Nicht verfügbare Tage (plan.json „unavailable“): Einheiten der Woche rücken in Reihenfolge auf die übrigen Trainingstage, was nicht passt, entfällt (kein Nachholen)
@@ -1845,7 +1866,7 @@ function apBuildBlock(phase, prev, prev2){
   const cap=C&&C.E ? P.cap+C.E.cap : P.cap; const kf=C?C.kf:1;
   return { id:'AUTO-'+phase.id, auto:true, name:'Block '+phase.id.slice(1)+' – '+P.name, phase:phase.id, start:phase.start, weeks, rpe_cap:[cap,cap], status:'automatisch',
     week_wave, test_weeks:types.map((t,i)=>(t==='H'||t==='DT')?i+1:0).filter(Boolean), week_schedule:sched, week_overrides, session_order:tids, limits:{ contacts_per_session:P.contacts.map(x=>Math.round(x*kf)), sprint_m_per_session:[0,0] }, week_notes, start_loads:{}, templates,
-    groups:C?C.label:null };
+    groups:C?C.label:null, warmup_min:(C&&C.warm)||undefined };
 }
 function apGames(){ const own=(typeof S!=='undefined'&&S ? (S.calendar||[]) : []).filter(e=>e.kind==='game'&&e.date).map(e=>e.date);
   const team=((typeof REF!=='undefined'&&REF.plan&&REF.plan.games)||[]).filter(e=>e&&e.date).map(e=>e.date);   // Teamkalender (team_season)
@@ -1878,7 +1899,7 @@ function apGenerate(plan){
 const TP={ version:"2.0",
   slots:{"field":{"n":"Sprint / Positionsarbeit (Feld)","r":["field","conditioning"],"p":1,"m":[],"ph":["P3","P4","P5","IN"]},"jump":{"n":"Sprünge","r":["power"],"p":1,"m":["jump"]},"power_lower":{"n":"Power Unterkörper (beladen/olympisch)","r":["power"],"p":1,"m":["olympic","jump_loaded","hinge","sled"]},"throw":{"n":"Medizinball","r":["power"],"p":2,"m":["throw"]},"power_upper":{"n":"Power Oberkörper","r":["power"],"p":2,"m":["vertical_push","angled_push","horizontal_push"]},"main_squat":{"n":"Hauptübung Kniebeuge","r":["main"],"p":1,"m":["squat"]},"main_hinge":{"n":"Hauptübung Hüftstreckung","r":["main"],"p":1,"m":["hinge"]},"main_push":{"n":"Hauptübung Drücken horizontal","r":["main"],"p":1,"m":["horizontal_push"]},"main_pull":{"n":"Hauptübung Ziehen vertikal","r":["main","assistance"],"p":1,"m":["vertical_pull"]},"push_2":{"n":"Drücken ergänzend","r":["main","assistance"],"p":2,"m":["incline_push","vertical_push","angled_push","horizontal_push","vertical_push_down"]},"pull_2":{"n":"Rudern","r":["assistance"],"p":2,"m":["horizontal_pull"]},"single_leg":{"n":"Einbeinig kniebetont","r":["assistance"],"p":2,"m":["lunge","squat"]},"posterior":{"n":"Hintere Kette / Hamstrings","r":["assistance"],"p":2,"m":["hinge","knee_flexion"]},"lateral_adductor":{"n":"Seitlich / Adduktoren","r":["assistance","prehab"],"p":3,"m":["lunge","adductor"]},"trunk":{"n":"Rumpf","r":["assistance","power"],"p":3,"m":["anti_extension","anti_lateral","anti_rotation","rotation","carry"]},"carry_contact":{"n":"Kontakt / Griff / Nacken","r":["assistance","prehab"],"p":3,"m":["shrug","carry","neck","grip"]},"prehab_lower":{"n":"Prehab Unterkörper","r":["prehab","assistance"],"p":3,"m":["ankle","adductor","hip_flexion","hinge","knee_flexion"]},"prehab_upper":{"n":"Prehab Oberkörper","r":["prehab"],"p":3,"m":["scapular","shoulder_rotation","elbow_flexion","elbow_extension","shoulder_abduction"]}},
   vorlagen:{"4":[{"id":"D1","name":"Lower Force","half":"lower","slots":["field","jump","main_squat","single_leg","posterior","trunk","prehab_lower"]},{"id":"D2","name":"Upper Strength","half":"upper","slots":["throw","main_push","main_pull","push_2","pull_2","carry_contact","prehab_upper"]},{"id":"D3","name":"Lower Power","half":"lower","slots":["field","power_lower","main_hinge","single_leg","lateral_adductor","trunk","prehab_lower"]},{"id":"D4","name":"Upper Power","half":"upper","slots":["power_upper","throw","push_2","main_pull","pull_2","carry_contact","prehab_upper"]}],"3":[{"id":"G1","name":"Ganzkörper Kniebeuge","half":"full","slots":["field","jump","main_squat","main_push","pull_2","posterior","prehab_lower"]},{"id":"G2","name":"Ganzkörper Power","half":"full","slots":["throw","power_lower","main_pull","push_2","single_leg","carry_contact","prehab_upper"]},{"id":"G3","name":"Ganzkörper Hüfte","half":"full","slots":["field","power_upper","main_hinge","push_2","pull_2","lateral_adductor","trunk"]}],"2":[{"id":"G1","name":"Ganzkörper A","half":"full","slots":["field","jump","main_squat","main_push","main_pull","posterior","trunk","prehab_lower"]},{"id":"G2","name":"Ganzkörper B","half":"full","slots":["field","power_lower","main_hinge","push_2","pull_2","single_leg","carry_contact","prehab_upper"]}]},
-  mod:{"einsteiger":{"x":["power_clean","clean_pull","high_pull","conventional_deadlift","depth_jump","bb_push_press","weighted_pull_up","pause_squat","ssb_good_morning"],"cap":-0.5,"minReps":3,"kf":0.7,"wd":2,"pref":{"main_squat":["goblet_squat","ssb_squat","high_bar_squat"],"main_hinge":["trap_bar_deadlift"],"main_push":["db_bench_press","bench_press"]}},"clean":{"ausgeschlossen":["hang_power_clean","hang_power_clean_bk","power_clean"],"ersatz":["trap_bar_jump","trap_bar_speed_pull","kb_swing"]},"schwer":{"kg":115,"kf":0.7,"x":["depth_jump","split_jump","single_leg_broad_jump"]}},
+  mod:{"einsteiger":{"x":["power_clean","clean_pull","high_pull","conventional_deadlift","depth_jump","bb_push_press","weighted_pull_up","pause_squat","ssb_good_morning"],"cap":-0.5,"minReps":3,"kf":0.7,"wd":2,"pref":{"main_squat":["goblet_squat","ssb_squat","high_bar_squat"],"main_hinge":["trap_bar_deadlift"],"main_push":["db_bench_press","bench_press"]}},"clean":{"ausgeschlossen":["hang_power_clean","hang_power_clean_bk","power_clean"],"ersatz":["trap_bar_jump","trap_bar_speed_pull","kb_swing"]},"schwer":{"kg":115,"kf":0.7,"x":["depth_jump","split_jump","single_leg_broad_jump"]},"gross":{"cm":193,"pref":{"main_hinge":["trap_bar_deadlift"],"main_squat":["ssb_squat","box_squat"]}},"verletzung":{"hamstring":{"p":[["nordic_hamstring",2]],"ab":{"flying_10m":"P4"},"h":"sprinten erst nach 2 Wochen beschwerdefreier Beschleunigung"},"leiste_adduktoren":{"p":[["copenhagen_plank",2]],"codAb":"P4"},"knie":{"x":["depth_jump"],"pref":{"main_squat":["box_squat","ssb_squat"]},"kf":0.8},"sprunggelenk":{"p":[["db_single_leg_calf_raise",2],["tibialis_raise",1]]},"schulter":{"p":[["band_external_rotation",2]],"x":["dips","bb_push_press"]},"ruecken":{"x":["conventional_deadlift","ssb_good_morning"],"pref":{"main_hinge":["trap_bar_deadlift"],"main_squat":["ssb_squat","belt_squat"]}},"nacken":{"h":"Nackentraining nur isometrisch und leicht, Steigerung 1,25 kg"}},"alter":{"30":{"kf":0.9,"warm":12},"35":{"kf":0.8,"warm":15}},"mobil":{"overhead":{"x":["db_overhead_press","bb_push_press"]},"ankle":{"pref":{"main_squat":["box_squat","ssb_squat"]},"p":[["tibialis_raise",2]]},"frontRack":{"x":["front_squat"]}},"gewicht":{"aufbauen":{"w":[8,12]},"reduzieren":{"sd":{"P2":-1,"P3":-1}}},"aussen":{"sd":-1}},
   gruppen:{
     OL:{"k":{"field":["three_point_start","sled_push","hand_fight_partner","accel_10_20m"],"jump":["box_jump","countermovement_jump","broad_jump","trap_bar_jump"],"power_lower":["hang_power_clean","hang_power_clean_bk","trap_bar_jump","trap_bar_speed_pull","clean_pull","sled_push","power_clean","kb_swing"],"throw":["mb_chest_pass","mb_split_stance_punch","mb_scoop_toss","mb_slam"],"power_upper":["bb_push_press","db_push_press_single_arm","landmine_push_press","explosive_push_up"],"main_squat":["high_bar_squat","ssb_squat","box_squat","pause_squat","front_squat","belt_squat"],"main_hinge":["trap_bar_deadlift","conventional_deadlift","romanian_deadlift"],"main_push":["bench_press","pause_bench","floor_press","db_bench_press"],"main_pull":["chin_up","pull_up","weighted_pull_up","inverted_row","lat_pulldown"],"push_2":["incline_bb_bench","close_grip_bench","incline_db_press","db_overhead_press","landmine_press","dips"],"pull_2":["pendlay_row","db_row","chest_supported_db_row","seated_cable_row"],"single_leg":["reverse_lunge","high_step_up","bulgarian_split_squat","walking_lunge"],"posterior":["romanian_deadlift","back_extension_45","hip_thrust","ssb_good_morning","nordic_hamstring"],"lateral_adductor":["lateral_lunge","copenhagen_plank","adductor_machine"],"trunk":["suitcase_carry","dead_bug","pallof_press","side_plank","bb_rollout"],"carry_contact":["trap_bar_shrug","neck_plate_isometric","farmer_carry","db_shrug","kb_front_rack_carry"],"prehab_lower":["back_extension_45","tibialis_raise","db_single_leg_calf_raise","copenhagen_plank"],"prehab_upper":["band_pull_apart","db_reverse_fly","face_pull","db_hammer_curl","db_triceps_extension"]},"sd":{"P1":0,"P2":1,"P3":1,"P4":0,"P5":0,"IN":0},"sf":null,"w":[6,10],"kf":0.7,"sprint":{"P3":"5–10 m aus 2/3-Punkt-Stand, Schlitten","P4":"Stance-Starts 5 m, Schlitten, Hand Fight, kurze Pass-Set-Folgen","P5":"wenige kurze Starts, volle Pausen","IN":"Erhalt über Teamtraining"},"p":[["neck_plate_isometric",1],["carry_contact",2],["back_extension_45",1]],"x":[["depth_jump","hauptgruppe"]],"sp":{"carry_contact":2,"trunk":2}},
     DL:{"k":{"field":["de_get_off","three_point_start","hand_fight_partner","sled_push","accel_10_20m","pro_agility"],"jump":["box_jump","broad_jump","countermovement_jump","lateral_bound","depth_jump","trap_bar_jump"],"power_lower":["hang_power_clean","hang_power_clean_bk","trap_bar_jump","trap_bar_speed_pull","power_clean","clean_pull","sled_push","kb_swing"],"throw":["mb_split_stance_punch","mb_chest_pass","mb_rotational_throw","mb_slam"],"power_upper":["db_push_press_single_arm","landmine_push_press","bb_push_press","explosive_push_up"],"main_squat":["high_bar_squat","ssb_squat","box_squat","front_squat","pause_squat","belt_squat"],"main_hinge":["trap_bar_deadlift","conventional_deadlift","romanian_deadlift"],"main_push":["bench_press","pause_bench","floor_press","db_bench_press"],"main_pull":["pull_up","weighted_pull_up","chin_up","lat_pulldown"],"push_2":["incline_bb_bench","landmine_press","incline_db_press","close_grip_bench","db_overhead_press","dips"],"pull_2":["db_row","pendlay_row","chest_supported_db_row","inverted_row"],"single_leg":["reverse_lunge","bulgarian_split_squat","high_step_up","walking_lunge"],"posterior":["romanian_deadlift","hip_thrust","db_single_leg_rdl","nordic_hamstring","back_extension_45"],"lateral_adductor":["lateral_lunge","copenhagen_plank","adductor_machine"],"trunk":["landmine_rotation","pallof_press","suitcase_carry","dead_bug","bb_rollout"],"carry_contact":["neck_plate_isometric","trap_bar_shrug","farmer_carry","db_shrug","plate_pinch"],"prehab_lower":["copenhagen_plank","db_single_leg_calf_raise","tibialis_raise","back_extension_45"],"prehab_upper":["prone_ytw","band_pull_apart","db_reverse_fly","face_pull","db_hammer_curl"]},"sd":{"P1":0,"P2":1,"P3":0,"P4":0,"P5":0,"IN":0},"sf":null,"w":[5,8],"kf":0.85,"sprint":{"P3":"5–20 m aus 3-Punkt-Stand","P4":"Get-off mit Reaktion, Hand Fight, Verfolgung 10–20 m","P5":"kurz und schnell, volle Pausen","IN":"Erhalt über Teamtraining"},"p":[["neck_plate_isometric",2],["carry_contact",2]],"x":[],"sp":{"carry_contact":2},"v":{"DE":{"kontakte_faktor":1.0,"hauptuebungen_saetze_delta":{"P2":0},"kandidaten_vorne":{"field":["de_get_off","three_point_start","hand_fight_partner","accel_10_20m","pro_agility"],"jump":["broad_jump","lateral_bound","box_jump"],"lateral_adductor":["lateral_lunge","copenhagen_plank"]},"p":[["copenhagen_plank",1]]},"DT":{"kontakte_faktor":0.7,"hauptuebungen_saetze_delta":{"P3":1},"kandidaten_vorne":{"field":["three_point_start","hand_fight_partner","sled_push","de_get_off"],"jump":["box_jump","countermovement_jump"]},"x":["depth_jump"]},"NT":{"wie":"DT"}}},
@@ -1890,6 +1911,7 @@ const TP={ version:"2.0",
     QB:{"k":{"field":["drop_back_start","accel_10_20m","pro_agility","two_point_start"],"jump":["broad_jump","box_jump","countermovement_jump","lateral_bound","skater_hop"],"power_lower":["trap_bar_jump","trap_bar_speed_pull","kb_swing","hang_power_clean"],"throw":["mb_rotational_throw","mb_scoop_toss"],"power_upper":["landmine_push_press","explosive_push_up"],"main_squat":["ssb_squat","front_squat","high_bar_squat","box_squat","goblet_squat"],"main_hinge":["trap_bar_deadlift","romanian_deadlift"],"main_push":["db_bench_press","weighted_push_up","floor_press"],"main_pull":["chin_up","pull_up","inverted_row","lat_pulldown"],"push_2":["landmine_press","weighted_push_up","incline_db_press"],"pull_2":["chest_supported_db_row","db_row","inverted_row","seated_cable_row"],"single_leg":["reverse_lunge","bulgarian_split_squat","high_step_up","lateral_lunge"],"posterior":["db_single_leg_rdl","nordic_hamstring","romanian_deadlift","hip_thrust"],"lateral_adductor":["lateral_lunge","copenhagen_plank"],"trunk":["landmine_rotation","pallof_press","side_plank","dead_bug","suitcase_carry"],"carry_contact":["suitcase_carry","farmer_carry"],"prehab_lower":["db_single_leg_calf_raise","tibialis_raise","banded_hip_flexor_march"],"prehab_upper":["band_external_rotation","prone_ytw","band_pull_apart","db_reverse_fly","db_hammer_curl","face_pull"]},"sd":{"P1":0,"P2":0,"P3":-1,"P4":-1,"P5":-1,"IN":-1},"sf":["main_squat","main_hinge"],"w":[6,10],"kf":0.8,"sprint":{"P3":"5–20 m, Drop-Back-Starts","P4":"Drop-Back + Scramble, Richtungswechsel","P5":"kurz, frisch","IN":"Erhalt über Teamtraining"},"p":[["band_external_rotation",3],["throw",2]],"x":[["bb_push_press","immer"],["db_overhead_press","immer"],["db_push_press_single_arm","immer"],["shoulder_press_machine","immer"],["dips","immer"]],"sp":{"prehab_upper":1,"trunk":2}}
   } };
 /* TP-END */
+const INJ_NAME={ hamstring:'Hamstring', leiste_adduktoren:'Leiste/Adduktoren', knie:'Knie', sprunggelenk:'Sprunggelenk', schulter:'Schulter', ruecken:'Rücken', nacken:'Nacken' };
 const EXP_LIST=[['einsteiger','Einsteiger'],['fortgeschritten','Fortgeschritten'],['erfahren','Erfahren']];
 const TP_VARIANT={ DE:'DE', DT:'DT', NT:'DT', CB:'CB', S:'S', FB:'FB' };
 const TP_SPEC={ main_squat:{ k:'squat', role:'main', main:'main' }, main_push:{ k:'bench', role:'main', main:'main' }, main_hinge:{ k:'hinge', role:'main', main:'hinge' },
@@ -1912,24 +1934,39 @@ function tpContext(){
   groups.forEach(g=>{ g.v=g.pos.slice().sort((a,b)=>b.share-a.share)[0].v; });   // Variante mit dem größten Anteil zieht Kandidaten nach vorn
   const sum=f=>pos.reduce((a,x)=>a+x.share*f(x),0)/100;
   let kf=sum(x=>(x.v&&x.v.kontakte_faktor!=null)?x.v.kontakte_faktor:TP.gruppen[x.group].kf); if(E) kf*=E.kf;
-  const bw=bwNow(); const heavy=bw!=null && bw>=TP.mod.schwer.kg; if(heavy) kf*=TP.mod.schwer.kf; kf=Math.max(0.5, Math.min(1, kf));
+  const bw=bwNow(); const heavy=bw!=null && bw>=TP.mod.schwer.kg; if(heavy) kf*=TP.mod.schwer.kf;
+  const age=p.birthYear ? new Date().getFullYear()-p.birthYear : null; const A=age>=35?TP.mod.alter['35']:age>=30?TP.mod.alter['30']:null; if(A) kf*=A.kf;
+  const inj=(p.injuries||[]).map(k=>[k,TP.mod.verletzung[k]]).filter(x=>x[1]); inj.forEach(([,v])=>{ if(v.kf) kf*=v.kf; });
+  kf=Math.max(0.5, Math.min(1, kf));
+  // bevorzugte Hauptübungen (Einsteiger, Verletzungen, Mobilität, Größe) – erste Quelle zuerst
+  const pref={}; const addPref=o=>Object.entries(o||{}).forEach(([t,l])=>{ pref[t]=(pref[t]||[]).concat(l.filter(id=>!(pref[t]||[]).includes(id))); });
+  if(E) addPref(E.pref); inj.forEach(([,v])=>addPref(v.pref)); const mob=p.mobility||{}; if(mob.ankle===false) addPref(TP.mod.mobil.ankle.pref);
+  if(p.heightCm>=TP.mod.gross.cm) addPref(TP.mod.gross.pref);
+  const phaseAb={}; const codAb=inj.map(([,v])=>v.codAb).filter(Boolean).sort().slice(-1)[0]||null;   // Übung/Muster erst ab Phase
+  inj.forEach(([,v])=>Object.assign(phaseAb, v.ab||{})); if(age>=35) phaseAb.depth_jump='P4';
+  const gz=TP.mod.gewicht[p.weightGoal]||{}; const assistDelta=ph=>((gz.sd||{})[ph]||0)+(p.extLoad?TP.mod.aussen.sd:0);
   const w=[0,1].map(i=>Math.round(sum(x=>TP.gruppen[x.group].w[i])));
   const excl=new Set(); const why={};
   groups.forEach(g=>{ (TP.gruppen[g.id].x||[]).forEach(([id,when])=>{ if(when==='immer' || g===main){ excl.add(id); why[id]=GROUP_NAME[g.id]; } });
     g.pos.forEach(x=>((x.v&&x.v.x)||[]).forEach(id=>{ excl.add(id); why[id]=x.code; })); });
   if(E) E.x.forEach(id=>{ excl.add(id); why[id]='Einsteiger'; });
   if(heavy) TP.mod.schwer.x.forEach(id=>{ excl.add(id); why[id]='hohes Körpergewicht'; });
+  if(age>=35 && exp!=='erfahren'){ excl.add('depth_jump'); why.depth_jump='ab 35 nur für Erfahrene'; }
+  inj.forEach(([k,v])=>(v.x||[]).forEach(id=>{ excl.add(id); why[id]='Verletzung '+INJ_NAME[k]; }));
+  ['overhead','frontRack'].forEach(k=>{ if(mob[k]===false) TP.mod.mobil[k].x.forEach(id=>{ excl.add(id); why[id]='Mobilitäts-Check'; }); });
   if(p.cleanSafe===false) TP.mod.clean.ausgeschlossen.forEach(id=>{ excl.add(id); why[id]='Umsetzen noch nicht technisch sicher'; });
   // Pflicht pro Woche: Hauptgruppe voll, Nebengruppe ab 30 % mit halber Häufigkeit (aufgerundet); gleiche Übung zählt einmal (höhere Häufigkeit)
   const req={}; const add=(id,n)=>{ req[id]=Math.max(req[id]||0, n); };
   groups.forEach(g=>{ const full=g===main||!main; if(!full && g.share<30) return; const f=n=>full?n:Math.ceil(n/2);
     (TP.gruppen[g.id].p||[]).forEach(([id,n])=>add(id,f(n)));
     g.pos.forEach(x=>{ if(!x.v||!x.v.p) return; if(x.share<30 && !(g===main && x===g.pos[0])) return; x.v.p.forEach(([id,n])=>add(id, x===((main||{}).pos||[])[0]?n:Math.ceil(n/2))); }); });
+  inj.forEach(([,v])=>(v.p||[]).forEach(([id,n])=>add(id,n))); if(mob.ankle===false) TP.mod.mobil.ankle.p.forEach(([id,n])=>add(id,n));
   const setsDelta=(type,ph)=>{ const ap=x=>{ const sf=TP.gruppen[x.group].sf; return !sf || sf.includes(type); };
     const val=x=>{ if(!ap(x)) return 0; const vd=x.v&&x.v.hauptuebungen_saetze_delta; return (vd&&vd[ph]!=null)?vd[ph]:(TP.gruppen[x.group].sd[ph]||0); };
     const v=sum(val); const fl=Math.floor(v); if(Math.abs(v-fl-0.5)<1e-9){ const mv=main?val(main.pos[0]):0; return mv>v?fl+1:fl; } return Math.round(v); };
   const label=pm.length ? groups.map(g=>g.id+(groups.length>1?' '+Math.round(g.share)+' %':'')).join(' / ') : 'ohne Position (alle Gruppen gleich)';
-  return { groups, main, pos, exp, E, kf, w, excl, why, req, setsDelta, label, clean:p.cleanSafe!==false, heavy };
+  const warm=A?A.warm:null; const notes=inj.map(([k,v])=>v.h?INJ_NAME[k]+': '+v.h:null).filter(Boolean);
+  return { groups, main, pos, exp, E, kf, w:gz.w||w, excl, why, req, setsDelta, label, clean:p.cleanSafe!==false, heavy, pref, phaseAb, codAb, assistDelta, warm, age, inj:inj.map(x=>x[0]), notes };
 }
 function tpRel(e, g){ const r=(e&&e.position_relevance)||{}; return r[g]!=null ? r[g] : 2; }
 function tpList(g, type){ const G=TP.gruppen[g.id]; const base=(G.k[type]||[]).slice(); const front=(g.v&&g.v.kandidaten_vorne&&g.v.kandidaten_vorne[type])||[];
@@ -1938,14 +1975,16 @@ function tpList(g, type){ const G=TP.gruppen[g.id]; const base=(G.k[type]||[]).s
 function tpRank(C, type, only){
   const groups=only ? [Object.assign({}, only, { share:100 })] : C.groups; const main=only ? groups[0] : C.main;
   const lists=groups.map(g=>tpList(g,type)); const ids=[...new Set(lists.flat())]; const ml=main?tpList(main,type):[];
-  const pref=(C.E&&C.E.pref[type])||[];
+  const pref=C.pref[type]||[];
   const sc=id=>{ const e=REF.exMap[id]; if(!e) return -99; let s=groups.reduce((a,g)=>a+g.share/100*tpRel(e,g.id),0)-(e.selection_penalty||0);
     const i=ml.indexOf(id); if(i===0) s+=0.5; else if(i===1) s+=0.25; const j=pref.indexOf(id); if(j>=0) s+=2-0.25*j; return s; };
   const ord=id=>{ const i=ml.indexOf(id); return i<0?99:i; };
   return ids.filter(id=>REF.exMap[id]).map(id=>({ id, s:sc(id), o:ord(id), a:ids.indexOf(id) })).sort((x,y)=>y.s-x.s || x.o-y.o || x.a-y.a).map(x=>x.id);
 }
+const PH_ORD=['P1','P2','P3','P4','P5','IN'];
 function tpAllowed(C, id, phaseId){ const e=REF.exMap[id]; if(!e || /snatch/.test(id) || C.excl.has(id)) return false;
   if(e.phases && !e.phases.includes(phaseId)) return false;
+  const ab=C.phaseAb[id] || (e.pattern==='cod' && C.codAb); if(ab && PH_ORD.indexOf(phaseId)<PH_ORD.indexOf(ab)) return false;   // nach Verletzung erst ab dieser Phase
   const chk=(e.equipment_check||[]).filter(x=>!(e.role==='field' && ['cones','partner'].includes(x)));   // Hütchen und Partner gibt es an Feldtagen
   return !chk.length; }
 /* Auswahl (Sessionplaner 3.9): Hauptübungen je Phase – Grundübung in P1/P2/P5 und Saison, Variante in P3 und P4;
@@ -1961,7 +2000,7 @@ function tpPick(spec, phaseId, prev, taken, C){
   return [pick].concat(free.filter(id=>id!==pick).slice(0,1));
 }
 function tpPickMain(spec, phaseId, taken, C, R){
-  const pref=(C.E&&C.E.pref[spec.tp])||[];
+  const pref=C.pref[spec.tp]||[];
   const ok=R.filter(id=>{ const e=REF.exMap[id]; return !taken.has(id) && tpAllowed(C,id,(e.phases||[])[0]||phaseId) && (e.role==='main' || pref.includes(id) || spec.tp==='main_pull'); });
   const inP=ph=>ok.filter(id=>{ const e=REF.exMap[id]; return !e.phases || e.phases.includes(ph); });
   const g2=inP('P2')[0]||ok[0]; let pick;
@@ -1997,6 +2036,7 @@ function tpDose(d, spec, ex, C, phaseId, wt){
   if(spec.main==='main'||spec.main==='hinge'){ const dl=C.setsDelta(spec.tp, phaseId); if(dl && !D) d.dose=[Math.max(1,Math.min(6,d.dose[0]+dl)), d.dose[1]];
     if(C.E){ const r=parseInt(d.dose[1],10); if(r && r<C.E.minReps) d.dose=[d.dose[0], String(C.E.minReps)]; if(typeof d.rpe==='number') d.rpe=Math.max(6,d.rpe+C.E.cap); } }
   if(ex.pattern==='jump' && C.kf<1) d.dose=[Math.max(1,Math.round(d.dose[0]*C.kf)), d.dose[1]];
+  if(!spec.main && spec.role==='assistance' && ex.role==='assistance'){ const sd=C.assistDelta(phaseId); if(sd) d.dose=[Math.max(1,d.dose[0]+sd), d.dose[1]]; }
   if(d.range && !spec.main && !spec.second && spec.role==='assistance' && ex.role==='assistance' && d.range[1]<=8){ const ex2=C.E?C.E.wd:0; const lo=d.range[0]+(C.w[0]-5)+ex2, hi=d.range[1]+(C.w[1]-8)+ex2;
     if(lo!==d.range[0]||hi!==d.range[1]){ d.range=[lo,hi]; d.dose=[d.dose[0], lo+'–'+hi+(/\/S$/.test(String(d.dose[1]))?'/S':'')]; } }
   return d;
@@ -2142,8 +2182,9 @@ function restWarnings(){ let v; try{ v=learn(); }catch(e){ return []; }
   return Object.entries(v.rest).filter(([,r])=>r.warn).map(([role,r])=>'Pausen bei '+(ROLE_REST_LABEL[role]||role)+' meist zu kurz (Ø '+fmtSec(r.rs)+' statt '+fmtSec(r.plan)+'): Der nächste Satz liegt dann im Schnitt '+fmtNum(Math.round(r.dShort*10)/10)+' RPE höher'+(r.nOk>=3?' als nach voller Pause (+'+fmtNum(Math.round(r.dOk*10)/10)+')':'')+'. Nimm dir die volle Pause.'); }
 
 /* ---------- Zeitbudget: max. 70 min pro Einheit ---------- */
-const SESSION_MAX_MIN=70;
-function sessionLimit(avail){ return Math.min(avail||SESSION_MAX_MIN, SESSION_MAX_MIN); }
+const SESSION_MAX_MIN=70;   // Standard (Sessionplaner 3.10): 60–70 min, nie länger
+function sessionMax(){ const m=typeof S!=='undefined'&&S&&S.profile&&+S.profile.sessionMin; return m>=30&&m<=120 ? m : SESSION_MAX_MIN; }
+function sessionLimit(avail){ return Math.min(avail||sessionMax(), sessionMax()); }
 function plGroup(ex){ const p=(ex&&ex.pattern)||'';
   if(/squat|hinge|lunge|knee|ankle|adductor|jump|olympic|sprint|cod/.test(p)) return 'legs';
   if(/push|elbow_extension|throw/.test(p)) return 'push';
@@ -2488,21 +2529,21 @@ function plBuild(inp){
 
   // Zeitbudget (8): höchstens 70 min, effizient gekürzt (plFit)
   const limitMin=sessionLimit(inp.avail);
-  const fit=plFit(items, limitMin, rules.warmup_min||7, dropped);
+  const fit=plFit(items, limitMin, (b.warmup_min||rules.warmup_min||7), dropped);
   if(fit.steps.length) notes.push('Zeit: höchstens '+limitMin+' min → '+fit.steps.map(x=>/^weggelassen/.test(x)?(n=>n+(n===1?' Übung':' Übungen')+' weggelassen (siehe unten)')(x.split(',').length):x).join(', ')+'.'+(fit.over?' Die Grundübungen bleiben, deshalb ca. '+fit.min+' min.':''));
   if(redist){ const ext=items.filter(x=>x.from); const src=[...new Set(ext.map(x=>x.from))];
-    notes[redist.at]='Diese Woche '+wp.count+' statt '+wp.full+' Einheiten: AOS verteilt den ganzen Wochenumfang neu auf die verbleibenden Einheiten, jede höchstens '+SESSION_MAX_MIN+' min.'+
+    notes[redist.at]='Diese Woche '+wp.count+' statt '+wp.full+' Einheiten: AOS verteilt den ganzen Wochenumfang neu auf die verbleibenden Einheiten, jede höchstens '+sessionMax()+' min.'+
       (ext.length?' Hier dazu aus '+src.join(', ')+': '+ext.map(x=>x.ex.name_de).join(', ')+'.':''); }
   items.forEach(x=>{ if(!x.pair) return; const y=items.find(z=>z!==x && z.pair===x.pair); if(!y) return; const first=items.indexOf(x)<items.indexOf(y);
     x.reasons.unshift('Supersatz mit '+y.ex.name_de+': abwechselnd je 1 Satz, '+(first?'kurz wechseln, Pause erst nach '+y.ex.name_de+'.':'danach Pause.'));
     if(first) x.rest=[20,30]; });
-  const est=()=>plEst(items, rules.warmup_min||7);
+  const est=()=>plEst(items, (b.warmup_min||rules.warmup_min||7));
   // Validierung (9)
   const valid=[];
   if(lim && cSum()>lim) valid.push('Bodenkontakte '+cSum()+' über dem Limit '+lim+'.');
   items.forEach(x=>{ const m=String(x.rpe).match(/[\d,]+(?=\s*$)/); if(m && num(m[0])>cap) valid.push(x.ex.name_de+': Ziel-RPE über dem Cap.'); });
   restWarnings().forEach(w=>notes.push(w));
-  return { due, tpl:t, block:b, week, cap, items, dropped, notes, valid, contacts:cSum(), estMin:est(), estRaw:plEst(items, rules.warmup_min||7, true), limitMin, inp };
+  return { due, tpl:t, block:b, week, cap, items, dropped, notes, valid, contacts:cSum(), estMin:est(), estRaw:plEst(items, (b.warmup_min||rules.warmup_min||7), true), limitMin, inp };
 }
 
 /* Plan → Einheit im App-Format (Snapshot inkl. Eingaben und Begründungen, Spezifikation 10) */
@@ -3328,7 +3369,7 @@ function viewPlan(){
   const b=ui.planBlock && P.blocks.find(x=>x.id===ui.planBlock);
   if(!b) return h;
   h+='<h2 id="plan-block">'+esc(b.name)+'</h2><div class="section"><div class="small ph-meta" style="margin-bottom:10px"><span style="flex-basis:100%">'+fmtDate(b.start).slice(0,6)+' – '+fmtDate(addDays(b.start,b.weeks*7-1))+'</span><span>'+b.weeks+' Wochen</span><span>RPE ≤ '+fmtNum(plCap(b))+'</span>'+
-    '<span>'+SESSION_MAX_MIN+' min/Einheit</span></div>'+
+    '<span>'+sessionMax()+' min/Einheit</span></div>'+
     '';
   // Wochenraster
   const days=['MON','TUE','WED','THU','FRI','SAT','SUN'], dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
@@ -3350,7 +3391,7 @@ function viewPlan(){
   }
   h+='</tbody></table></div><p class="small muted">✓ erledigt · ○ offen · ✗ verpasst<br>Tag antippen zum Ändern</p>';
   if(plBlockAt(today)===b){ const wk=plWeek(b,today); const wp=plWeekPlan(b,wk);
-    h+='<p class="small"><strong>Diese Woche: '+wp.count+' Einheit'+(wp.count===1?'':'en')+'.</strong> '+(wp.redistributed?'Der Umfang von '+wp.missing.join(', ')+' ist auf '+wp.upcoming.map(u=>u.tpl+' ('+WD[weekdayOf(u.date)]+')').join(', ')+' verteilt, jede Einheit höchstens '+SESSION_MAX_MIN+' min.':'Alle Einheiten wie geplant.')+'</p>'; }
+    h+='<p class="small"><strong>Diese Woche: '+wp.count+' Einheit'+(wp.count===1?'':'en')+'.</strong> '+(wp.redistributed?'Der Umfang von '+wp.missing.join(', ')+' ist auf '+wp.upcoming.map(u=>u.tpl+' ('+WD[weekdayOf(u.date)]+')').join(', ')+' verteilt, jede Einheit höchstens '+sessionMax()+' min.':'Alle Einheiten wie geplant.')+'</p>'; }
   h+='</div>';
   // Templates
   h+='<h2>Einheiten</h2>';
@@ -3411,7 +3452,7 @@ function ovToday(today){
   else if(due.plannedToday && !due.plannedToday.planner){ state='open'; title=due.plannedToday.name; sub='offen · bereit zum Erfassen';
     btn=phBtn((ui.sessionId===due.plannedToday.id&&isLive())||due.plannedToday.draft?'Einheit fortsetzen':'Einheit erfassen','data-act="startLog" data-id="'+due.plannedToday.id+'"'); }
   else if(due.block && due.tpl && !due.offday){ const t=plTemplate(due.block, due.tpl); state='open'; title=t.id+' – '+t.name;
-    sub='ca. '+Math.min(SESSION_MAX_MIN, Math.round(t.time_min*plDurFactor()))+' min';
+    sub='ca. '+Math.min(sessionMax(), Math.round(t.time_min*plDurFactor()))+' min';
     btn=phBtn('Einheit starten','data-act="go" data-view="training"'); }
   else if(isFieldDay(today)){ title='Kein Gym – '+((fieldCfg()||{}).name||'Feldtraining'); sub=((fieldCfg()||{}).time||'')+' · siehe unten'; }
   else { const n=plNextTraining(addDays(today,1)); sub=n?'Nächste Einheit: '+n.tpl+' · '+WD[weekdayOf(n.date)]+' '+fmtDate(n.date).slice(0,6):'Erholung'; }
@@ -3634,7 +3675,7 @@ function viewProfile(){
   h+=pdet('person','Persönliche Daten',[p.name,p.heightCm?p.heightCm+' cm':''].filter(Boolean).join(' · '),'<div class="fields">'+inp('p-name','Name',p.name)+inp('p-by','Geburtsjahr',p.birthYear,'inputmode="numeric" placeholder="z. B. 1990"')+'</div>'+
     '<div class="fields">'+inp('p-h','Größe (cm)',p.heightCm,'inputmode="numeric"')+inp('p-tw','Zielgewicht (kg, optional)',fmtNum(p.targetWeightKg),'inputmode="decimal"')+'</div>'+
     '<button class="primary" data-act="saveProfileSlim">Speichern</button>');
-  h+=athleteSection();
+  h+=athleteSection(); h+=loadSection();
   h+=calSection();
   h+=pdet('loc','Trainingsorte',(S.profile.locations||[]).length+' Orte',locSection());
   h+=pushSection();
@@ -3726,7 +3767,7 @@ function plSection(){
   // Seltene Angaben eingeklappt
   const more = p.tpl || p.sleep!=null || p.avail!=null || p.noEquip.length || p.grip;
   h+='<details'+(more?' open':'')+'><summary class="small">Mehr Angaben</summary>';
-  h+='<div class="fields">'+inp('pl-avail','Zeit (min)',p.avail==null?'':p.avail,'inputmode="numeric" placeholder="'+SESSION_MAX_MIN+'" data-chg="plIn"')+inp('pl-sleep','Schlaf (h)',p.sleep==null?'':fmtNum(p.sleep),'inputmode="decimal" data-chg="plIn"')+'</div>';
+  h+='<div class="fields">'+inp('pl-avail','Zeit (min)',p.avail==null?'':p.avail,'inputmode="numeric" placeholder="'+sessionMax()+'" data-chg="plIn"')+inp('pl-sleep','Schlaf (h)',p.sleep==null?'':fmtNum(p.sleep),'inputmode="decimal" data-chg="plIn"')+'</div>';
   if(t){
     if(t.slots.some(s=>s.grip && (s.dose||{})[due.week])) h+='<div>'+chipBtn('plChip','grip','1','Griff stark ermüdet',p.grip)+'</div>'; }
   h+='<div class="fields">'+inp('pl-date','Anderer Tag',p.date,'type="date" data-chg="plIn"')+(b?sel('pl-tpl','Andere Einheit',b.templates.map(x=>[x.id, x.id+' – '+x.name]), pin.tpl||'', 'data-chg="plIn"'):'')+'</div>';
