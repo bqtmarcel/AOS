@@ -21,7 +21,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 | **M1** | 21.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 12 / 12 ✅ |
 | **M2** | 21.11.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 6 / 6 ✅ |
 | **M3** | 21.11.2026 | Positionsgruppen | Planung für alle Positionen | 8 / 9 |
-| **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 6 / 13 |
+| **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 7 / 13 |
 | **Start** | ab 11.01.2027 | Teamstart | alle eingeladenen Spieler | 0 / 2 |
 | **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 4 / 5 |
 | **M6** | 25.01.–07.02.2027 | Ranglisten mit DOTS | erste Ranglisten nach der Testwoche Anfang Februar | 5 / 6 |
@@ -85,7 +85,7 @@ Hinweis: Bestehende Profile planen weiter mit den bisherigen Vorlagen, bis der A
 - [ ] **M4.5** Einstieg für spätere Starter: 2 Wochen Einstieg, dann im Teamkalender
 - [x] **M4.6** Teamkalender (Spiele, Feldtraining, Saisonstart) durch den Admin in der App pflegen (Team → Verwaltung → Teamkalender: Spiele, Feldtraining-Tage, Start und Dauer) ✅ 21.11.2026
 - [x] **M4.7** Push-Erinnerungen pro Athlet (Anmeldung je Gerät, Versand für alle) (Erinnerungen für alle aktiven Athleten mit eigenen Geräten und Uhrzeiten) ✅ 21.11.2026
-- [ ] **M4.8** 👤 Freigabe durch den Vorstand einholen
+- [x] **M4.8** 👤 Freigabe durch den Vorstand einholen ✅ 21.11.2026
 - [ ] **M4.9** 👤 Pilot ab ca. 04.01.: Pilot-Athleten einladen, eine Woche trainieren lassen, Rückmeldungen sammeln
 - [ ] **M4.10** Rückmeldungen aus dem Pilot umsetzen
 - [ ] **M4.11** Prüfung: Onboarding ohne Hilfe geschafft, niemand sieht fremde Daten, Pläne passen zu Position und Ausstattung
