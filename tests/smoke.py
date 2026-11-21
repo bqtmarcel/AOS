@@ -182,6 +182,12 @@ async def supabase_test(browser):
             b = json.loads(req.post_data)
             if b.get('token') != '123456': return await route.fulfill(status=403, json={'msg': 'Token has expired or is invalid'})
             return await route.fulfill(status=200, json={'access_token': 'tok', 'refresh_token': 'ref', 'expires_in': 3600, 'user': {'id': uid, 'email': b['email']}})
+        if path.startswith('/auth/v1/token'):
+            b = json.loads(req.post_data)
+            if b.get('refresh_token') != 'uebergabe-abc12': return await route.fulfill(status=400, json={'msg': 'Invalid Refresh Token'})
+            return await route.fulfill(status=200, json={'access_token': 'tok2', 'refresh_token': 'ref2', 'expires_in': 3600, 'user': {'id': uid, 'email': 'athlet@test.invalid'}})
+        if path.startswith('/auth/v1/user'):
+            return await route.fulfill(status=200, json={'id': uid, 'email': 'athlet@test.invalid'})
         if path.startswith('/rest/v1/records'):
             if req.method == 'GET':
                 rows = [dict(key=k, **v) for k, v in sorted(db.items())]
@@ -226,7 +232,17 @@ async def supabase_test(browser):
         db[k] = {'data': None, 'updated_at': '2099-01-01T00:00:00.000Z', 'deleted': True}
         gone = await page.evaluate("async k=>{ await sbSync('test'); return !syncRecords(S).has(k); }", k)
         if not gone: errors.append('Supabase: Löschung des anderen Geräts kam nicht an')
-    # Laufende Einheit/Abmelden: Daten bleiben auf dem Gerät
+    # Übergabecode aus dem Browser (Link aus der Mail) in der App eingeben
+    await page.evaluate("()=>{ sb.sess=null; sbStore(); ui.view='profil'; ui.profOpen={sb:true}; render(); }")
+    await page.click('[data-act="sbHaveCode"]'); await page.fill('#sb-otp', 'uebergabe-abc12'); await page.click('[data-act="sbVerify"]'); await page.wait_for_timeout(300)
+    if not await page.evaluate("sbReady() && sb.sess.access_token==='tok2'"): errors.append('Supabase: Anmeldung mit Übergabecode klappt nicht')
+    # Link aus der Mail im Browser: zeigt den Übergabecode
+    p2 = await ctx.new_page(); p2.on('pageerror', lambda e: errors.append(str(e)))
+    await p2.goto(ROOT.as_uri() + '#access_token=x&refresh_token=handoff-xyz&expires_in=3600&type=magiclink'); await p2.wait_for_timeout(700)
+    if 'handoff-xyz' not in (await p2.evaluate("(document.getElementById('dlg')||{}).textContent||''")): errors.append('Supabase: Link aus der Mail zeigt keinen Übergabecode')
+    if '#access_token' in p2.url: errors.append('Supabase: Anmeldedaten bleiben in der Adresse stehen')
+    await p2.close()
+    # Abmelden: Daten bleiben auf dem Gerät
     await page.evaluate("()=>{ sb.sess=null; sbStore(); render(); }")
     if await page.evaluate("S.profile.name") != 'anderes Gerät': errors.append('Supabase: Daten nach dem Abmelden weg')
     await ctx.close()
