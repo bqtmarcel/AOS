@@ -45,6 +45,20 @@ DEMO = """(()=>{
 
 # Ablauf: Einheit aus dem Demo-Plan starten, Satz eintragen (Pausentimer), speichern
 FLOW = """(async()=>{
+  // M2: Richtwerte je Positionsgruppe und Wochenplan aus den Trainingstagen des Profils
+  { const kp=clone(S.profile), kb=clone(S.bodyweight), kg=clone(S.goals);
+    S.profile.positions=[{id:'t1',code:'WR',name:'Wide Receiver',weight:100}]; S.bodyweight=[{id:'tb',date:todayISO(),kg:80}]; S.goals=[];
+    const g=stdGoals(); const sq=g.find(x=>x.name==='Kniebeuge'), bj=g.find(x=>x.name==='Broad Jump');
+    const ok1 = sq && sq.target===120 && bj && bj.target===295;
+    S.profile.positions=[{id:'t1',code:'RB',name:'Running Back',weight:70},{id:'t2',code:'DE',name:'Defensive End',weight:30}];
+    const mix=groupMix().map(x=>x.group+x.share).join(',');
+    S.profile.trainingDays=['THU','TUE']; const sc=JSON.stringify(schedFromDays(['D1','D2','D3','D4']));
+    delete S.profile.trainingDays; const legacy=JSON.stringify(schedFromDays(['D1','D2','D3','D4']));
+    S.profile=kp; S.bodyweight=kb; S.goals=kg;
+    if(!ok1) return 'Richtwerte: WR-Werte falsch ('+JSON.stringify(g)+')';
+    if(mix!=='RB70,DL30') return 'Positionsgruppen falsch gemischt ('+mix+')';
+    if(sc!=='{"TUE":"D1","THU":"D2"}') return 'Trainingstage: Wochenplan falsch ('+sc+')';
+    if(legacy!=='{"MON":"D1","WED":"D2","THU":"D3","FRI":"D4"}') return 'Bestehende Profile ohne Trainingstage bekommen einen anderen Wochenplan ('+legacy+')'; }
   // Zeitbudget: zu volle Einheit wird auf höchstens 70 min gebracht, Grundübungen bleiben
   { const mk=(role,prio,method,sets,id)=>({ role, prio, method, sets, reps:'5', rest:[150,180], ex:REF.exMap[id], slot:{id}, slotId:id, reasons:[] });
     const it=[mk('power',1,'quality',4,'broad_jump'), mk('main',1,'wave',5,'high_bar_squat'), mk('main',1,'wave',5,'bench_press'), mk('main',1,'bodyweight_reps',5,'pull_up')]

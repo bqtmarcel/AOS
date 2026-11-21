@@ -18,15 +18,15 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 | # | Zeitraum | Meilenstein | Ergebnis | Stand |
 |---|---|---|---|---|
 | **0** | 17.–22.11.2026 | Vorbereitung | Zugänge da | 2 / 2 ✅ |
-| **M1** | 21.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 11 / 12 |
-| **M2** | 07.–13.12.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 0 / 6 |
+| **M1** | 21.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 12 / 12 ✅ |
+| **M2** | 21.11.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 6 / 6 ✅ |
 | **M3** | 14.–27.12.2026 | Positionsgruppen | Planung für alle Positionen | 0 / 9 |
 | **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 0 / 12 |
 | **Start** | ab 11.01.2027 | Teamstart | alle eingeladenen Spieler | 0 / 2 |
 | **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 0 / 5 |
 | **M6** | 25.01.–07.02.2027 | Ranglisten mit DOTS | erste Ranglisten nach der Testwoche Anfang Februar | 0 / 6 |
 | **Stopp** | 01.03.–21.03.2027 | Funktionsstopp bis zum ersten Spiel | nur Fehlerbehebungen | – |
-| später | ab Saison | Nachrichten Coach → Athlet prüfen | Entscheidung, ob nötig | 0 / 1 |
+| später | ab Saison | Nachrichten Coach → Athlet prüfen; alten GitHub-Token löschen | Entscheidung, ob nötig | 0 / 2 |
 
 **Leitlinien:** Große Umstellungen nur am Wochenende und an einem Phasenwechsel, damit das laufende Training nicht gestört wird. Teamstart mit Beginn des Feldtrainings im Jänner. Ab 01.03.2027 keine neuen Funktionen mehr.
 
@@ -50,16 +50,16 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 - [x] **M1.9** Speicherung über GitHub-Token entfernen (inkl. Ablaufwarnung W6) ✅ 21.11.2026 (GitHub-Token wird von jedem Gerät entfernt, Ablaufwarnung entfällt)
 - [x] **M1.10** Umstellung am Wochenende 05./06.12. durchführen ✅ 21.11.2026 (auf 21.11. vorgezogen; Erinnerungen lesen aus Supabase, `aos-data.json` ist Archiv, Planänderungen in `AOS_DATA/planner` und `db` gehen automatisch nach Supabase)
 - [x] **M1.11** Prüfung: alle Einheiten, Tests und Verläufe vollständig; geplante Einheit für Mo 07.12. vor und nach der Umstellung identisch; Coach-Testkonto kann nichts ändern ✅ 21.11.2026 (Einheiten 23.11.–13.12. inkl. Mo 07.12., Kalorienziele und alle Verläufe mit Daten aus Supabase identisch zum Datenrepo; Coach-Rechte über den Datenbanktest)
-- [ ] **M1.12** 👤 Auf iPhone und Laptop anmelden und bestätigen, dass alles wie gewohnt da ist
+- [x] **M1.12** 👤 Auf iPhone und Laptop anmelden und bestätigen, dass alles wie gewohnt da ist ✅ 21.11.2026 (iPhone und Laptop geprüft)
 
-## M2 · Engine personenneutral (07.–13.12.2026)
+## M2 · Engine personenneutral (21.11.2026)
 
-- [ ] **M2.1** Bestandsaufnahme: alle personenbezogenen Annahmen im Code auflisten (Positionsanteile, Trainingsort, Ziele, Startlasten, Feldtage)
-- [ ] **M2.2** Positionen mit Anteil als Profilwert statt fest im Code
-- [ ] **M2.3** Langfristziele als Profilwert; Richtwerte je Positionsgruppe (relativ zum Körpergewicht) als Standard
-- [ ] **M2.4** Trainingsorte, Wochentage und Startlasten nur noch aus Profil und Protokollen
-- [ ] **M2.5** Neutrales Standardprofil für neue Athleten
-- [ ] **M2.6** Prüfung: eigener Plan unverändert; Testprofil „Einsteiger, WR, Home Gym“ bekommt einen vollständigen, eigenen Plan ohne fremde Vorlieben
+- [x] **M2.1** Bestandsaufnahme: alle personenbezogenen Annahmen im Code auflisten (Positionsanteile, Trainingsort, Ziele, Startlasten, Feldtage) ✅ 21.11.2026 (`docs/M2_ENGINE_PERSONENNEUTRAL.md`)
+- [x] **M2.2** Positionen mit Anteil als Profilwert statt fest im Code ✅ 21.11.2026 (Profil → Position & Trainingstage; Mischung der Positionsgruppen nach Anteil)
+- [x] **M2.3** Langfristziele als Profilwert; Richtwerte je Positionsgruppe (relativ zum Körpergewicht) als Standard ✅ 21.11.2026 (eigene Ziele haben Vorrang, sonst Richtwerte der Gruppe × Körpergewicht; steuern den Schwerpunkt-Satz)
+- [x] **M2.4** Trainingsorte, Wochentage und Startlasten nur noch aus Profil und Protokollen ✅ 21.11.2026 (Trainingstage im Profil statt festem Wochenplan; Orte aus dem Profil; Lasten nur aus Protokollen und Tests)
+- [x] **M2.5** Neutrales Standardprofil für neue Athleten ✅ 21.11.2026 (Standardprofil ohne Position und Ziele, Mo/Di/Do/Fr; allgemeine Planerregeln als Referenzdokument)
+- [x] **M2.6** Prüfung: eigener Plan unverändert; Testprofil „Einsteiger, WR, Home Gym“ bekommt einen vollständigen, eigenen Plan ohne fremde Vorlieben ✅ 21.11.2026 (eigener Plan bis Ende Jänner 0 Unterschiede; Testprofil WR/Home Gym vollständig; positionsspezifische Übungswahl folgt in M3)
 
 ## M3 · Positionsgruppen (14.–27.12.2026)
 
@@ -114,6 +114,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 
 - [ ] **L.1** Nachrichten Coach → Athlet: Bedarf mit dem Coach klären, dann entscheiden
 
+- [ ] **L.2** 👤 Alten GitHub-Token löschen: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens (wird seit der Umstellung am 21.11.2026 nicht mehr gebraucht)
 ---
 
 ## Risiken

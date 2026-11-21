@@ -446,7 +446,7 @@ function seedData(){
   return {
     schemaVersion: SCHEMA_VERSION,
     meta: { createdAt: now, updatedAt: now, app:'AOS – Athlete Operating System' },
-    profile: { name:'', birthYear:null, heightCm:null, targetWeightKg:null, positions:[], locations:[] },
+    profile: { name:'', birthYear:null, heightCm:null, targetWeightKg:null, positions:[], locations:[], trainingDays:['MON','TUE','THU','FRI'] },
     goals: [], tests: [], bodyweight: [], blocks: [], sessions: [],
     unavailable: [], suggestionDecisions: {}, calendar: [],
     nutrition: defaultNutrition(),
@@ -1561,6 +1561,71 @@ function plDropStale(){ if(typeof S==='undefined' || !S || !REF.plan || !(REF.pl
 function refInit(){ try{ const c=JSON.parse(localStorage.getItem(REF_KEY)||'null'); if(c&&c.plan&&c.ex) refSet(c.plan, c.ex, c.at, c); }catch(e){} }
 async function refLoad(force){ return sbRefLoad(force); }
 
+/* ===== AOS – Athletenprofil: Positionen, Trainingstage, Richtwerte (Roadmap M2: Engine personenneutral) =====
+   Alles Persönliche kommt aus dem Profil bzw. den Protokollen des Athleten; im Code stehen nur allgemeine Standards. */
+const POS_LIST=[['QB','Quarterback'],['RB','Running Back'],['FB','Fullback'],['WR','Wide Receiver'],['TE','Tight End'],['C','Center'],['G','Guard'],['T','Tackle'],
+  ['DE','Defensive End'],['DT','Defensive Tackle'],['NT','Nose Tackle'],['OLB','Outside Linebacker'],['MLB','Middle Linebacker'],['ILB','Inside Linebacker'],['CB','Cornerback'],['S','Safety']];
+const POS_GROUP={ C:'OL', G:'OL', T:'OL', DE:'DL', DT:'DL', NT:'DL', MLB:'LB', ILB:'LB', OLB:'LB', TE:'TE', FB:'TE', RB:'RB', WR:'WR', CB:'DB', S:'DB', QB:'QB' };
+const GROUP_NAME={ OL:'Offensive Line', DL:'Defensive Line', LB:'Linebacker', TE:'Tight End', RB:'Running Back', WR:'Wide Receiver', DB:'Defensive Back', QB:'Quarterback' };
+/* Richtwerte je Positionsgruppe (Trainingspfade 2.0, Vorschlag): Kraft als e1RM relativ zum Körpergewicht, Broad Jump in cm */
+const GOAL_STD={ OL:{squat:1.8,bench:1.4,hinge:2.2,broad:235}, DL:{squat:1.8,bench:1.35,hinge:2.2,broad:255}, LB:{squat:1.8,bench:1.3,hinge:2.2,broad:270},
+  TE:{squat:1.7,bench:1.25,hinge:2.1,broad:265}, RB:{squat:1.8,bench:1.25,hinge:2.2,broad:285}, WR:{squat:1.5,bench:1.1,hinge:1.9,broad:295},
+  DB:{squat:1.6,bench:1.1,hinge:2.0,broad:295}, QB:{squat:1.5,bench:1.0,hinge:1.9,broad:260} };
+const STD_LIFTS=[ ['squat','Kniebeuge','high_bar_squat',['kniebeuge','squat']], ['bench','Bankdrücken','bench_press',['bankdrücken','bench']],
+  ['hinge','Kreuzheben','trap_bar_deadlift',['kreuzheben','deadlift']], ['broad','Broad Jump','broad_jump',['broad','weitsprung']] ];
+const DAY_KEYS=['MON','TUE','WED','THU','FRI','SAT','SUN'];
+const DEFAULT_TRAINING_DAYS=['MON','TUE','THU','FRI'];   // Standard für neue Athleten (seedData): 4 Tage, Unter-/Oberkörper im Wechsel
+const LEGACY_TRAINING_DAYS=['MON','WED','THU','FRI'];    // fester Wochenplan bis Version M2: gilt für bestehende Profile ohne eigene Angabe
+function posMix(){ const P=((S&&S.profile&&S.profile.positions)||[]).filter(p=>POS_GROUP[p.code]); const tot=P.reduce((a,p)=>a+(+p.weight||0),0)||P.length;
+  return P.map(p=>({ code:p.code, name:p.name, group:POS_GROUP[p.code], share:Math.round(((+p.weight||0)||(100/P.length))/tot*100) })).sort((a,b)=>b.share-a.share); }
+function groupMix(){ const m={}; posMix().forEach(p=>{ m[p.group]=(m[p.group]||0)+p.share; }); return Object.entries(m).map(([group,share])=>({ group, share })).sort((a,b)=>b.share-a.share); }
+function trainingDays(){ const d=S&&S.profile&&S.profile.trainingDays; return Array.isArray(d)&&d.length ? DAY_KEYS.filter(k=>d.includes(k)) : LEGACY_TRAINING_DAYS.slice(); }
+/* Wochenplan aus den Trainingstagen: Einheiten D1–D4 der Reihe nach; bei weniger Tagen verteilt AOS den Wochenumfang (plWeekPlan) */
+function schedFromDays(ids){ const out={}; trainingDays().slice(0, ids.length).forEach((d,i)=>{ out[d]=ids[i]; }); return out; }
+/* Einmalig ergänzen (mit Zeitstempel, damit alle Geräte denselben Stand bekommen). Bestand: bisheriger fester Wochenplan bleibt. */
+function ensureProfileDefaults(){ if(!S||!S.profile) return; const p=S.profile; let ch=false;
+  if(!Array.isArray(p.trainingDays)){ p.trainingDays=LEGACY_TRAINING_DAYS.slice(); ch=true; }   // neue Profile haben die Tage schon aus seedData()
+  if(!Array.isArray(p.positions)){ p.positions=[]; ch=true; }
+  if(ch) save(true); }
+function bwNow(){ const L=(S.bodyweight||[]).filter(b=>b.kg!=null&&b.date).sort((a,b)=>a.date<b.date?-1:1); if(!L.length) return null;
+  const last=L[L.length-1].date; const w=L.filter(b=>daysBetween(b.date,last)<7); return w.reduce((a,b)=>a+b.kg,0)/w.length; }
+function goalLiftKey(g){ const s=((g.name||'')+' '+(g.testName||'')).toLowerCase(); const l=STD_LIFTS.find(([,,,w])=>w.some(x=>s.includes(x))); return l?l[0]:null; }
+/* Richtwerte der eigenen Positionsgruppe(n) für alles, wofür der Athlet kein eigenes Ziel gesetzt hat */
+function stdGoals(){ const gm=groupMix(); const bw=bwNow(); if(!gm.length) return [];
+  const own=new Set((S.goals||[]).filter(g=>g.status==='aktiv').map(goalLiftKey).filter(Boolean));
+  const tot=gm.reduce((a,g)=>a+g.share,0)||1; const val=k=>gm.reduce((a,g)=>a+(GOAL_STD[g.group]||{})[k]*g.share,0)/tot;
+  const label=gm.map(g=>g.group+(gm.length>1?' '+g.share+' %':'')).join(' / ');
+  return STD_LIFTS.filter(([k])=>!own.has(k)).map(([k,name,ex])=>{
+    const tn=(typeof REF!=='undefined'&&REF.exMap&&REF.exMap[ex]&&REF.exMap[ex].name_de)||name;
+    if(k==='broad') return { id:'std-'+k, name, target:Math.round(val(k)/5)*5, unit:'cm', testName:tn, status:'aktiv', source:'richtwert', group:label };
+    if(!bw) return null; return { id:'std-'+k, name, target:Math.round(bw*val(k)/2.5)*2.5, unit:'kg', testName:tn, status:'aktiv', source:'richtwert', group:label, rel:Math.round(val(k)*100)/100 };
+  }).filter(Boolean); }
+function activeGoals(){ return (S.goals||[]).filter(g=>g.status==='aktiv').concat(stdGoals()); }
+ACT.stdGoalTake = el=>{ const g=stdGoals().find(x=>x.id===el.dataset.id); if(!g) return;
+  S.goals.push({ id:uid('goal'), name:g.name, target:g.target, unit:g.unit, testName:g.testName, status:'aktiv', note:'Richtwert '+g.group, createdAt:new Date().toISOString(), source:'richtwert' }); save(); render(); toast('Als eigenes Ziel übernommen'); };
+/* Profil: Position und Trainingstage */
+function athleteSection(){ const mix=posMix(); const main=mix[0]||null, sec=mix[1]||null; const days=trainingDays(); const dn={MON:'Mo',TUE:'Di',WED:'Mi',THU:'Do',FRI:'Fr',SAT:'Sa',SUN:'So'};
+  const opt=(sel,none)=>(none?'<option value="">— keine —</option>':'')+POS_LIST.map(([c,n])=>'<option value="'+c+'"'+(sel===c?' selected':'')+'>'+c+' – '+n+'</option>').join('');
+  let b='<label for="ap-main">Hauptposition</label><select id="ap-main" data-chg="apPos">'+(main?'':'<option value="" selected>— bitte wählen —</option>')+opt(main&&main.code,false)+'</select>'+
+    '<label for="ap-sec">Nebenposition (optional)</label><select id="ap-sec" data-chg="apPos">'+opt(sec&&sec.code,true)+'</select>';
+  if(sec) b+='<label>Anteil Nebenposition</label><div>'+[10,20,30,40,50].map(v=>'<button class="chip" data-act="apShare" data-v="'+v+'" aria-pressed="'+(sec.share===v)+'">'+v+' %</button>').join('')+'</div>';
+  const gm=groupMix(); if(gm.length) b+='<p class="small muted">Positionsgruppe: '+esc(gm.map(g=>GROUP_NAME[g.group]+(gm.length>1?' '+g.share+' %':'')).join(' · '))+'</p>';
+  b+='<label>Trainingstage (Krafttraining)</label><div class="chips7">'+DAY_KEYS.map(d=>'<button class="chip" data-act="apDay" data-v="'+d+'" aria-pressed="'+days.includes(d)+'">'+dn[d]+'</button>').join('')+'</div>'+
+    '<p class="small muted">AOS plant bis zu 4 Einheiten pro Woche. Bei weniger Tagen wird der Wochenumfang auf diese Tage verteilt.</p>';
+  return pdet('athlet','Position & Trainingstage', [main?main.code+(sec?' / '+sec.code+' '+sec.share+' %':''):'keine Position', days.length+' Tage'].join(' · '), b); }
+function apReplan(){ if(typeof REF!=='undefined' && REF.plan && REF.ex){ refSet(REF.plan, REF.ex, REF.at, { nut:REF.nut, food:REF.food, recipes:REF.recipes }); } }
+CHG.apPos = ()=>{ const m=val('ap-main'), s=val('ap-sec'); const old=S.profile.positions||[]; const cur=posMix();
+  if(!m){ toast('Bitte eine Hauptposition wählen.'); return; }
+  const share = (s && s!==m) ? ((cur[1]&&cur[1].share)||30) : 0; const name=c=>(POS_LIST.find(p=>p[0]===c)||[c,c])[1];
+  const keep=c=>(old.find(p=>p.code===c)||{}).id;
+  S.profile.positions=[{ id:keep(m)||uid('pos'), code:m, name:name(m), weight:100-share }].concat(share?[{ id:keep(s)||uid('pos'), code:s, name:name(s), weight:share }]:[]);
+  save(); render(); };
+ACT.apShare = el=>{ const P=S.profile.positions||[]; if(P.length<2) return; const v=+el.dataset.v; const mi=P[0].weight>=P[1].weight?0:1; P[mi].weight=100-v; P[1-mi].weight=v; save(); render(); };
+ACT.apDay = el=>{ const d=el.dataset.v; let days=trainingDays(); days=days.includes(d)?days.filter(x=>x!==d):days.concat([d]);
+  if(!days.length){ toast('Mindestens ein Trainingstag.'); return; }
+  S.profile.trainingDays=DAY_KEYS.filter(k=>days.includes(k)); save(); apReplan(); render();
+  if(days.length>4) toast('AOS plant höchstens 4 Einheiten – die ersten 4 Tage zählen.'); };
+
 /* ===== AOS – Automatische Blockplanung (interner Strength Coach) =====
    Für jede Phase ohne eigenen Block in plan.json stellt AOS den Block selbst zusammen – ohne Entscheidung des Athleten:
    - Übungen: Hauptübungen bleiben (3.9), alles andere rotiert innerhalb des Bewegungsmusters (nicht im direkt vorherigen Block),
@@ -1689,7 +1754,7 @@ function apSlotDose(spec, ex, P, wt, emph){
 /* Schwerpunkt: Hauptübung mit dem geringsten Fortschritt zum Ziel (Tests vor Blockbeginn) */
 function apEmphasis(start){ if(typeof S==='undefined'||!S) return null;
   const lifts={ squat:['kniebeuge','squat'], bench:['bankdrücken','bench'], hinge:['kreuzheben','deadlift'] }; let best=null;
-  (S.goals||[]).filter(g=>g.status==='aktiv' && g.unit==='kg' && g.target).forEach(g=>{
+  activeGoals().filter(g=>g.unit==='kg' && g.target).forEach(g=>{
     const key=Object.keys(lifts).find(k=>lifts[k].some(w=>(g.name+' '+(g.testName||'')).toLowerCase().includes(w))); if(!key) return;
     const L=S.tests.filter(t=>t.name===g.testName && t.unit==='kg' && t.value!=null && t.date && t.date<start).sort((a,b)=>a.date<b.date?-1:1); if(!L.length) return;
     const p=goalVal(L[L.length-1])/g.target; if(!best||p<best.p) best={ key, p, name:g.name }; });
@@ -1718,7 +1783,7 @@ function apBuildBlock(phase, prev){
       const tw=types.findIndex(t=>t==='H'||t==='DT')+1; slots.unshift({ id:'D1-0', role:'power', prio:1, method:'quality', candidates:['broad_jump'], dose:{[tw]:[1,'3']}, rest:[60,90], note:'Standortbestimmung: 3 Versuche nach dem Aufwärmen, beste Weite notieren.' }); }
     return { id:tid, name:T.name, group:T.group, time_min:T.time, goal:P.goal, slots };
   });
-  const ps=prev&&prev.week_schedule; const sched=phase.id==='IN' ? { TUE:'IN1', THU:'IN2' } : (ps && Object.values(ps).every(t=>AP_SLOTS[t])) ? ps : { MON:'D1', WED:'D2', THU:'D3', FRI:'D4' };
+  const ps=prev&&prev.week_schedule; const sched=phase.id==='IN' ? { TUE:'IN1', THU:'IN2' } : schedFromDays(Object.keys(AP_SLOTS));   // Trainingstage aus dem Profil
   const week_wave={}, week_notes={}, week_overrides={};
   types.forEach((t,w)=>{ week_wave[w+1]=AP_WAVE_LABEL[t]; });
   week_notes[1]=[P.goal+'. Hauptübungen fix, Rest wechselt.'];
@@ -1751,7 +1816,9 @@ function apBuildBlock(phase, prev){
   return { id:'AUTO-'+phase.id, auto:true, name:'Block '+phase.id.slice(1)+' – '+P.name, phase:phase.id, start:phase.start, weeks, rpe_cap:[P.cap,P.cap], status:'automatisch',
     week_wave, test_weeks:types.map((t,i)=>(t==='H'||t==='DT')?i+1:0).filter(Boolean), week_schedule:sched, week_overrides, session_order:Object.keys(SL), limits:{ contacts_per_session:P.contacts, sprint_m_per_session:[0,0] }, week_notes, start_loads:{}, templates };
 }
-function apGames(){ return (typeof S!=='undefined'&&S ? (S.calendar||[]) : []).filter(e=>e.kind==='game'&&e.date).map(e=>e.date).sort(); }
+function apGames(){ const own=(typeof S!=='undefined'&&S ? (S.calendar||[]) : []).filter(e=>e.kind==='game'&&e.date).map(e=>e.date);
+  const team=((typeof REF!=='undefined'&&REF.plan&&REF.plan.games)||[]).filter(e=>e&&e.date).map(e=>e.date);   // Teamkalender (team_season)
+  return [...new Set(own.concat(team))].sort(); }
 /* Saison-Phase (In-Season) direkt nach der letzten Phase bis zur Woche des letzten Spiels im Kalender (sonst 12 Wochen) */
 function apInSeason(plan){
   plan.phases=plan.phases.filter(p=>!p.auto); if(plan.phases.some(p=>p.id==='IN')) return;
@@ -3366,6 +3433,7 @@ function viewProfile(){
   h+=pdet('person','Persönliche Daten',[p.name,p.heightCm?p.heightCm+' cm':''].filter(Boolean).join(' · '),'<div class="fields">'+inp('p-name','Name',p.name)+inp('p-by','Geburtsjahr',p.birthYear,'inputmode="numeric" placeholder="z. B. 1990"')+'</div>'+
     '<div class="fields">'+inp('p-h','Größe (cm)',p.heightCm,'inputmode="numeric"')+inp('p-tw','Zielgewicht (kg, optional)',fmtNum(p.targetWeightKg),'inputmode="decimal"')+'</div>'+
     '<button class="primary" data-act="saveProfileSlim">Speichern</button>');
+  h+=athleteSection();
   h+=calSection();
   h+=pdet('loc','Trainingsorte',(S.profile.locations||[]).length+' Orte',locSection());
   h+=pushSection();
@@ -3422,6 +3490,11 @@ function goalsSection(){
     return '<div class="goal-row"><div class="row between" style="flex-wrap:nowrap;gap:8px"><button class="link" data-act="editGoal" data-id="'+g.id+'">'+esc(g.name)+'</button>'+
       '<span class="small" style="text-align:right">'+(t?esc(testValueText(t)):'<span class="muted">—</span>')+' <span class="muted">/ '+fmtNum(g.target)+' '+esc(g.unit)+'</span></span></div>'+
       (p!=null?'<div class="goal-bar" role="img" aria-label="'+p+' % erreicht"><i style="width:'+Math.max(2,p)+'%"></i></div><div class="small muted">'+p+' %'+(t&&goalVal(t)!==t.value?' · geschätztes 1RM ≈ '+fmtNum(goalVal(t))+' kg':'')+(p>=100?' · erreicht ✓':'')+'</div>':'')+'</div>'; }).join('');
+  const sg=stdGoals();
+  if(sg.length) h+='<p class="small muted" style="margin-top:12px">Richtwerte für '+esc(sg[0].group)+' (gelten, solange du kein eigenes Ziel setzt):</p>'+sg.map(g=>{ const t=latestTest(g.testName); const p=goalProgress(g);
+    return '<div class="goal-row"><div class="row between" style="flex-wrap:nowrap;gap:8px"><span>'+esc(g.name)+'</span><span class="small" style="text-align:right">'+(t?esc(testValueText(t)):'<span class="muted">—</span>')+' <span class="muted">/ '+fmtNum(g.target)+' '+esc(g.unit)+(g.rel?' ('+fmtNum(g.rel)+' × KG)':'')+'</span></span></div>'+
+      (p!=null?'<div class="goal-bar" role="img" aria-label="'+p+' % erreicht"><i style="width:'+Math.max(2,p)+'%"></i></div>':'')+'<button class="link small" data-act="stdGoalTake" data-id="'+g.id+'">als eigenes Ziel übernehmen</button></div>'; }).join('');
+  else if(!posMix().length) h+='<p class="small muted" style="margin-top:12px">Mit deiner Position im Profil schlägt AOS Richtwerte für deine Positionsgruppe vor.</p>';
   return pdet('v-goals','Ziele',gl.length===1?'1 aktiv':gl.length+' aktiv',h+'<div class="add-row"><button class="small" data-act="editGoal">+ Ziel</button></div>');
 }
 
@@ -3470,7 +3543,7 @@ const GH_OLD_KEY = 'aos-github-v1';   // alter GitHub-Token: wird beim Start von
 function canon(v){ if(Array.isArray(v)) return '['+v.map(canon).join(',')+']'; if(v&&typeof v==='object') return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canon(v[k])).join(',')+'}'; return JSON.stringify(v===undefined?null:v); }
 function syncSig(d){ const o={}; syncRecords(d).forEach((v,k)=>o[k]=v); return canon([o, d.sync&&d.sync.stamps||{}, d.sync&&d.sync.tombstones||{}]); }
 function applyMerged(d){
-  S=d; syncInit();
+  S=d; syncInit(); ensureProfileDefaults();
   if(storageOK){ try{ localStorage.setItem(AOS_KEY, JSON.stringify(S)); }catch(e){} }
   // Offene Eingaben (Dialog, Protokoll in Arbeit) nicht unter den Fingern neu zeichnen
   const dlg=document.getElementById('dlg');
@@ -3587,7 +3660,8 @@ async function sbRefLoad(force){
   REF.loading=true;
   try{
     const [pr, docs, team]=await Promise.all([ sbApi('GET','/rest/v1/profiles?select=planner,nutrition&id=eq.'+sbUid()), sbApi('GET','/rest/v1/ref_docs?select=name,data'), sbTeam() ]);
-    const plan=pr[0]&&pr[0].planner; const D=Object.fromEntries(docs.map(d=>[d.name,d.data]));
+    const D=Object.fromEntries(docs.map(d=>[d.name,d.data]));
+    const own=(pr[0]&&pr[0].planner)||null; const plan=(D.planer||own) ? Object.assign({}, clone(D.planer||{}), clone(own||{})) : null;   // allgemein + persönlich
     if(!plan || !D.uebungen) throw new Error('Plan oder Übungsdatenbank fehlen in Supabase.');
     sbTeamOverlay(plan, team);
     const more={ nut:pr[0].nutrition||null, food:D.lebensmittel||null, recipes:D.rezepte||null };
@@ -3599,7 +3673,7 @@ async function sbRefLoad(force){
 }
 async function sbTeam(){ const t=await sbApi('GET','/rest/v1/team_season?select=data,updated_at&id=eq.1'); sb.team=(t[0]&&t[0].data)||null; sbStore(); return sb.team; }
 /* Teamweite Daten gelten für alle gleich und ersetzen die entsprechenden Teile der Planerdaten */
-function sbTeamOverlay(plan, team){ if(!plan || !team) return plan; ['season','phases','field'].forEach(k=>{ if(team[k]) plan[k]=team[k]; }); return plan; }
+function sbTeamOverlay(plan, team){ if(!plan || !team) return plan; ['season','phases','field','games'].forEach(k=>{ if(team[k]) plan[k]=team[k]; }); return plan; }
 function sbStatusText(){ if(!sbReady()) return 'Nicht angemeldet.';
   const st={ ok:'abgeglichen', laeuft:'gleicht ab …', offline:'offline – gleicht ab, sobald Netz da ist', fehler:'Fehler: '+sb.lastError, aus:'bereit' }[sb.state]||sb.state;
   return 'Angemeldet als '+(sb.email||'—')+' · '+st+(sb.lastOk?' · zuletzt '+fmtSyncTime(sb.lastOk):''); }
@@ -3649,7 +3723,7 @@ function aosApplyUpdate(){
   if(sbReady() && sb.dirty) sbSync('update').finally(go); else go();
 }
 (function init(){
-  sbLoad(); load(); refInit(); sbFromHash();
+  sbLoad(); load(); ensureProfileDefaults(); refInit(); sbFromHash();
   const h=location.hash.slice(1); if(VIEWS.some(v=>v[0]===h)) ui.view=h;
   if(liveRestore()) ui.view='training';   // laufende Einheit nach Neustart der App fortsetzen
   render();
