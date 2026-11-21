@@ -9,3 +9,5 @@
 - Vor dem Hochladen den Klicktest laufen lassen: `python tests/smoke.py` (läuft auch automatisch als GitHub Action bei jedem Push).
 - **Roadmap:** `ROADMAP.md` führt die Tasks für Mehrbenutzer, Positionsgruppen, Coach und Ranglisten. Jeden Task nach erfolgreichem Abschluss (umgesetzt und geprüft) im selben Commit abhaken: `[x]` und `✅ TT.MM.JJJJ` ans Ende, Zähler „Stand“ im Überblick aktualisieren. Neue oder geänderte Tasks dort eintragen. Keine persönlichen Werte in die Roadmap.
 - Spezifikationen und Datenbanken (Sessionplaner, Nutrition, Übungen, Lebensmittel, Rezepte) liegen in `AOS_DATA/docs` und `AOS_DATA/db`.
+- **Rollen:** Spieler, Coach, Admin in `profiles.roles`; Rechte erzwingt die Datenbank. Fremde Daten (Coach-Übersicht) nur anzeigen, nie in `S` übernehmen. Einladungen laufen über die Edge Function `supabase/functions/admin` (geheimer Schlüssel nur dort, gesetzt von der Action „Datenbank“).
+- Gruppenregeln (`TP` in `index.html`) nicht von Hand ändern: `python3 tools/tp-gen.py ../AOS_DATA/docs/AOS_Trainingspfade.json`. Testprofile je Gruppe: `python tests/gruppen.py <Übungsdatenbank>` (Action „Gruppentest“ im Datenrepo).

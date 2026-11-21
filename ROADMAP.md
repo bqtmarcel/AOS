@@ -21,10 +21,10 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 | **M1** | 21.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 12 / 12 ✅ |
 | **M2** | 21.11.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 6 / 6 ✅ |
 | **M3** | 21.11.2026 | Positionsgruppen | Planung für alle Positionen | 8 / 9 |
-| **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 1 / 13 |
+| **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 5 / 13 |
 | **Start** | ab 11.01.2027 | Teamstart | alle eingeladenen Spieler | 0 / 2 |
-| **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 0 / 5 |
-| **M6** | 25.01.–07.02.2027 | Ranglisten mit DOTS | erste Ranglisten nach der Testwoche Anfang Februar | 0 / 6 |
+| **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 4 / 5 |
+| **M6** | 25.01.–07.02.2027 | Ranglisten mit DOTS | erste Ranglisten nach der Testwoche Anfang Februar | 5 / 6 |
 | **Stopp** | 01.03.–21.03.2027 | Funktionsstopp bis zum ersten Spiel | nur Fehlerbehebungen | – |
 | später | ab Saison | Nachrichten Coach → Athlet prüfen; alten GitHub-Token löschen | Entscheidung, ob nötig | 0 / 2 |
 
@@ -77,14 +77,14 @@ Hinweis: Bestehende Profile planen weiter mit den bisherigen Vorlagen, bis der A
 
 ## M4 · Einladungen, Onboarding, Pilot (28.12.2026–10.01.2027)
 
-- [ ] **M4.1** Admin-Bereich: Spieler per E-Mail einladen, Rollen vergeben, Konten deaktivieren
+- [x] **M4.1** Admin-Bereich: Spieler per E-Mail einladen, Rollen vergeben, Konten deaktivieren (Team → Verwaltung: Einladen per Admin-Funktion auf dem Server, Rollen Spieler/Coach/Admin, Sperren; Mails erreichen Spieler erst mit M4.12) ✅ 21.11.2026
 - [ ] **M4.2** Onboarding in 8 Schritten (Einwilligung, Position, Körperdaten, Erfahrung, Ort, Trainingstage, Einschränkungen, Eingangstests in Woche 1)
 - [x] **M4.2a** Gegebenheiten im Profil und in der Planung (vor dem Onboarding): Zeit pro Einheit, Verletzungen der letzten 12 Monate, Mobilitäts-Check, Körpergewichtsziel, Außenbelastung, Alter und Größe; wirken auf Übungswahl, Pflicht, Kontakte und Aufwärmen ✅ 21.11.2026
 - [ ] **M4.3** Einwilligung und Datenschutzinfo in der App (Text abgestimmt mit dem Vorstand)
-- [ ] **M4.4** Konto löschen und eigene Daten exportieren
+- [x] **M4.4** Konto löschen und eigene Daten exportieren (Profil → AOS-Konto: Daten herunterladen, Konto samt Daten löschen; der letzte Admin kann sich nicht löschen) ✅ 21.11.2026
 - [ ] **M4.5** Einstieg für spätere Starter: 2 Wochen Einstieg, dann im Teamkalender
-- [ ] **M4.6** Teamkalender (Spiele, Feldtraining, Saisonstart) durch den Admin in der App pflegen
-- [ ] **M4.7** Push-Erinnerungen pro Athlet (Anmeldung je Gerät, Versand für alle)
+- [x] **M4.6** Teamkalender (Spiele, Feldtraining, Saisonstart) durch den Admin in der App pflegen (Team → Verwaltung → Teamkalender: Spiele, Feldtraining-Tage, Start und Dauer) ✅ 21.11.2026
+- [x] **M4.7** Push-Erinnerungen pro Athlet (Anmeldung je Gerät, Versand für alle) (Erinnerungen für alle aktiven Athleten mit eigenen Geräten und Uhrzeiten) ✅ 21.11.2026
 - [ ] **M4.8** 👤 Freigabe durch den Vorstand einholen
 - [ ] **M4.9** 👤 Pilot ab ca. 04.01.: Pilot-Athleten einladen, eine Woche trainieren lassen, Rückmeldungen sammeln
 - [ ] **M4.10** Rückmeldungen aus dem Pilot umsetzen
@@ -98,19 +98,19 @@ Hinweis: Bestehende Profile planen weiter mit den bisherigen Vorlagen, bis der A
 
 ## M5 · Coach-Übersicht (11.–24.01.2027)
 
-- [ ] **M5.1** Eigene Ansicht für die Rolle Coach
-- [ ] **M5.2** Athletenliste: Name, Positionsgruppe, Phase und Woche, Einheiten erledigt / geplant, letzte Einheit, Readiness-Trend, Gewicht und Veränderung 4 Wochen
-- [ ] **M5.3** Hinweise: 7 Tage kein Training, Entlastung aktiv, Beschwerden gemeldet
-- [ ] **M5.4** Detailansicht je Athlet mit den Verlaufsansichten, nur lesen
+- [x] **M5.1** Eigene Ansicht für die Rolle Coach (Ansicht „Team“, Abschnitt „Athleten“ für Coach und Admin) ✅ 21.11.2026
+- [x] **M5.2** Athletenliste: Name, Positionsgruppe, Phase und Woche, Einheiten erledigt / geplant, letzte Einheit, Readiness-Trend, Gewicht und Veränderung 4 Wochen ✅ 21.11.2026
+- [x] **M5.3** Hinweise: 7 Tage kein Training, Entlastung aktiv, Beschwerden gemeldet (plus Gewichtsänderung ≥ 3 kg in 4 Wochen) ✅ 21.11.2026
+- [x] **M5.4** Detailansicht je Athlet mit den Verlaufsansichten, nur lesen (letzte Einheiten, Gewicht, Tests, Ziele; nur lesen, nie im eigenen Datenbestand) ✅ 21.11.2026
 - [ ] **M5.5** Prüfung: Der Coach findet in unter einer Minute, wer seit 7 Tagen nicht trainiert hat und wessen Gewicht sich stark verändert
 
 ## M6 · Ranglisten (25.01.–07.02.2027)
 
-- [ ] **M6.1** Opt-in für Ranglisten im Profil
-- [ ] **M6.2** Ranglisten-Ansicht in der Datenbank: nur Name, Gruppe, Disziplin, Wert bzw. Score, nie Körpergewicht
-- [ ] **M6.3** e1RM für Ranglisten nur aus Sätzen mit höchstens 5 Wdh und RPE ≥ 7 der letzten 8 Wochen
-- [ ] **M6.4** DOTS-Score (Männer/Frauen) berechnen und gegen einen Referenzrechner prüfen
-- [ ] **M6.5** Anzeige: Rangliste je Positionsgruppe und Pound for Pound
+- [x] **M6.1** Opt-in für Ranglisten im Profil (Team → Rangliste → Mitmachen, mit Hinweis was sichtbar wird) ✅ 21.11.2026
+- [x] **M6.2** Ranglisten-Ansicht in der Datenbank: nur Name, Gruppe, Disziplin, Wert bzw. Score, nie Körpergewicht (Tabelle rankings: Name, Gruppe, Disziplin, Wert, Score) ✅ 21.11.2026
+- [x] **M6.3** e1RM für Ranglisten nur aus Sätzen mit höchstens 5 Wdh und RPE ≥ 7 der letzten 8 Wochen ✅ 21.11.2026
+- [x] **M6.4** DOTS-Score (Männer/Frauen) berechnen und gegen einen Referenzrechner prüfen (Referenz 100 kg / 600 kg Total → 369,3 im Klicktest) ✅ 21.11.2026
+- [x] **M6.5** Anzeige: Rangliste je Positionsgruppe und Pound for Pound ✅ 21.11.2026
 - [ ] **M6.6** Prüfung: Athleten ohne Opt-in erscheinen nirgends; erste Ranglisten nach der Testwoche Anfang Februar
 
 ## Später

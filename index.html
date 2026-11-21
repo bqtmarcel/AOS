@@ -850,6 +850,7 @@ const NAV_ICON = (()=>{ const ic=d=>'<svg viewBox="0 0 24 24" fill="none" stroke
     ernaehrung:ic('<path d="M5 3.5v5.5h4.5V3.5M7.25 3.5v17"/><path d="M18 20.5v-17l-3.5 4.5v6.5H18"/>'),
     tests:ic('<path d="M3.75 3.5v16.75H20.5"/><path d="M7.5 15.5l4-4.5 3 2.75 5-6"/><rect class="f" x="18.5" y="6.5" width="2.25" height="2.25"/>'),
     plan:ic('<rect x="3.75" y="5.25" width="16.5" height="15"/><path d="M3.75 9.75h16.5M8 3.25v3.5M16 3.25v3.5"/><rect class="f" x="7" y="13" width="2" height="2"/><rect class="f" x="11" y="13" width="2" height="2"/><rect class="f" x="15" y="13" width="2" height="2"/><rect class="f" x="7" y="16.5" width="2" height="2"/>'),
+    team:ic('<rect x="3.25" y="5.25" width="5.5" height="5.5" rx="2.75"/><rect x="15.25" y="5.25" width="5.5" height="5.5" rx="2.75"/><path d="M2 19.5v-1a3.75 3.75 0 0 1 3.75-3.75h1a3.75 3.75 0 0 1 3.75 3.75v1M13.5 19.5v-1a3.75 3.75 0 0 1 3.75-3.75h1A3.75 3.75 0 0 1 22 18.5v1"/>'),
     profil:ic('<rect x="8.25" y="3.75" width="7.5" height="7.5" rx="3.75"/><path d="M4.75 20.25v-1.5a4.5 4.5 0 0 1 4.5-4.5h5.5a4.5 4.5 0 0 1 4.5 4.5v1.5"/>') }; })();
 const VIEWS = [['uebersicht','Übersicht'],['training','Training'],['ernaehrung','Ernährung'],['tests','Verlauf'],['plan','Plan'],['profil','Profil']];
 
@@ -884,7 +885,8 @@ ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f
 
 /* ---------- Gerüst ---------- */
 function renderShell(){
-  document.getElementById('nav').innerHTML = VIEWS.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+' aria-label="'+t+'" title="'+t+'">'+(NAV_ICON[k]||'')+'<span class="sr-only">'+t+'</span></button>').join('');
+  const NV=teamViews(); const nav=document.getElementById('nav'); nav.style.gridTemplateColumns='repeat('+NV.length+',1fr)';
+  nav.innerHTML = NV.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+' aria-label="'+t+'" title="'+t+'">'+(NAV_ICON[k]||'')+'<span class="sr-only">'+t+'</span></button>').join('');
   document.getElementById('topinfo').innerHTML = '<div class="sysbar"><button id="hsync" class="sync-btn" data-act="syncInfo" aria-label="Speicherstatus anzeigen">'+syncDot()+'</button></div>';
 }
 /* Tabellen mit 3+ Spalten werden am Handy als Liste untereinander dargestellt (kein Seitwärts-Scrollen) */
@@ -898,7 +900,7 @@ function render(){
   if(window.__aosUpdate && typeof aosApplyUpdate==='function'){ aosApplyUpdate(); }
   renderShell();
   const m=document.getElementById('main');
-  const fn = {uebersicht:viewOverview, plan:viewPlan, training:viewTraining, tests:viewTests, profil:viewProfile, ernaehrung:viewNutrition}[ui.view] || viewOverview;
+  const fn = {uebersicht:viewOverview, plan:viewPlan, training:viewTraining, tests:viewTests, profil:viewProfile, ernaehrung:viewNutrition, team:viewTeam}[ui.view] || viewOverview;
   m.innerHTML = (isLive() && !logVisible() ? liveBar() : '') + (storageOK?'':'<div class="note bad"><strong>Lokaler Speicher nicht verfügbar.</strong> Der Browser erlaubt für diese Datei keine dauerhafte Speicherung (z. B. privater Modus oder blockierte Website-Daten). Eingaben gehen beim Schließen verloren – exportiere eine JSON-Sicherung oder öffne die Datei in einem normalen Browserfenster.</div>') + fn();
   stackTables(m);
   if(!isLive() && REST.iv) restStop();
@@ -909,7 +911,7 @@ ACT.go = el=>{ ui.view=el.dataset.view;
   if(ui.view==='training') ui.logHidden=false;
   else if(!isLive()){ ui.sessionId=null; ui.draft=null; }   // eine laufende Einheit bleibt offen
   location.hash=ui.view; render(); window.scrollTo(0,0); };
-window.addEventListener('hashchange', ()=>{ const h=location.hash.slice(1); if(h && h!==ui.view && (VIEWS.some(v=>v[0]===h))){ ui.view=h; render(); } });
+window.addEventListener('hashchange', ()=>{ const h=location.hash.slice(1); if(h && h!==ui.view && (teamViews().some(v=>v[0]===h))){ ui.view=h; render(); } });
 
 /* ---------- Übersicht ---------- */
 ACT.exportJSON = ()=>{ exportJSON(); toast('Sicherung wird heruntergeladen.'); render(); };
@@ -3798,10 +3800,15 @@ function applyMerged(d){
    Home-Bildschirm-App am iPhone (ein Link aus der Mail würde in Safari statt in der App landen). */
 const SB_URL='https://sraocwhvkisomjjoqznr.supabase.co', SB_KEY='sb_publishable_Cvqcna518s5NdlUahoIHcw_TRPfBMXZ', SB_STORE='aos-sb-v1';
 const sb={ sess:null, email:'', state:'aus', syncing:false, again:false, timer:null, lastOk:null, lastError:'', codeSent:false, team:null, dirty:false, renderPending:false };
-function sbLoad(){ try{ const c=JSON.parse(localStorage.getItem(SB_STORE)||'null'); if(c){ sb.sess=c.sess||null; sb.email=c.email||''; sb.lastOk=c.lastOk||null; sb.team=c.team||null; sb.dirty=!!c.dirty; } }catch(e){}
+function sbLoad(){ try{ const c=JSON.parse(localStorage.getItem(SB_STORE)||'null'); if(c){ sb.sess=c.sess||null; sb.email=c.email||''; sb.lastOk=c.lastOk||null; sb.team=c.team||null; sb.dirty=!!c.dirty; TEAM.roles=c.roles||[]; TEAM.name=c.name||''; } }catch(e){}
   sb.state=sbReady()?(sb.dirty?'ausstehend':'ok'):'aus';
   try{ localStorage.removeItem(GH_OLD_KEY); }catch(e){} }
-function sbStore(){ try{ localStorage.setItem(SB_STORE, JSON.stringify({ sess:sb.sess, email:sb.email, lastOk:sb.lastOk, team:sb.team, dirty:sb.dirty })); }catch(e){} }
+function sbStore(){ try{ localStorage.setItem(SB_STORE, JSON.stringify({ sess:sb.sess, email:sb.email, lastOk:sb.lastOk, team:sb.team, dirty:sb.dirty, roles:TEAM.roles, name:TEAM.name })); }catch(e){} }
+/* Gerät wechselt den Besitzer (anderer Athlet meldet sich an): lokale Daten des vorherigen Kontos nie in das neue übernehmen */
+const OWNER_KEY='aos-owner-v1';
+function sbOwnerCheck(){ const uid=sbUid(); if(!uid) return; let prev=null; try{ prev=localStorage.getItem(OWNER_KEY); }catch(e){}
+  if(prev && prev!==uid){ S=freshData(); syncInit(); save(true); TEAM.users=null; TEAM.athletes=null; TEAM.rank=null; ui.sessionId=null; ui.draft=null; try{ localStorage.removeItem(LIVE_KEY); }catch(e){} }
+  try{ localStorage.setItem(OWNER_KEY, uid); }catch(e){} }
 function sbReady(){ return !!(sb.sess && sb.sess.refresh_token && sb.sess.user && sb.sess.user.id); }
 function sbUid(){ return sb.sess && sb.sess.user && sb.sess.user.id; }
 function sbErr(status, msg){ const e=new Error(msg); e.status=status; return e; }
@@ -3837,7 +3844,7 @@ ACT.sbVerify = async ()=>{ const token=val('sb-otp').replace(/\s/g,''); if(token
     if(/^\d{6,10}$/.test(token)) sbSetSession(await sbRaw('POST','/auth/v1/verify', { type:'email', email:sb.email, token }));   // Code aus der E-Mail
     else { sbSetSession(await sbRaw('POST','/auth/v1/token?grant_type=refresh_token', { refresh_token:token }));                // Übergabecode aus dem Browser
       if(!sbUid()){ const u=await sbRaw('GET','/auth/v1/user',null,null,sb.sess.access_token); sb.sess.user={ id:u.id, email:u.email }; sb.email=u.email; sbStore(); } }
-    sb.codeSent=false; render(); toast('Angemeldet'); await sbSync('login'); sbRefLoad(true);
+    sb.codeSent=false; sbOwnerCheck(); render(); toast('Angemeldet'); await teamMe(); await sbSync('login'); sbRefLoad(true);
   }catch(e){ toast(e.status===403||e.status===400?'Code falsch, abgelaufen oder schon verwendet.':e.message); } };
 ACT.sbLogout = ()=>confirmDlg('Abmelden?','Die Daten bleiben auf diesem Gerät und in Supabase. Der Abgleich mit Supabase pausiert, bis du dich wieder anmeldest.','Abmelden',async ()=>{
   try{ if(sbReady()) await sbRaw('POST','/auth/v1/logout',{}, null, sb.sess.access_token); }catch(e){}
@@ -3862,7 +3869,7 @@ ACT.sbCopy = async ()=>{ try{ await navigator.clipboard.writeText(sb.handoff.ref
 ACT.sbDone = ()=>{ sb.handoff=null; closeDlg(); toast('Jetzt den Code in der App eingeben.'); };
 ACT.sbHere = async ()=>{ const H=sb.handoff; sb.handoff=null; closeDlg(); if(!H) return;
   try{ sbSetSession(H); const u=await sbRaw('GET','/auth/v1/user',null,null,sb.sess.access_token); sb.sess.user={ id:u.id, email:u.email }; sb.email=u.email; sbStore();
-    render(); toast('Angemeldet'); await sbSync('login'); sbRefLoad(true); }catch(e){ toast(e.message); } };
+    sbOwnerCheck(); render(); toast('Angemeldet'); await teamMe(); await sbSync('login'); sbRefLoad(true); }catch(e){ toast(e.message); } };
 
 /* Abgleich: alle Datensätze laden, mit dem lokalen Stand zusammenführen, Neueres hochladen */
 function sbIso(t){ const d=new Date(t); return isNaN(d)?'':d.toISOString(); }
@@ -3888,6 +3895,7 @@ async function sbSync(reason){
     Object.entries(S.sync.tombstones||{}).forEach(([k,t])=>{ const r=remote.get(k); if(r && !r.del && r.t<t) up.push({ athlete_id:uid, key:k, data:null, updated_at:t, deleted:true }); });
     for(let i=0;i<up.length;i+=200) await sbApi('POST','/rest/v1/records?on_conflict=athlete_id,key', up.slice(i,i+200), { Prefer:'resolution=merge-duplicates,return=minimal' });
     sb.lastOk=new Date().toISOString(); sb.lastError=''; sb.dirty=false; sb.state='ok'; sbStore();
+    if(S.profile.rankOptIn && (!sb.rkAt || Date.now()-sb.rkAt>10*60*1000)){ sb.rkAt=Date.now(); rkPublish(); }
     return true;
   }catch(e){ sb.lastError=e.message; sb.state=e.offline?'offline':'fehler'; if(reason==='manuell'||reason==='login') toast('Speichern: '+e.message); return false; }
   finally{ sb.syncing=false; sbPaint(); if(sb.again){ sb.again=false; sbSchedule(1000); } }
@@ -3922,7 +3930,8 @@ function sbStatusText(){ if(!sbReady()) return 'Nicht angemeldet.';
 function sbSection(){
   let b='<p id="sb-status" class="small" aria-live="polite">'+esc(sbStatusText())+'</p>';
   if(sbReady()) b+='<p class="small muted">Plan und Datenbanken geladen '+(REF.at?fmtSyncTime(REF.at):'—')+' · <button class="link" data-act="plReload">neu laden</button></p>'+
-    '<div class="row"><button data-act="sbSyncNow">Jetzt abgleichen</button><button class="small danger" data-act="sbLogout">Abmelden</button></div>';
+    '<div class="row"><button data-act="sbSyncNow">Jetzt abgleichen</button><button class="small danger" data-act="sbLogout">Abmelden</button></div>'+
+    '<p class="small muted">'+(sbRoles().length?'Rollen: '+sbRoles().map(r=>({athlete:'Spieler',coach:'Coach',admin:'Admin'})[r]||r).join(', ')+' · ':'')+'<button class="link" data-act="exportJSON">Meine Daten herunterladen</button> · <button class="link" data-act="acctDelete">Konto löschen</button></p>';
   else if(sb.codeSent) b+='<p class="small">Mail an '+esc(sb.email)+' öffnen und den Link antippen. Nutzt du AOS als App vom Home-Bildschirm, zeigt dir der Link einen Code – den hier eingeben:</p>'+inp('sb-otp','Code','','autocomplete="one-time-code" autocapitalize="off" spellcheck="false"')+
     '<div class="row"><button class="primary" data-act="sbVerify">Anmelden</button><button class="small" data-act="sbBack">Andere Adresse</button></div>';
   else b+=inp('sb-email','E-Mail-Adresse',sb.email,'type="email" autocomplete="email" inputmode="email"')+'<div class="row"><button class="primary" data-act="sbCode">Anmeldelink anfordern</button><button class="small" data-act="sbHaveCode">Ich habe schon einen Code</button></div>'+
@@ -3930,6 +3939,178 @@ function sbSection(){
   b+='<p class="small muted">Deine Daten liegen auf diesem Gerät und in deinem AOS-Konto (Supabase, Frankfurt). Ohne Netz speichert AOS auf dem Gerät und gleicht später ab.</p>';
   return pdet('sb','AOS-Konto', sbReady()?(sb.email||'angemeldet'):'nicht angemeldet', '<span id="sb-sec"></span>'+b);
 }
+
+
+/* ===== AOS – Team: Rollen, Admin, Coach-Übersicht, Ranglisten (Roadmap M4.1, M4.4, M4.6, M5, M6) =====
+   Rollen kommen aus profiles.roles (Datenbank erzwingt die Rechte). Coach und Admin lesen fremde Daten nur zur Anzeige,
+   nie in den eigenen Datenbestand. Ranglisten nur mit Zustimmung, nie mit Körpergewicht. */
+const TEAM={ roles:[], name:'', loaded:false, users:null, athletes:null, docs:{}, rank:null, loading:'', detail:null, err:'' };
+function sbRoles(){ return TEAM.roles||[]; }
+function isAdminUser(){ return sbReady() && sbRoles().includes('admin'); }
+function isStaffUser(){ return sbReady() && (sbRoles().includes('coach')||sbRoles().includes('admin')); }
+async function teamMe(){ if(!sbReady()) return; try{ const r=await sbApi('GET','/rest/v1/profiles?select=roles,name,active&id=eq.'+sbUid()); if(r[0]){ TEAM.roles=r[0].roles||[]; TEAM.name=r[0].name||''; TEAM.active=r[0].active; TEAM.loaded=true; sbStore(); } }catch(e){} }
+
+/* ---------- Ranglisten (M6) ---------- */
+/* DOTS (IPF/OpenPowerlifting): Score = Last × 500 / Polynom(Körpergewicht), Körpergewicht begrenzt (Männer 40–210 kg, Frauen 40–150 kg) */
+const DOTS_C={ m:[-0.000001093,0.0007391293,-0.1918759221,24.0900756,-307.75076], w:[-0.0000010706,0.0005158568,-0.1126655495,13.6175032,-57.96288] };
+function dots(kg, bw, sex){ const c=DOTS_C[sex==='w'?'w':'m']; if(!(kg>0)||!(bw>0)) return null; const x=Math.min(sex==='w'?150:210, Math.max(40,bw));
+  const d=c[0]*x**4+c[1]*x**3+c[2]*x**2+c[3]*x+c[4]; return Math.round(kg*500/d*100)/100; }
+const RK_DISC=[ ['squat','Kniebeuge',['high_bar_squat'],/kniebeuge|squat/i], ['bench','Bankdrücken',['bench_press'],/bankdr|bench/i],
+  ['hinge','Kreuzheben',['trap_bar_deadlift','conventional_deadlift'],/kreuzheben|deadlift/i], ['broad','Broad Jump',['broad_jump'],/broad|weitsprung/i] ];
+/* e1RM nur aus Sätzen mit höchstens 5 Wdh und RPE ≥ 7 der letzten 8 Wochen (Protokolle und Tests) */
+function rkBest(){ const from=addDays(todayISO(),-56); const out={};
+  RK_DISC.forEach(([k,,ids,rx])=>{ let best=null; const take=(v,d)=>{ if(v>0 && (!best||v>best.value)) best={ value:Math.round(v*10)/10, date:d }; };
+    if(k==='broad'){ (S.tests||[]).filter(t=>t.unit==='cm' && t.value!=null && t.date>=from && rx.test(t.name)).forEach(t=>take(t.value,t.date)); }
+    else { ids.forEach(id=>plHistory(id).filter(h=>h.date>=from).forEach(h=>workSets(h.le).forEach(x=>{ if(x.kg>0 && x.reps>=1 && x.reps<=5 && x.rpe>=7) take(x.kg/pctRM(x.reps,x.rpe), h.date); })));
+      (S.tests||[]).filter(t=>t.unit==='kg' && t.value!=null && t.date>=from && t.reps>=1 && t.reps<=5 && rx.test(t.name) && !/front|ssb|box|pause|sumo|rumän|romanian/i.test(t.name))
+        .forEach(t=>take(t.value/pctRM(t.reps, t.rpe!=null?t.rpe:9), t.date)); }
+    if(best) out[k]=best; });
+  if(out.squat&&out.bench&&out.hinge) out.total={ value:Math.round((out.squat.value+out.bench.value+out.hinge.value)*10)/10 };
+  return out; }
+function rkRows(){ const p=S.profile; if(!p.rankOptIn) return []; const bw=bwNow(); const best=rkBest(); const grp=(groupMix()[0]||{}).group||'';
+  return Object.entries(best).map(([k,b])=>({ athlete_id:sbUid(), discipline:k, name:p.name||TEAM.name||'', grp, value:b.value, score:k==='broad'||!bw?null:dots(b.value,bw,p.sex) })); }
+/* Eigene Werte hochladen (nach dem Abgleich); ohne Zustimmung alle eigenen Einträge löschen */
+async function rkPublish(){ if(!sbReady()) return; try{
+  const rows=rkRows(); const keep=rows.map(r=>r.discipline);
+  if(rows.length) await sbApi('POST','/rest/v1/rankings?on_conflict=athlete_id,discipline', rows, { Prefer:'resolution=merge-duplicates,return=minimal' });
+  await sbApi('DELETE','/rest/v1/rankings?athlete_id=eq.'+sbUid()+(keep.length?'&discipline=not.in.('+keep.join(',')+')':''), null, { Prefer:'return=minimal' });
+}catch(e){} }
+async function rkLoad(){ TEAM.rank=await sbApi('GET','/rest/v1/rankings?select=athlete_id,discipline,name,grp,value,score,updated_at'); return TEAM.rank; }
+function rankingSection(){
+  const p=S.profile; const on=!!p.rankOptIn; const R=TEAM.rank;
+  let b='<p class="small">Ranglisten je Positionsgruppe und Pound for Pound (DOTS). Gezählt wird dein bestes geschätztes 1RM aus Sätzen mit höchstens 5 Wdh und RPE ≥ 7 der letzten 8 Wochen, beim Broad Jump der beste Test. Dein Körpergewicht sieht niemand.</p>'+
+    '<div class="row"><button class="'+(on?'':'primary')+'" data-act="rkOpt">'+(on?'Aus der Rangliste austreten':'Mitmachen')+'</button>'+(on?'':'')+'</div>';
+  if(on && !p.sex) b+='<p class="small">Für den DOTS-Score: <button class="link" data-act="rkSex" data-v="m">männlich</button> · <button class="link" data-act="rkSex" data-v="w">weiblich</button></p>';
+  if(!R) b+='<p class="small muted">'+(TEAM.loading==='rank'?'Lädt …':'<button class="link" data-act="rkReload">Rangliste laden</button>')+'</p>';
+  else if(!R.length) b+='<p class="small muted">Noch niemand eingetragen.</p>';
+  else { const disc=ui.rkDisc||'total'; const grpSel=ui.rkGrp||'alle';
+    b+='<div>'+[['total','Total'],['squat','Kniebeuge'],['bench','Bank'],['hinge','Kreuzheben'],['broad','Broad Jump']].map(([k,n])=>'<button class="chip" data-act="rkDisc" data-v="'+k+'" aria-pressed="'+(disc===k)+'">'+n+'</button>').join('')+'</div>';
+    const groups=[...new Set(R.map(r=>r.grp).filter(Boolean))].sort();
+    b+='<div>'+[['alle','Pound for Pound']].concat(groups.map(g=>[g,GROUP_NAME[g]||g])).map(([k,n])=>'<button class="chip" data-act="rkGrp" data-v="'+k+'" aria-pressed="'+(grpSel===k)+'">'+esc(n)+'</button>').join('')+'</div>';
+    const pfp=grpSel==='alle' && disc!=='broad'; const L=R.filter(r=>r.discipline===disc && (grpSel==='alle'||r.grp===grpSel) && (!pfp||r.score!=null)).sort((a,c)=>pfp?(c.score-a.score):(c.value-a.value));
+    b+=L.length?'<table class="nostack"><thead><tr><th>#</th><th>Name</th><th style="text-align:right">'+(pfp?'DOTS':disc==='broad'?'cm':'kg')+'</th></tr></thead><tbody>'+L.map((r,i)=>'<tr'+(r.athlete_id===sbUid()?' style="font-weight:600"':'')+'><td>'+(i+1)+'</td><td>'+esc(r.name||'—')+' <span class="muted small">'+esc(r.grp)+'</span></td><td style="text-align:right">'+fmtNum(pfp?r.score:r.value)+'</td></tr>').join('')+'</tbody></table>':'<p class="small muted">Keine Einträge.</p>';
+    b+='<p class="small muted">'+(pfp?'Pound for Pound vergleicht über den DOTS-Score (Last relativ zum Körpergewicht). ':'')+'<button class="link" data-act="rkReload">aktualisieren</button></p>'; }
+  return '<section class="card"><h2>Rangliste</h2>'+b+'</section>'; }
+ACT.rkOpt = async ()=>{ const on=!S.profile.rankOptIn;
+  if(on){ confirmDlg('Rangliste','Dein Name, deine Positionsgruppe und deine besten Werte (geschätztes 1RM, Broad Jump, DOTS-Score) sind dann für alle Teammitglieder sichtbar. Dein Körpergewicht nicht. Du kannst jederzeit austreten.','Mitmachen', async ()=>{ S.profile.rankOptIn=true; save(); render(); await rkPublish(); await rkLoad(); render(); }); return; }
+  S.profile.rankOptIn=false; save(); await rkPublish(); await rkLoad().catch(()=>{}); render(); toast('Aus der Rangliste ausgetreten'); };
+ACT.rkSex = async el=>{ S.profile.sex=el.dataset.v; save(); await rkPublish(); await rkLoad().catch(()=>{}); render(); };
+ACT.rkDisc = el=>{ ui.rkDisc=el.dataset.v; render(); };
+ACT.rkGrp = el=>{ ui.rkGrp=el.dataset.v; render(); };
+ACT.rkReload = async ()=>{ TEAM.loading='rank'; render(); try{ await rkPublish(); await rkLoad(); }catch(e){ toast(e.message); } TEAM.loading=''; render(); };
+
+/* ---------- Coach-Übersicht (M5): nur lesen ---------- */
+function teamDocSummary(D, prof){
+  const t=todayISO(); const mon=mondayOf(t);
+  const logged=(D.sessions||[]).filter(s=>(s.status==='absolviert'||s.status==='teilweise') && s.log).sort((a,b)=>sessionDate(a)<sessionDate(b)?-1:1);
+  const last=logged.length?sessionDate(logged[logged.length-1]):null; const week=logged.filter(s=>sessionDate(s)>=mon).length;
+  const plannedN=Math.min(4,((D.profile||{}).trainingDays||LEGACY_TRAINING_DAYS).length);
+  const rd=logged.map(s=>{ const c=(s.planner&&s.planner.checkin)||{}; return s.log.form!=null?s.log.form:c.readiness; }).filter(v=>v!=null);
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null; const r1=avg(rd.slice(-3)), r0=avg(rd.slice(-6,-3));
+  const trend=r1==null?'—':fmtNum(Math.round(r1*10)/10)+(r0==null?'':r1>r0+0.3?' ↑':r1<r0-0.3?' ↓':' →');
+  const BW=(D.bodyweight||[]).filter(b=>b.kg!=null&&b.date).sort((a,b)=>a.date<b.date?-1:1); const bw=BW.length?BW[BW.length-1]:null;
+  const bw4=bw?BW.filter(b=>b.date<=addDays(bw.date,-28)).slice(-1)[0]:null; const dBw=bw&&bw4?Math.round((bw.kg-bw4.kg)*10)/10:null;
+  const pos=((D.profile||{}).positions||[]).filter(p=>POS_GROUP[p.code]).sort((a,b)=>(b.weight||0)-(a.weight||0));
+  const grp=pos.length?pos.map(p=>p.code+(pos.length>1?' '+p.weight+' %':'')).join(' / '):'—';
+  const pain=logged.filter(s=>sessionDate(s)>=addDays(t,-7)).some(s=>((s.planner&&s.planner.checkin)||{}).pain>=3);
+  const ph=(REF.plan&&plPhase(t))||null; const blk=REF.plan?plBlockAt(t):null; const wk=blk?plWeek(blk,t):null; const wave=blk&&wk?(blk.week_wave||{})[wk]||'':'';
+  const hints=[]; if(!last || daysBetween(last,t)>=7) hints.push(['warn', last?'seit '+daysBetween(last,t)+' Tagen kein Training':'noch kein Training']);
+  if(/Entlastung/.test(wave)) hints.push(['info','Entlastung']); if(pain) hints.push(['bad','Beschwerden gemeldet']);
+  if(dBw!=null && Math.abs(dBw)>=3) hints.push(['warn','Gewicht '+(dBw>0?'+':'')+fmtNum(dBw)+' kg in 4 Wochen']);
+  return { id:prof.id, name:prof.name||(D.profile||{}).name||'—', grp, phase:ph?ph.id+(wk?' · W'+wk:''):'—', week, plannedN, last, trend, bw, dBw, hints, logged, D }; }
+async function teamLoadAthletes(){ TEAM.loading='team'; render();
+  try{ const P=await sbApi('GET','/rest/v1/profiles?select=id,name,roles,active&order=name'); const rows=[];
+    for(let start=0;;start+=1000){ const r=await sbApi('GET','/rest/v1/records?select=athlete_id,key,data,updated_at,deleted&or=(key.like.%22sessions:*%22,key.like.%22bodyweight:*%22,key.eq.%22profile:_%22,key.like.%22tests:*%22,key.like.%22goals:*%22)&order=athlete_id,key', null, { 'Range-Unit':'items', Range:start+'-'+(start+999) }); rows.push(...r); if(r.length<1000) break; }
+    const by={}; rows.forEach(r=>{ (by[r.athlete_id]=by[r.athlete_id]||[]).push(r); });
+    TEAM.athletes=P.filter(p=>p.active && (p.roles||[]).includes('athlete')).map(p=>{ let D; try{ D=migrate(sbDocOf(by[p.id]||[])); }catch(e){ D=seedData(); } return teamDocSummary(D, p); });
+    TEAM.err=''; }
+  catch(e){ TEAM.err=e.message; }
+  TEAM.loading=''; render(); }
+function coachSection(){
+  let b='';
+  if(!TEAM.athletes) b='<p class="small muted">'+(TEAM.loading==='team'?'Lädt …':'<button class="primary" data-act="teamLoad">Athleten laden</button>')+'</p>';
+  else { const sort=ui.teamSort||'hinweise'; const L=TEAM.athletes.slice().sort((a,c)=>sort==='name'?a.name.localeCompare(c.name):(c.hints.length-a.hints.length)||((a.last||'')<(c.last||'')?-1:1));
+    b+='<div>'+[['hinweise','Hinweise zuerst'],['name','Name']].map(([k,n])=>'<button class="chip" data-act="teamSort" data-v="'+k+'" aria-pressed="'+(sort===k)+'">'+n+'</button>').join('')+' <button class="link" data-act="teamLoad">aktualisieren</button></div>';
+    b+='<table><thead><tr><th>Name</th><th>Position</th><th>Phase</th><th>Woche</th><th>Letzte Einheit</th><th>Readiness</th><th>Gewicht (4 Wo.)</th><th>Hinweise</th></tr></thead><tbody>'+
+      L.map(a=>'<tr><td><button class="link" data-act="teamDetail" data-id="'+a.id+'">'+esc(a.name)+'</button></td><td>'+esc(a.grp)+'</td><td>'+esc(a.phase)+'</td><td>'+a.week+' / '+a.plannedN+'</td><td>'+(a.last?fmtDateShort(a.last):'—')+'</td><td>'+esc(a.trend)+'</td><td>'+(a.bw?fmtNum(a.bw.kg)+' kg'+(a.dBw!=null?' ('+(a.dBw>0?'+':'')+fmtNum(a.dBw)+')':''):'—')+'</td><td>'+(a.hints.map(([c,t])=>badge(t,c)).join(' ')||'—')+'</td></tr>').join('')+'</tbody></table>';
+    if(!L.length) b+='<p class="small muted">Noch keine aktiven Athleten.</p>'; }
+  if(TEAM.err) b+='<p class="small bad">'+esc(TEAM.err)+'</p>';
+  return '<section class="card"><h2>Athleten</h2><p class="small muted">Nur lesen. Gewicht und Beschwerden sind vertraulich und nur für Coach und Admin sichtbar.</p>'+b+'</section>'; }
+function coachDetail(){ const a=(TEAM.athletes||[]).find(x=>x.id===TEAM.detail); if(!a) return '';
+  const D=a.D; let h='<p><button class="link" data-act="teamBack">← zurück zur Liste</button></p><h1>'+esc(a.name)+'</h1><p class="small muted">'+esc(a.grp)+' · '+esc(a.phase)+' · diese Woche '+a.week+' / '+a.plannedN+' Einheiten</p>';
+  h+='<section class="card"><h2>Letzte Einheiten</h2>'+(a.logged.length?'<table><thead><tr><th>Datum</th><th>Einheit</th><th>Dauer</th><th>Übungen</th></tr></thead><tbody>'+a.logged.slice(-10).reverse().map(s=>'<tr><td>'+fmtDateShort(sessionDate(s))+'</td><td>'+esc(s.title||((s.planner||{}).templateId)||'Einheit')+'</td><td>'+(s.log.durationMin?s.log.durationMin+' min':'—')+'</td><td class="small">'+(s.log.exercises||[]).slice(0,6).map(e=>esc(e.name||'')+': '+esc(setsTxt(e))).join('<br>')+'</td></tr>').join('')+'</tbody></table>':'<p class="small muted">Noch keine.</p>')+'</section>';
+  const BW=(D.bodyweight||[]).filter(b=>b.kg!=null).sort((x,y)=>x.date<y.date?1:-1).slice(0,8);
+  h+='<section class="card"><h2>Körpergewicht</h2>'+(BW.length?'<p>'+BW.map(b=>fmtDateShort(b.date)+': '+fmtNum(b.kg)+' kg').join(' · ')+'</p>':'<p class="small muted">Keine Messungen.</p>')+'</section>';
+  const T={}; (D.tests||[]).filter(t=>t.date).sort((x,y)=>x.date<y.date?1:-1).forEach(t=>{ if(!T[t.name]) T[t.name]=t; });
+  h+='<section class="card"><h2>Tests (jeweils der letzte)</h2>'+(Object.keys(T).length?'<table><thead><tr><th>Test</th><th>Wert</th><th>Datum</th></tr></thead><tbody>'+Object.values(T).map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(testValueText(t))+'</td><td>'+fmtDateShort(t.date)+'</td></tr>').join('')+'</tbody></table>':'<p class="small muted">Keine Tests.</p>')+'</section>';
+  const G=(D.goals||[]).filter(g=>g.status==='aktiv'); if(G.length) h+='<section class="card"><h2>Ziele</h2><p>'+G.map(g=>esc(g.name)+' '+fmtNum(g.target)+' '+esc(g.unit||'')).join(' · ')+'</p></section>';
+  return h; }
+ACT.teamLoad = ()=>teamLoadAthletes();
+ACT.teamSort = el=>{ ui.teamSort=el.dataset.v; render(); };
+ACT.teamDetail = el=>{ TEAM.detail=el.dataset.id; render(); window.scrollTo(0,0); };
+ACT.teamBack = ()=>{ TEAM.detail=null; render(); };
+
+/* ---------- Admin (M4.1, M4.6) ---------- */
+async function adminLoad(){ TEAM.loading='admin'; render(); try{ TEAM.users=await sbApi('POST','/rest/v1/rpc/admin_users',{}); TEAM.err=''; }catch(e){ TEAM.err=e.message; } TEAM.loading=''; render(); }
+async function adminFn(body){ return sbApi('POST','/functions/v1/admin', body); }
+function adminSection(){
+  let b='<h3>Spieler einladen</h3><div class="fields">'+inp('ad-name','Name','', 'autocomplete="off"')+inp('ad-mail','E-Mail-Adresse','','type="email" inputmode="email" autocomplete="off"')+'</div>'+
+    '<div class="row"><button class="primary" data-act="adInvite">Einladen</button></div>'+
+    '<p class="small muted">Der Spieler bekommt eine Mail mit Anmeldelink. Solange kein eigener E-Mail-Versand eingerichtet ist (Roadmap M4.12), stellt Supabase nur an Mitglieder der Supabase-Organisation zu, höchstens 2 Mails pro Stunde.</p>';
+  b+='<h3>Konten</h3>';
+  if(!TEAM.users) b+='<p class="small muted">'+(TEAM.loading==='admin'?'Lädt …':'<button data-act="adLoad">Konten laden</button>')+'</p>';
+  else b+='<table><thead><tr><th>Name</th><th>E-Mail</th><th>Rollen</th><th>Zuletzt angemeldet</th><th></th></tr></thead><tbody>'+TEAM.users.map(u=>{ const me=u.id===sbUid();
+      const role=r=>'<button class="chip" data-act="adRole" data-id="'+u.id+'" data-v="'+r+'" aria-pressed="'+(u.roles||[]).includes(r)+'"'+(me&&r==='admin'?' disabled':'')+'>'+({athlete:'Spieler',coach:'Coach',admin:'Admin'})[r]+'</button>';
+      return '<tr'+(u.active?'':' class="muted"')+'><td>'+esc(u.name||'—')+(u.active?'':' '+badge('gesperrt','bad'))+'</td><td class="small">'+esc(u.email||'')+'</td><td>'+['athlete','coach','admin'].map(role).join('')+'</td><td class="small">'+(u.last_sign_in_at?fmtSyncTime(u.last_sign_in_at):(u.invited_at?'eingeladen '+fmtSyncTime(u.invited_at):'nie'))+'</td><td>'+
+        (me?'':'<button class="small" data-act="adActive" data-id="'+u.id+'">'+(u.active?'Sperren':'Entsperren')+'</button> ')+(u.last_sign_in_at||me?'':'<button class="small" data-act="adResend" data-mail="'+esc(u.email)+'">Link erneut senden</button>')+'</td></tr>'; }).join('')+'</tbody></table><p class="small"><button class="link" data-act="adLoad">aktualisieren</button></p>';
+  b+='<h3>Teamkalender</h3>'+teamCalEditor();
+  if(TEAM.err) b+='<p class="small bad">'+esc(TEAM.err)+'</p>';
+  return '<section class="card"><h2>Verwaltung (Admin)</h2>'+b+'</section>'; }
+ACT.adLoad = ()=>adminLoad();
+ACT.adInvite = async ()=>{ const email=val('ad-mail').trim(), name=val('ad-name').trim(); if(!email){ toast('Bitte eine E-Mail-Adresse eingeben.'); return; }
+  try{ await adminFn({ action:'invite', email, name }); toast('Einladung an '+email+' verschickt'); await adminLoad(); }catch(e){ toast(e.message); } };
+ACT.adResend = async el=>{ try{ await adminFn({ action:'resend', email:el.dataset.mail }); toast('Anmeldelink verschickt'); }catch(e){ toast(e.message); } };
+ACT.adRole = async el=>{ const u=(TEAM.users||[]).find(x=>x.id===el.dataset.id); if(!u) return; const r=el.dataset.v; let roles=(u.roles||[]).includes(r)?u.roles.filter(x=>x!==r):(u.roles||[]).concat([r]);
+  if(!roles.length){ toast('Mindestens eine Rolle.'); return; }
+  try{ await sbApi('PATCH','/rest/v1/profiles?id=eq.'+u.id,{ roles },{ Prefer:'return=minimal' }); u.roles=roles; render(); }catch(e){ toast(e.message); } };
+ACT.adActive = el=>{ const u=(TEAM.users||[]).find(x=>x.id===el.dataset.id); if(!u) return;
+  confirmDlg(u.active?'Konto sperren':'Konto entsperren', u.active?esc(u.name||u.email)+' kann sich danach nicht mehr anmelden bzw. nichts mehr speichern. Die Daten bleiben erhalten.':esc(u.name||u.email)+' kann AOS wieder nutzen.', u.active?'Sperren':'Entsperren', async ()=>{
+    try{ await sbApi('PATCH','/rest/v1/profiles?id=eq.'+u.id,{ active:!u.active },{ Prefer:'return=minimal' }); u.active=!u.active; render(); }catch(e){ toast(e.message); } }, u.active); };
+/* Teamkalender: Spiele und Feldtraining gelten für alle Athleten */
+function teamCalEditor(){ const T=sb.team||{}; const G=(T.games||[]).slice().sort((a,b)=>a.date<b.date?-1:1); const F=T.field||{}; const fd=F.days||[];
+  const dn={MON:'Mo',TUE:'Di',WED:'Mi',THU:'Do',FRI:'Fr',SAT:'Sa',SUN:'So'};
+  let b='<p class="small"><strong>Spiele</strong></p>'+(G.length?'<ul class="small">'+G.map(g=>'<li>'+fmtDate(g.date)+' · '+esc(g.title||g.opponent||'Spiel')+' <button class="link" data-act="tcDel" data-id="'+esc(g.id)+'">entfernen</button></li>').join('')+'</ul>':'<p class="small muted">Keine Spiele eingetragen.</p>')+
+    '<div class="fields">'+inp('tc-date','Datum','','type="date"')+inp('tc-title','Gegner / Bezeichnung','')+'</div><div class="row"><button data-act="tcAdd">Spiel eintragen</button></div>'+
+    '<p class="small"><strong>Feldtraining (Team)</strong></p><div class="chips7">'+DAY_KEYS.map(d=>'<button class="chip" data-act="tcDay" data-v="'+d+'" aria-pressed="'+fd.includes(d)+'">'+dn[d]+'</button>').join('')+'</div>'+
+    '<div class="fields">'+inp('tc-fstart','Feldtraining ab',F.start||'','type="date" data-chg="tcField"')+inp('tc-fdur','Dauer (min)',F.duration_min||'','inputmode="numeric" data-chg="tcField"')+'</div>'+
+    '<p class="small muted">Gilt für alle: AOS plant Spielwochen, Saisonphase und Einheiten an Feldtagen danach.</p>';
+  return b; }
+async function tcSave(f){ try{ const t=await sbApi('GET','/rest/v1/team_season?select=data&id=eq.1'); const data=Object.assign({}, (t[0]&&t[0].data)||{}); f(data);
+    await sbApi('PATCH','/rest/v1/team_season?id=eq.1',{ data },{ Prefer:'return=minimal' }); sb.team=data; sbStore(); await sbRefLoad(true); render(); toast('Teamkalender gespeichert'); }
+  catch(e){ toast(e.message); } }
+ACT.tcAdd = ()=>{ const d=val('tc-date'), t=val('tc-title').trim(); if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ toast('Bitte ein Datum wählen.'); return; }
+  tcSave(D=>{ D.games=(D.games||[]).concat([{ id:uid('game'), date:d, kind:'game', title:t||'Spiel', createdAt:new Date().toISOString() }]); }); };
+ACT.tcDel = el=>tcSave(D=>{ D.games=(D.games||[]).filter(g=>g.id!==el.dataset.id); });
+ACT.tcDay = el=>tcSave(D=>{ const F=D.field=Object.assign({}, D.field||{}); const v=el.dataset.v; const l=F.days||[]; F.days=DAY_KEYS.filter(k=>l.includes(v)?(k!==v&&l.includes(k)):(l.includes(k)||k===v)); });
+CHG.tcField = ()=>tcSave(D=>{ const F=D.field=Object.assign({}, D.field||{}); const s=val('tc-fstart'), m=val('tc-fdur'); if(s) F.start=s; if(m) F.duration_min=+m; });
+
+/* ---------- Ansicht „Team“ ---------- */
+function viewTeam(){
+  if(!sbReady()) return '<h1>Team</h1><p>Bitte zuerst unter Profil → AOS-Konto anmelden.</p>';
+  if(!TEAM.rank && !TEAM.loading){ setTimeout(()=>{ if(!TEAM.rank) ACT.rkReload(); }, 0); }
+  if(TEAM.detail && isStaffUser()) return coachDetail();
+  let h='<h1>Team</h1>';
+  h+=rankingSection();
+  if(isStaffUser()) h+=coachSection();
+  if(isAdminUser()) h+=adminSection();
+  return h; }
+function teamViews(){ return sbReady() ? VIEWS.slice(0,5).concat([['team','Team']], VIEWS.slice(5)) : VIEWS; }
+
+/* ---------- Konto (M4.4): Daten exportieren, Konto löschen ---------- */
+ACT.acctDelete = ()=>confirmDlg('Konto löschen','Dein AOS-Konto und alle deine Daten in Supabase werden endgültig gelöscht (Einheiten, Tests, Gewicht, Profil, Ranglisten-Einträge). Lade vorher eine Sicherung herunter, wenn du sie behalten willst. Das kann nicht rückgängig gemacht werden.','Endgültig löschen', async ()=>{
+  try{ await sbApi('POST','/rest/v1/rpc/delete_me',{}); }catch(e){ toast(e.message); return; }
+  sb.sess=null; sb.state='aus'; sbStore(); try{ localStorage.removeItem(AOS_KEY); localStorage.removeItem(OWNER_KEY); }catch(e){}
+  S=freshData(); syncInit(); save(true); TEAM.roles=[]; render(); toast('Konto gelöscht'); }, true);
 
 /* ---------- Anzeige ---------- */
 function fmtSyncTime(iso){ if(!iso) return ''; const d=new Date(iso); const t=pad(d.getHours())+':'+pad(d.getMinutes()); return isoOf(d)===todayISO()?t:fmtDateShort(isoOf(d))+' '+t; }
@@ -3966,11 +4147,11 @@ function aosApplyUpdate(){
 }
 (function init(){
   sbLoad(); load(); ensureProfileDefaults(); refInit(); sbFromHash();
-  const h=location.hash.slice(1); if(VIEWS.some(v=>v[0]===h)) ui.view=h;
+  const h=location.hash.slice(1); if(teamViews().some(v=>v[0]===h)) ui.view=h;
   if(liveRestore()) ui.view='training';   // laufende Einheit nach Neustart der App fortsetzen
   render();
   setInterval(clockTick, 1000);
-  if(sbReady()){ sbSync('start'); refLoad(); }
+  if(sbReady()){ sbOwnerCheck(); sbSync('start'); refLoad(); teamMe().then(()=>renderShell()); }
   setTimeout(()=>{ fdbUpdate().catch(()=>{}); }, 4000);
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') && document.querySelector('link[rel=manifest]')){

@@ -146,6 +146,8 @@ async def supabase_test(browser):
     älterer Stand überschreibt keinen neueren (wie der Trigger in der Datenbank)."""
     uid = '00000000-0000-4000-a000-0000000000aa'
     db = {}   # key -> {data, updated_at, deleted}
+    other = '00000000-0000-4000-a000-0000000000bb'
+    team = {'patched': [], 'invites': [], 'rank': {}, 'season': {'games': []}}
     sent = {'otp': 0}
     async def sbr(route):
         req = route.request; url = req.url; path = url.split('.supabase.co')[1]
@@ -161,6 +163,9 @@ async def supabase_test(browser):
             return await route.fulfill(status=200, json={'access_token': 'tok2', 'refresh_token': 'ref2', 'expires_in': 3600, 'user': {'id': uid, 'email': 'athlet@test.invalid'}})
         if path.startswith('/auth/v1/user'):
             return await route.fulfill(status=200, json={'id': uid, 'email': 'athlet@test.invalid'})
+        if path.startswith('/rest/v1/records') and 'or=(' in path:   # Coach-Übersicht: Datensätze aller Athleten
+            return await route.fulfill(status=200, json=[{'athlete_id': other, 'key': 'profile:_', 'data': {'name': 'Spieler B', 'positions': [{'id': 'x', 'code': 'WR', 'name': 'WR', 'weight': 100}]}, 'updated_at': '2026-11-01T00:00:00Z', 'deleted': False},
+                                                          {'athlete_id': other, 'key': 'bodyweight:b1', 'data': {'id': 'b1', 'date': '2026-11-01', 'kg': 80}, 'updated_at': '2026-11-01T00:00:00Z', 'deleted': False}])
         if path.startswith('/rest/v1/records'):
             if req.method == 'GET':
                 rows = [dict(key=k, **v) for k, v in sorted(db.items())]
@@ -172,6 +177,27 @@ async def supabase_test(browser):
                     if cur and cur['updated_at'] > r['updated_at']: continue   # jüngste Änderung gewinnt
                     db[r['key']] = {'data': r['data'], 'updated_at': r['updated_at'], 'deleted': r['deleted']}
                 return await route.fulfill(status=201, body='')
+        # Team: Rollen (Admin), Admin-Übersicht, Einladung, Rangliste, Teamkalender, Coach-Übersicht
+        if path.startswith('/rest/v1/profiles') and 'select=roles' in path:
+            return await route.fulfill(status=200, json=[{'roles': ['athlete', 'admin'], 'name': 'Admin', 'active': True}])
+        if path.startswith('/rest/v1/profiles') and req.method == 'PATCH':
+            team['patched'].append(json.loads(req.post_data)); return await route.fulfill(status=204, body='')
+        if path.startswith('/rest/v1/profiles') and 'select=id,name' in path:
+            return await route.fulfill(status=200, json=[{'id': uid, 'name': 'Admin', 'roles': ['athlete', 'admin'], 'active': True}, {'id': other, 'name': 'Spieler B', 'roles': ['athlete'], 'active': True}])
+        if path.startswith('/rest/v1/rpc/admin_users'):
+            return await route.fulfill(status=200, json=[{'id': uid, 'email': 'athlet@test.invalid', 'name': 'Admin', 'roles': ['athlete', 'admin'], 'active': True, 'last_sign_in_at': '2026-11-21T10:00:00Z'},
+                                                          {'id': other, 'email': 'b@test.invalid', 'name': 'Spieler B', 'roles': ['athlete'], 'active': True, 'last_sign_in_at': None, 'invited_at': '2026-11-21T10:00:00Z'}])
+        if path.startswith('/functions/v1/admin'):
+            team['invites'].append(json.loads(req.post_data)); return await route.fulfill(status=200, json={'ok': True, 'id': 'neu'})
+        if path.startswith('/rest/v1/rankings'):
+            if req.method == 'POST':
+                for r in json.loads(req.post_data): team['rank'][(r['athlete_id'], r['discipline'])] = r
+                return await route.fulfill(status=201, body='')
+            if req.method == 'DELETE': return await route.fulfill(status=204, body='')
+            return await route.fulfill(status=200, json=list(team['rank'].values()) + [{'athlete_id': other, 'discipline': 'total', 'name': 'Spieler B', 'grp': 'WR', 'value': 400, 'score': 280}])
+        if path.startswith('/rest/v1/team_season'):
+            if req.method == 'PATCH': team['season'] = json.loads(req.post_data)['data']; return await route.fulfill(status=204, body='')
+            return await route.fulfill(status=200, json=[{'data': team['season'], 'updated_at': '2026-11-21T10:00:00Z'}])
         if path.startswith('/rest/v1/'):
             return await route.fulfill(status=200, json=[])
         return await route.fulfill(status=404, json={})
@@ -215,9 +241,33 @@ async def supabase_test(browser):
     if 'handoff-xyz' not in (await p2.evaluate("(document.getElementById('dlg')||{}).textContent||''")): errors.append('Supabase: Link aus der Mail zeigt keinen Übergabecode')
     if '#access_token' in p2.url: errors.append('Supabase: Anmeldedaten bleiben in der Adresse stehen')
     await p2.close()
+    # Team: Rollen, Rangliste, Coach-Übersicht, Admin, Teamkalender
+    await page.evaluate("async()=>{ await teamMe(); ui.view='team'; render(); }"); await page.wait_for_timeout(200)
+    if not await page.evaluate("isAdminUser() && document.querySelector('[data-view=\"team\"]')!=null"): errors.append('Team: Admin-Rolle bzw. Team-Ansicht fehlt')
+    # Rangliste: DOTS gegen Referenzwert (100 kg, Männer, 600 kg Total ≈ 369,3), eigener Eintrag nur mit Zustimmung
+    if abs(await page.evaluate("dots(600,100,'m')") - 369.3) > 0.2: errors.append('Rangliste: DOTS-Score weicht vom Referenzwert ab')
+    await page.evaluate("async()=>{ S.profile.rankOptIn=false; save(); await rkPublish(); }")
+    if team['rank']: errors.append('Rangliste: ohne Zustimmung wurde etwas eingetragen')
+    await page.evaluate("async()=>{ S.profile.rankOptIn=true; S.profile.sex='m'; S.bodyweight.push({id:'rb',date:todayISO(),kg:90}); S.tests.push({id:'rt',name:'Broad Jump',value:280,unit:'cm',date:todayISO()}); save(); await rkPublish(); await rkLoad(); render(); }")
+    if not any(k[1] == 'broad' and v['value'] == 280 and 'kg' not in json.dumps(v) for k, v in team['rank'].items()): errors.append('Rangliste: eigener Broad Jump nicht eingetragen')
+    if any('bodyweight' in json.dumps(v) or v.get('value') == 90 for v in team['rank'].values()): errors.append('Rangliste: Körpergewicht wurde übertragen')
+    if 'Spieler B' not in await page.evaluate("document.getElementById('main').textContent"): errors.append('Rangliste: andere Athleten werden nicht angezeigt')
+    await page.evaluate("async()=>{ await teamLoadAthletes(); }")
+    if not await page.evaluate("(TEAM.athletes||[]).some(a=>a.name==='Spieler B' && a.grp==='WR' && a.hints.length>0)"): errors.append('Coach: Athletenliste oder Hinweise fehlen')
+    if await page.evaluate("S.profile.name") == 'Spieler B': errors.append('Coach: fremde Daten sind in den eigenen Bestand geraten')
+    await page.evaluate("async()=>{ await adminLoad(); }")
+    await page.fill('#ad-name', 'Neu'); await page.fill('#ad-mail', 'neu@test.invalid'); await page.click('[data-act="adInvite"]'); await page.wait_for_timeout(200)
+    if not team['invites'] or team['invites'][0].get('email') != 'neu@test.invalid': errors.append('Admin: Einladung wurde nicht verschickt')
+    await page.click('[data-act="adRole"][data-v="coach"][data-id="%s"]' % other); await page.wait_for_timeout(200)
+    if not team['patched'] or 'coach' not in team['patched'][-1].get('roles', []): errors.append('Admin: Rolle Coach wurde nicht gesetzt')
+    await page.fill('#tc-date', '2027-04-10'); await page.fill('#tc-title', 'Testgegner'); await page.click('[data-act="tcAdd"]'); await page.wait_for_timeout(300)
+    if not any(g.get('date') == '2027-04-10' for g in team['season'].get('games', [])): errors.append('Teamkalender: Spiel wurde nicht gespeichert')
     # Abmelden: Daten bleiben auf dem Gerät
     await page.evaluate("()=>{ sb.sess=null; sbStore(); render(); }")
     if await page.evaluate("S.profile.name") != 'anderes Gerät': errors.append('Supabase: Daten nach dem Abmelden weg')
+    # Gerätewechsel: anderer Athlet meldet sich an → lokale Daten des vorherigen Kontos verschwinden
+    await page.evaluate("()=>{ sb.sess={access_token:'t',refresh_token:'r',expires_at:9e9,user:{id:'00000000-0000-4000-a000-0000000000cc'}}; sbOwnerCheck(); }")
+    if await page.evaluate("S.profile.name") == 'anderes Gerät': errors.append('Gerätewechsel: Daten des vorherigen Kontos bleiben stehen')
     await ctx.close()
     return errors
 
