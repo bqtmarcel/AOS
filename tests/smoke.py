@@ -11,7 +11,7 @@ from playwright.async_api import async_playwright
 
 ROOT = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else pathlib.Path(__file__).resolve().parent.parent / 'index.html').resolve()
 VIEWS = ['uebersicht', 'training', 'ernaehrung', 'tests', 'plan', 'profil']
-SKIP = {'resetAll', 'exportJSON', 'csv', 'go', 'plReload', 'ghSyncNow', 'ghDisconnect', 'ghOpen'}
+SKIP = {'resetAll', 'exportJSON', 'csv', 'go', 'plReload'}
 
 # Neutrale Beispieldaten: eine freie Einheit, zwei Gewichtsmessungen, ein Test
 

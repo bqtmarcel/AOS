@@ -133,8 +133,6 @@ details[open]>summary::before{content:'–'}
 /* Kennzeichen: leise Textmarken statt Pillen */
 .badge,.cap{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:.75rem;font-weight:500;color:var(--text2);background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
 .badge.ok{color:var(--text)} .badge.warn,.badge.bad{color:var(--text);border-color:var(--line2)}
-.syncchip{font:inherit;font-size:.78rem;line-height:1.3;min-height:0;padding:3px 10px;border-radius:6px;white-space:nowrap;box-shadow:none}
-.syncchip.warn,.syncchip.bad,.syncchip.info{background:var(--surface2);color:var(--text2)}
 
 /* Wochenstreifen */
 .weekstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin:6px 0 4px}
@@ -439,8 +437,8 @@ function fmtNum(n){ if(n===null||n===undefined||n==='') return ''; return String
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 
 /* ---------- Ausgangsdaten ----------
-   Bewusst neutral: Dieses Repo ist öffentlich. Persönliche Werte (Profil, Tests, Ziele, Blöcke …)
-   liegen ausschließlich im privaten Datenrepo und kommen beim ersten Abgleich auf das Gerät. */
+   Bewusst neutral: Dieses Repo ist öffentlich. Persönliche Werte liegen je Athlet in Supabase
+   und kommen beim ersten Abgleich auf das Gerät. */
 function seedData(){
   const now = new Date().toISOString();
   return {
@@ -454,7 +452,7 @@ function seedData(){
     settings: { seededAt: now }
   };
 }
-/* Neue Geräte bekommen ältere Zeitstempel als alles im Datenrepo: Beim ersten Abgleich gewinnt immer der gespeicherte Stand. */
+/* Neue Geräte bekommen ältere Zeitstempel als alles in Supabase: Beim ersten Abgleich gewinnt immer der gespeicherte Stand. */
 const FRESH_TIME = '0000-01-01T00:00:00.000Z';
 function freshData(){ const d=seedData(); syncStampAll(d, FRESH_TIME); return migrate(d); }   // migrate ergänzt u. a. die Standard-Trainingsorte
 
@@ -516,8 +514,8 @@ function migrate(d){
   d.schemaVersion = SCHEMA_VERSION;
   return d;
 }
-/* Altdaten der früheren, von Hand geführten Planverwaltung entfernen (Backlog W3). Entfernte Datensätze bekommen eine
-   Löschmarke, damit sie beim Abgleich mit iPhone/Laptop/Datenrepo nicht zurückkommen. Idempotent. */
+/* Altdaten der früheren, von Hand geführten Planverwaltung entfernen . Entfernte Datensätze bekommen eine
+   Löschmarke, damit sie beim Abgleich nicht zurückkommen. Idempotent. */
 function cleanupLegacy(d){
   const sy=d.sync; if(!sy) return; sy.stamps=sy.stamps||{}; sy.tombstones=sy.tombstones||{}; const now=new Date().toISOString();
   const tomb=k=>{ sy.tombstones[k]=now; delete sy.stamps[k]; };
@@ -525,9 +523,9 @@ function cleanupLegacy(d){
   (d.unavailable||[]).forEach(x=>tomb('unavail:'+x)); d.unavailable=[];                 // alte „nicht verfügbar“-Tage (ersetzt durch Tag frei im Plan)
   Object.keys(d.suggestionDecisions||{}).forEach(k=>{ if(/^(deload|plan)\|/.test(k)){ tomb('decision:'+k); delete d.suggestionDecisions[k]; } });
   // Profil: Altfelder still entfernen, ohne den Zeitstempel zu erneuern – sonst überschreibt beim Abgleich die
-  // frisch bereinigte (ältere) Fassung aus dem Datenrepo neuere Eingaben dieses Geräts (z. B. Ausstattung der Orte)
+  // frisch bereinigte (ältere) Fassung aus Supabase neuere Eingaben dieses Geräts (z. B. Ausstattung der Orte)
   const p=d.profile||{};
-  ['positionHistory','sex','age'].forEach(f=>{ if(f in p) delete p[f]; });
+  ['positionHistory','age'].forEach(f=>{ if(f in p) delete p[f]; });
   // alte Ausstattungsliste wurde nie ausgewertet – maßgeblich ist der Freitext (eine positive Liste würde dort alles andere ausschließen)
   (p.locations||[]).forEach(l=>{ if('equipment' in l) delete l.equipment; });
 }
@@ -624,7 +622,6 @@ function exPlanText(ex){
 function exTitle(ex){ return ex.name + (ex.variant?' ('+ex.variant+')':''); }
 function repMin(reps){ if(reps==null) return null; const m=String(reps).match(/\d+/); return m?Number(m[0]):null; }
 
-
 /* ---------- Ernährung: Ausgangs-Bausteine (anpassbar, ohne Mengen- oder Kalorienangaben) ---------- */
 function defaultNutrition(){
   const L={
@@ -646,7 +643,6 @@ function defaultNutrition(){
   };
 }
 
-'use strict';
 /* ===== AOS – Änderungsverfolgung & Zusammenführen =====
    Jeder Eintrag (Einheit, Test, Mahlzeit …) ist ein "Datensatz" mit Schlüssel <bereich>:<id>.
    AOS merkt sich pro Datensatz, wann er zuletzt geändert (stamps) oder gelöscht (tombstones) wurde.
@@ -740,7 +736,7 @@ function syncMigrateLegacy(d){
   if(same.size){ const m=syncRecords(d); same.forEach((v,k)=>m.set(k, clone(v))); applyRecords(d, m); }
 }
 
-/* Zusammenführen: lokaler Stand L + Datei R → neuer Stand + Bericht */
+/* Zusammenführen: lokaler Stand L + entfernter Stand R → neuer Stand + Bericht */
 function mergeData(L, R){
   const lm=syncRecords(L), rm=syncRecords(R);
   const ls=L.sync.stamps, lt=L.sync.tombstones, rs=R.sync.stamps, rt=R.sync.tombstones;
@@ -773,12 +769,10 @@ function mergeData(L, R){
   return { data:res, report:rep };
 }
 
-'use strict';
 /* ===== AOS – Hilfsfunktionen für protokollierte Einheiten ===== */
 function sessionDate(s){ return s.plannedDate || (s.log && s.log.loggedAt ? s.log.loggedAt.slice(0,10) : null) || s.createdAt.slice(0,10); }
 function loggedSessions(){ return S.sessions.filter(s=>(s.status==='absolviert'||s.status==='teilweise') && s.log).sort((a,b)=>sessionDate(a)<sessionDate(b)?-1:1); }
 
-'use strict';
 /* ===== AOS – Ausgaben: Text, JSON, CSV ===== */
 
 function istOf(x, metric){
@@ -792,7 +786,6 @@ function istOf(x, metric){
   if(x.rpe!=null) s+=' @RPE '+fmtNum(x.rpe);
   return s;
 }
-
 
 /* ---------- Dateien & Zwischenablage ---------- */
 function isIOS(){ return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
@@ -839,7 +832,6 @@ function exportCSV(kind){
   }
 }
 
-'use strict';
 /* ===== AOS – Oberfläche: Grundgerüst, Dialoge, Übersicht ===== */
 const ui = { view:'uebersicht', weekStart:null, sessionId:null, draft:null, logHidden:false, testName:null, exName:null, blockId:null, filterEquip:false, importData:null };
 const ACT = {};      // Klick-Aktionen
@@ -938,7 +930,6 @@ document.addEventListener('input', e=>{
   const t=e.target; if(t.dataset && t.dataset.log!==undefined) updateDraftFromInput(t);
 });
 
-'use strict';
 /* ===== AOS – Einheit: Details, verschieben, auslassen ===== */
 ACT.openSession = el=>{
   const s=sessionById(el.dataset.id); if(!s) return;
@@ -977,7 +968,6 @@ ACT.unskipSession = el=>{ const s=sessionById(el.dataset.id); s.status='geplant'
 ACT.deleteSession = el=>{ const id=el.dataset.id; confirmDlg('Einheit löschen?','Die geplante Einheit wird entfernt (noch nichts protokolliert).','Löschen',()=>{ S.sessions=S.sessions.filter(x=>x.id!==id); save(); render(); }, true); };
 ACT.copyPre = el=>{ copyText(document.getElementById(el.dataset.src).textContent); };
 
-'use strict';
 /* ===== AOS – Training protokollieren ===== */
 const METRIC_FIELDS = {
   kraft:[['kg','kg','decimal'],['reps','Wdh','numeric'],['rpe','RPE','decimal']],
@@ -1290,7 +1280,6 @@ ACT.saveLog = el=>{
 };
 ACT.discardLog = ()=>{ confirmDlg('Protokoll verwerfen?','Die erfassten Werte dieser Einheit werden gelöscht und die Einheit wieder auf „geplant“ gesetzt.','Verwerfen',()=>{ const s=sessionById(ui.sessionId); s.log=null; s.status='geplant'; S.tests=S.tests.filter(t=>t.fromSession!==s.id); save(); logClear(); render(); }, true); };
 
-'use strict';
 /* ===== AOS – Tests, Körpergewicht, Verlauf ===== */
 function lineChart(points, opts){
   opts=opts||{}; const W=640,H=200,P={l:44,r:14,t:14,b:28};
@@ -1500,7 +1489,6 @@ function trainingProgress(){
 }
 CHG.pickEx = el=>{ ui.exName=el.value; render(); };
 
-'use strict';
 /* ===== AOS – Profil & Einstellungen ===== */
 ACT.editGoal = el=>{ const g=el.dataset.id?S.goals.find(x=>x.id===el.dataset.id):null;
   const names=[...new Set(S.tests.map(t=>t.name))];
@@ -1542,13 +1530,11 @@ ACT.resetAll = ()=>{
     '<button data-act="closeDlg">Abbrechen</button><button data-act="exportJSON">Vorher sichern</button><button class="danger" data-act="resetOk">Zurücksetzen</button>'); };
 ACT.resetOk = ()=>{ if(val('rs-conf')!=='LÖSCHEN'){ toast('Bitte LÖSCHEN eingeben.'); return; } S=freshData(); syncInit(); save(); closeDlg(); toast('Zurückgesetzt.'); render(); if(sbReady()) sbSync('reset'); };
 
-'use strict';
 /* ===== AOS – Sessionplaner =====
-   Regeln laut AOS_Sessionplaner_Spezifikation (v11). Persönliche Planerdaten (Phasen, Block, Templates, Startlasten)
-   und die Übungsdatenbank kommen aus dem privaten Datenrepo (planner/plan.json, db/AOS_Uebungsdatenbank.json),
-   werden nur gelesen und für den Offline-Betrieb auf dem Gerät zwischengespeichert.
-   Grundsätze: AOS erfindet keine Zahlen (ohne Wert → Kalibrieren), Steigerungen brauchen eine Bestätigung,
-   Reduktionen wegen Readiness/Zeit/Beschwerden passieren automatisch und werden begründet. */
+   Regeln laut Sessionplaner-Spezifikation. Planerregeln (planner/plan.json) und Übungsdatenbank pflegt das
+   private Datenrepo; sie kommen über Supabase, werden nur gelesen und für den Offline-Betrieb zwischengespeichert.
+   Grundsätze: AOS erfindet keine Zahlen (ohne Wert → Kalibrieren), Steigerungen und Reduktionen passieren
+   automatisch und werden begründet. */
 
 const REF_KEY = 'aos-ref-v1';
 const REF = { plan:null, ex:null, exMap:{}, nut:null, food:null, recipes:null, at:null, error:'', nutError:'', loading:false };
@@ -1565,7 +1551,7 @@ function plDropStale(){ if(typeof S==='undefined' || !S || !REF.plan || !(REF.pl
 function refInit(){ try{ const c=JSON.parse(localStorage.getItem(REF_KEY)||'null'); if(c&&c.plan&&c.ex) refSet(c.plan, c.ex, c.at, c); }catch(e){} }
 async function refLoad(force){ return sbRefLoad(force); }
 
-/* ===== AOS – Athletenprofil: Positionen, Trainingstage, Richtwerte (Roadmap M2: Engine personenneutral) =====
+/* ===== AOS – Athletenprofil: Positionen, Trainingstage, Richtwerte =====
    Alles Persönliche kommt aus dem Profil bzw. den Protokollen des Athleten; im Code stehen nur allgemeine Standards. */
 const POS_LIST=[['QB','Quarterback'],['RB','Running Back'],['FB','Fullback'],['WR','Wide Receiver'],['TE','Tight End'],['C','Center'],['G','Guard'],['T','Tackle'],
   ['DE','Defensive End'],['DT','Defensive Tackle'],['NT','Nose Tackle'],['OLB','Outside Linebacker'],['MLB','Middle Linebacker'],['ILB','Inside Linebacker'],['CB','Cornerback'],['S','Safety']];
@@ -1578,7 +1564,6 @@ const GOAL_STD={ OL:{squat:1.8,bench:1.4,hinge:2.2,broad:235}, DL:{squat:1.8,ben
 const STD_LIFTS=[ ['squat','Kniebeuge','high_bar_squat',['kniebeuge','squat']], ['bench','Bankdrücken','bench_press',['bankdrücken','bench']],
   ['hinge','Kreuzheben','trap_bar_deadlift',['kreuzheben','deadlift']], ['broad','Broad Jump','broad_jump',['broad','weitsprung']] ];
 const DAY_KEYS=['MON','TUE','WED','THU','FRI','SAT','SUN'];
-const DEFAULT_TRAINING_DAYS=['MON','TUE','THU','FRI'];   // Standard für neue Athleten (seedData): 4 Tage, Unter-/Oberkörper im Wechsel
 const LEGACY_TRAINING_DAYS=['MON','WED','THU','FRI'];    // fester Wochenplan bis Version M2: gilt für bestehende Profile ohne eigene Angabe
 function posMix(){ const P=((S&&S.profile&&S.profile.positions)||[]).filter(p=>POS_GROUP[p.code]); const tot=P.reduce((a,p)=>a+(+p.weight||0),0)||P.length;
   return P.map(p=>({ code:p.code, name:p.name, group:POS_GROUP[p.code], share:Math.round(((+p.weight||0)||(100/P.length))/tot*100) })).sort((a,b)=>b.share-a.share); }
@@ -1590,7 +1575,7 @@ function schedFromDays(ids){ const out={}; trainingDays().slice(0, ids.length).f
 function ensureProfileDefaults(){ if(!S||!S.profile) return; const p=S.profile; let ch=false;
   if(!Array.isArray(p.trainingDays)){ p.trainingDays=LEGACY_TRAINING_DAYS.slice(); ch=true; }   // neue Profile haben die Tage schon aus seedData()
   if(!Array.isArray(p.positions)){ p.positions=[]; ch=true; }
-  // M3: Bestand plant mit den bisherigen Vorlagen weiter, bis der Athlet umstellt; Erfahrung/Umsetzen wie bisher angenommen
+  // Bestand plant mit den bisherigen Vorlagen weiter, bis der Athlet umstellt; Erfahrung/Umsetzen wie bisher angenommen
   if(!p.planEngine){ p.planEngine='klassisch'; p.planEngineSince=''; ch=true; }
   if(!p.experience){ p.experience='fortgeschritten'; ch=true; }
   if(typeof p.cleanSafe!=='boolean'){ p.cleanSafe=true; ch=true; }
@@ -1611,10 +1596,12 @@ function stdGoals(){ const gm=groupMix(); const bw=bwNow(); if(!gm.length) retur
 function activeGoals(){ return (S.goals||[]).filter(g=>g.status==='aktiv').concat(stdGoals()); }
 ACT.stdGoalTake = el=>{ const g=stdGoals().find(x=>x.id===el.dataset.id); if(!g) return;
   S.goals.push({ id:uid('goal'), name:g.name, target:g.target, unit:g.unit, testName:g.testName, status:'aktiv', note:'Richtwert '+g.group, createdAt:new Date().toISOString(), source:'richtwert' }); save(); render(); toast('Als eigenes Ziel übernommen'); };
+/* Auswahlliste der Positionen; ohne Auswahl „bitte wählen“, bei der Nebenposition „keine“ */
+function posOptions(sel, none){ return (none?'<option value="">— keine —</option>':(sel?'':'<option value="" selected>— bitte wählen —</option>'))+POS_LIST.map(([c,n])=>'<option value="'+c+'"'+(sel===c?' selected':'')+'>'+c+' – '+n+'</option>').join(''); }
 /* Profil: Position und Trainingstage */
 function athleteSection(){ const mix=posMix(); const main=mix[0]||null, sec=mix[1]||null; const days=trainingDays(); const dn={MON:'Mo',TUE:'Di',WED:'Mi',THU:'Do',FRI:'Fr',SAT:'Sa',SUN:'So'};
-  const opt=(sel,none)=>(none?'<option value="">— keine —</option>':'')+POS_LIST.map(([c,n])=>'<option value="'+c+'"'+(sel===c?' selected':'')+'>'+c+' – '+n+'</option>').join('');
-  let b='<label for="ap-main">Hauptposition</label><select id="ap-main" data-chg="apPos">'+(main?'':'<option value="" selected>— bitte wählen —</option>')+opt(main&&main.code,false)+'</select>'+
+  const opt=posOptions;
+  let b='<label for="ap-main">Hauptposition</label><select id="ap-main" data-chg="apPos">'+opt(main&&main.code,false)+'</select>'+
     '<label for="ap-sec">Nebenposition (optional)</label><select id="ap-sec" data-chg="apPos">'+opt(sec&&sec.code,true)+'</select>';
   if(sec) b+='<label>Anteil Nebenposition</label><div>'+[10,20,30,40,50].map(v=>'<button class="chip" data-act="apShare" data-v="'+v+'" aria-pressed="'+(sec.share===v)+'">'+v+' %</button>').join('')+'</div>';
   const EI=entryInfo(); if(EI){ const t=todayISO(); b+='<p class="small">Einstieg: '+esc(ENTRY_NAME[EI.stage])+(EI.end?(t<=EI.end?' · bis '+fmtDate(EI.end):' · abgeschlossen'):'')+'</p>'+(EI.adj?'<p class="small muted">'+esc(EI.adj)+'</p>':''); }
@@ -1670,7 +1657,7 @@ ACT.apDay = el=>{ const d=el.dataset.v; let days=trainingDays(); days=days.inclu
   S.profile.trainingDays=DAY_KEYS.filter(k=>days.includes(k)); save(); apReplan(); render();
   if(days.length>4) toast('AOS plant höchstens 4 Einheiten – die ersten 4 Tage zählen.'); };
 
-/* ===== Onboarding für neue Athleten (Mehrbenutzer-Spezifikation 6, Roadmap M4.2) =====
+/* ===== Onboarding für neue Athleten (Mehrbenutzer-Spezifikation 6) =====
    Einmalig beim ersten Login, ca. 5 Minuten. Danach plant AOS sofort. Alles bleibt im Profil änderbar.
    Erscheint nur für angemeldete Athleten ohne Position und ohne abgeschlossenes Onboarding (Bestand gilt als eingerichtet). */
 const OB_STEPS=['Willkommen','Position','Körperdaten','Erfahrung','Trainingsstand','Trainingsort','Trainingstage','Einschränkungen','Fertig'];
@@ -1688,7 +1675,7 @@ function obState(){ if(!ui.ob){ const p=S.profile;
   return ui.ob; }
 function obChips(act, list, on){ return '<div>'+list.map(([v,n])=>'<button class="chip" data-act="'+act+'" data-v="'+esc(String(v))+'" aria-pressed="'+!!on(String(v))+'">'+esc(n)+'</button>').join('')+'</div>'; }
 function viewOnboarding(){ const O=obState(), d=O.d, st=O.step; const dn={MON:'Mo',TUE:'Di',WED:'Mi',THU:'Do',FRI:'Fr',SAT:'Sa',SUN:'So'};
-  const opt=(sel,none)=>(none?'<option value="">— keine —</option>':'<option value=""'+(sel?'':' selected')+'>— bitte wählen —</option>')+POS_LIST.map(([c,n])=>'<option value="'+c+'"'+(sel===c?' selected':'')+'>'+c+' – '+n+'</option>').join('');
+  const opt=posOptions;
   let b='';
   if(st===0) b='<p>Willkommen bei AOS, dem Trainingssystem der Red Tigers.</p><p>AOS plant dein Krafttraining vollautomatisch: Übungen, Sätze, Wiederholungen und Gewichte, passend zu deiner Position, deiner Ausstattung und deinem Trainingsstand. Du trainierst und trägst ein, was du geschafft hast.</p><p class="small muted">Die Einrichtung dauert ca. 5 Minuten. Alles kannst du später im Profil ändern.</p>';
   if(st===1){ b='<label for="ob-main">Hauptposition</label><select id="ob-main" data-chg="obPos">'+opt(d.main,false)+'</select>'+
@@ -1867,7 +1854,8 @@ function apWeekTypes(phaseId, start, weeks){
 function apUsedIn(block){ const s=new Set(); (block&&block.templates||[]).forEach(t=>t.slots.forEach(x=>s.add(x.candidates[0]))); return s; }
 function apPick(spec, phaseId, prevUsed, taken){
   const pool=Array.isArray(spec.pool)?spec.pool:(spec.pool[phaseId]||[]);
-  const ok=id=>{ const e=REF.exMap[id]; if(!e || (e.selection_penalty||0)>0 || /snatch/.test(id)) return false;   // keine Reißen-Varianten (Nutzervorgabe) if(spec.main) return true;
+  const ok=id=>{ const e=REF.exMap[id]; if(!e || (e.selection_penalty||0)>0 || /snatch/.test(id)) return false;   // keine Reißen-Varianten
+    if(spec.main) return true;
     if(e.phases && !e.phases.includes(phaseId)) return false; if((e.equipment_check||[]).length) return false; return true; };
   const free=pool.filter(id=>ok(id) && !taken.has(id));
   let pick;
@@ -1913,13 +1901,12 @@ function apEmphasis(start){ if(typeof S==='undefined'||!S) return null;
     const p=goalVal(L[L.length-1])/g.target; if(!best||p<best.p) best={ key, p, name:g.name }; });
   return best;
 }
-/* ===== Einstieg für spätere Starter (Mehrbenutzer-Spezifikation 6.1, Roadmap M4.5) =====
+/* ===== Einstieg für spätere Starter (Mehrbenutzer-Spezifikation 6.1) =====
    AOS bestimmt aus der Standortbestimmung im Onboarding eine Einstiegsstufe (der Athlet sieht nur das Ergebnis):
    3 = direkt in die laufende Teamphase · 2 = 1 Woche Einstieg · 1 = 2 Wochen Eingewöhnung. Die Einstiegswochen laufen parallel
    zum Teamkalender und ersetzen dort die ersten Wochen (Dosierung wie P1-Einstieg); danach ist der Athlet in derselben Phase und Woche wie alle.
    Nach der ersten Woche steuert AOS automatisch nach (Einstiegswoche nachsetzen bzw. Einstieg vorzeitig beenden). */
 const ENTRY_NAME={ 1:'Eingewöhnung: 2 Wochen Einstieg', 2:'Kurzer Einstieg: 1 Woche', 3:'Direkt in die laufende Teamphase' };
-const ENTRY_PAIN=['knie','huefte','ruecken','schulter'];
 function entryStage(a, exp, painMain){ a=a||{}; let s;
   if(a.w8==='0-2' || a.last==='lang' || a.lifts==='nein' || exp==='einsteiger') s=1;
   else if(a.w8==='6-8' && a.last==='kurz' && a.lifts==='ja') s=3;
@@ -2006,7 +1993,7 @@ function apBuildBlock(phase, prev, prev2){
   types.forEach((t,w)=>{ if(t==='D') week_overrides[w+1]={ note:'Entlastung: weniger Sätze, gleiche Last'+(addDays(phase.start,w*7).slice(5)<='12-31'&&addDays(phase.start,w*7).slice(5)>='12-18'?' · Feiertage: Tage frei setzen':'') };
     if(t==='H'||t==='DT') (week_notes[w+1]=week_notes[w+1]||[]).push('Standortbestimmung: Broad Jump (D1), Top-Sets Kniebeuge, Kreuzheben, Bank bis RPE '+fmtNum(P.cap)+', kein Maxtest. Ergebnisse gehen automatisch in den Verlauf.'); });
   // Nicht verfügbare Tage (plan.json „unavailable“): Einheiten der Woche rücken in Reihenfolge auf die übrigen Trainingstage, was nicht passt, entfällt (kein Nachholen)
-  const una=(REF.plan.unavailable||[]); const ORD=['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  const una=(REF.plan.unavailable||[]); const ORD=DAY_KEYS;
   if(phase.id!=='IN' && una.length) for(let w=1; w<=weeks; w++){ const mon=addDays(phase.start,(w-1)*7); const hit=ORD.filter((d,i)=>una.includes(addDays(mon,i))); if(!hit.length) continue;
     const order=ORD.filter(d=>sched[d]).map(d=>sched[d]); const free=ORD.filter(d=>sched[d] && !hit.includes(d)); const s2={}; free.forEach((d,i)=>{ s2[d]=order[i]; });
     const skipped=order.slice(free.length); const lbl=hit.map(d=>WD[(ORD.indexOf(d)+1)%7]).join('/');
@@ -2014,10 +2001,10 @@ function apBuildBlock(phase, prev, prev2){
   // Spielwoche: letzte schwere Einheit mindestens 4 Tage vor dem Spiel (3.2.1), danach nur kurz und schnell
   const game=((REF.plan.season||{}).first_game||[])[0];
   if(phase.id==='P5' && game){ const lw=weeks; const mon=addDays(phase.start,(lw-1)*7);
-    if(game>=mon && game<=addDays(mon,6)){ const order=['MON','TUE','WED','THU','FRI','SAT','SUN']; const s2={}; Object.entries(sched).forEach(([d,t])=>{ const dt=addDays(mon,order.indexOf(d)); if(daysBetween(dt,game)>=4) s2[d]=t; });
+    if(game>=mon && game<=addDays(mon,6)){ const order=DAY_KEYS; const s2={}; Object.entries(sched).forEach(([d,t])=>{ const dt=addDays(mon,order.indexOf(d)); if(daysBetween(dt,game)>=4) s2[d]=t; });
       const kept=Object.values(s2); week_overrides[lw]={ schedule:s2, skipped:tids.filter(t=>!kept.includes(t)), note:'Spielwoche: letzte Einheit spätestens 4 Tage vor dem Spiel, danach frei.' }; } }
   // Saison: Spielwochen 1 Einheit (Kraft) mindestens 4 Tage vor dem Spiel, spielfreie Wochen 2 Einheiten (2.3 In-Season)
-  if(phase.id==='IN'){ const games=apGames(); const order=['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  if(phase.id==='IN'){ const games=apGames(); const order=DAY_KEYS;
     for(let w=1; w<=weeks; w++){ const mon=addDays(phase.start,(w-1)*7); const g=games.find(d=>d>=mon && d<=addDays(mon,6));
       const prevG=games.filter(d=>d<mon).slice(-1)[0];
       if(g){ let day=addDays(g,-4); if(day<mon) day=null;
@@ -2052,7 +2039,7 @@ function apGenerate(plan){
   plan.blocks.sort((a,b)=>a.start<b.start?-1:1);
 }
 
-/* ===== AOS – Positionsgruppen (Roadmap M3, Trainingspfade) =====
+/* ===== AOS – Positionsgruppen (Trainingspfade) =====
    Die Gruppe bestimmt WAS trainiert wird und wie es dosiert wird, nicht WANN (Phasen, Wochenwelle, RPE-Grenzen bleiben gleich).
    - Vorlage aus der Zahl der Trainingstage (4: Unter-/Oberkörper im Wechsel, 3 und 2: Ganzkörper).
    - Übungswahl je Slot: Score = Σ Anteil × Relevanz der Gruppe − Abzug + Rangbonus aus der Liste der Hauptgruppe (Platz 1 +0,5, Platz 2 +0,25).
@@ -2759,7 +2746,6 @@ function plDefaults(){ return { date:todayISO(), readiness:null, sleep:null, pai
 function plInput(){ const p=ui.pl; const due=plDue(p.date); const loc=p.loc && locById(p.loc) ? p.loc : locDefault(p.date); return Object.assign({}, p, { tpl: p.tpl && due.block && plTemplate(due.block,p.tpl) ? p.tpl : due.tpl, loc }); }
 function chipBtn(act, k, v, label, on){ return '<button class="chip" data-act="'+act+'" data-k="'+k+'" data-v="'+esc(v)+'" aria-pressed="'+(on?'true':'false')+'">'+esc(label)+'</button>'; }
 
-
 function plPreview(P){
   if(P.error) return '<div class="note">'+esc(P.error)+'</div>';
   const b=P.block;
@@ -2810,11 +2796,9 @@ function plCommit(){
 }
 ACT.plTake = ()=>{ const s=plCommit(); if(s){ toast('Einheit angelegt.'); startLog(s.id); } };
 
-
-'use strict';
-/* ===== AOS – Ernährung (Spezifikation Nutrition v11) =====
-   Persönliche Ernährungsdaten (planner/nutrition.json), Lebensmittel- und Rezeptdatenbank kommen aus dem privaten Datenrepo.
-   Gespeichert werden nur deine Eingaben: Mahlzeiten (nutrition.meals, Format v2), Tageseinstellungen (nutrition.dayOverrides),
+/* ===== AOS – Ernährung (Nutrition-Spezifikation) =====
+   Ernährungsregeln (planner/nutrition.json), Lebensmittel- und Rezeptdatenbank pflegt das private Datenrepo (über Supabase).
+   Gespeichert werden nur die Eingaben des Athleten: Mahlzeiten (nutrition.meals, Format v2), Tageseinstellungen (nutrition.dayOverrides),
    Bewertungen und eigene Lebensmittel (nutrition.items). Keine Bewertung von Essen, Abweichungen werden neutral angezeigt. */
 
 const NUT = ()=>REF.nut;
@@ -3524,7 +3508,6 @@ ACT.shopOpen = ()=>shopShow();
 ACT.shopWeek = el=>{ ui.shopWeek=el.dataset.v; const b=document.getElementById('shop-body'); if(b) b.innerHTML=shopHTML(); };
 ACT.shopChk = el=>{ const o=shopLoad(); const k=el.dataset.k; o[k]=o[k]||{}; o[k][el.dataset.f]=!o[k][el.dataset.f]; Object.keys(o).forEach(x=>{ if(x.slice(11)<todayISO()) delete o[x]; }); shopStore(o); const b=document.getElementById('shop-body'); if(b) b.innerHTML=shopHTML(); };
 
-'use strict';
 /* ===== AOS – Plan: Ansicht des aktuellen Plans (planner/plan.json, nur lesend) ===== */
 const METHOD_LABEL={ rpe_linear:'RPE-gesteuert linear', wave:'Wochenwelle', double:'Doppelprogression', bodyweight_reps:'Wdh steigern (KG)', velocity:'Tempo („alle schnell?“)',
   contacts:'Bodenkontakte', quality:'Qualität', reps_rom:'Wdh/Bewegungsumfang', reps_load:'Wdh/Last', load_distance:'Last/Strecke', load_time:'Last/Zeit', time:'Zeit' };
@@ -3562,7 +3545,7 @@ function viewPlan(){
     '<span>'+sessionMax()+' min/Einheit</span></div>'+
     '';
   // Wochenraster
-  const days=['MON','TUE','WED','THU','FRI','SAT','SUN'], dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const days=DAY_KEYS, dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
   const mine=plSessions().filter(s=>s.planner.blockId===b.id);
   h+='<div class="table-wrap"><table class="small wgrid"><thead><tr><th>Woche</th>'+dn.map(d=>'<th>'+d+'</th>').join('')+'</tr></thead><tbody>';
   for(let w=1; w<=b.weeks; w++){
@@ -3716,7 +3699,7 @@ function fieldCard(date){ if(!isFieldDay(date)) return ''; const c=fieldCfg(); c
   return '<div class="section field-card"><div class="eyebrow">'+(c.time?esc(c.time)+' · ':'')+'Feldtraining</div><div class="row between" style="align-items:center;margin-top:6px"><div><strong>'+esc(c.name||'Football-Training')+'</strong><div class="small muted">'+(l?esc(fieldSummary(l)):'ca. '+(c.duration_min||90)+' min · Inhalte vom Team')+'</div></div>'+
     (date<=today ? '<button class="small'+(l?'':' primary')+'" data-act="fieldLog" data-d="'+date+'">'+(l?'ändern':'Erfassen')+'</button>' : '')+'</div></div>'; }
 
-/* ===== AOS – Gesamtbelastung (Backlog T19) und Spielwoche (T20) =====
+/* ===== AOS – Gesamtbelastung und Spielwoche =====
    Belastung = Anstrengung (Session-RPE 1–10) × Minuten („AU“) aus Gym, Feldtraining und Spielen.
    Steigt die Belastung der letzten 7 Tage deutlich über den Schnitt der letzten 4 Wochen, entlastet AOS die nächste Einheit selbst.
    Spielwoche: Vortag nur Aktivierung, Tag danach Regeneration, nach einem harten Spiel keine intensiven Sprünge; Beschwerden aus dem Spiel wirken wie ein Check-in. */
@@ -3783,9 +3766,8 @@ function cdNext(now){ now=now||new Date(); const G=calGames(); const td=todayISO
   const i=G.findIndex(g=> g.time ? kickoffAt(g)>now : g.date>=td); if(i<0) return null;
   const g=G[i]; const ms=g.time ? kickoffAt(g)-now : null;
   return { g, first:i===0, live: ms!=null && ms<=7*864e5, ms, days:daysBetween(td, g.date) }; }
-const p2=n=>String(n).padStart(2,'0');
 function cdSegs(ms){ const t=Math.max(0,Math.floor(ms/1000)); const d=Math.floor(t/86400), h=Math.floor(t%86400/3600), m=Math.floor(t%3600/60), x=t%60;
-  return [[d,'Tage'],[p2(h),'Std'],[p2(m),'Min'],[p2(x),'Sek']].map(([v,l])=>'<span class="cd-seg"><b>'+v+'</b><small>'+l+'</small></span>').join(''); }
+  return [[d,'Tage'],[pad(h),'Std'],[pad(m),'Min'],[pad(x),'Sek']].map(([v,l])=>'<span class="cd-seg"><b>'+v+'</b><small>'+l+'</small></span>').join(''); }
 function cdBlock(cls){ const c=cdNext(); if(!c) return '';
   const g=c.g; const when=fmtDateShort(g.date)+(g.alt.length?'/'+g.alt.map(fmtDateShort).join('/'):'')+(g.time?' · '+g.time:'');
   const lbl=(c.first?'Saisonstart':'Nächstes Spiel')+(g.title?' · '+g.title:'');
@@ -3842,8 +3824,7 @@ ACT.logFree = ()=>{ const s={ id:uid('ses'), blockId:null, dayId:null, name:'Fre
 
 /* ===== AOS – Erinnerungen (Push-Nachrichten) =====
    Die App speichert pro Gerät ein Push-Abo und die gewünschten Uhrzeiten (Datensatz push:_) sowie eine Vorschau der
-   nächsten 14 Trainingstage (pushag:_) im privaten Datenrepo. Den Versand übernimmt eine GitHub Action im Datenrepo
-   (stündlich). Hier im öffentlichen Repo steht nur der öffentliche Schlüssel – keine persönlichen Daten. */
+   nächsten 14 Trainingstage (pushag:_) in Supabase. Den Versand übernimmt stündlich eine GitHub Action im Datenrepo. Hier im öffentlichen Repo steht nur der öffentliche Schlüssel – keine persönlichen Daten. */
 const PUSH_VAPID_PUBLIC = 'BPlHvhAeamNzrx1GJtImXUPzbfasjiRbnpDA21YcGmLnEwb708MXIHsxb0_RpdWdBaKTxzcNj87MjPevpP5f9is';
 const PUSH_KINDS = [
   ['morning','Einheit des Tages','Morgens: welche Einheit heute dran ist'],
@@ -3855,7 +3836,7 @@ const PUSH_HOURS = [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22];
 function pushDefaults(){ return { subs:[], on:{ morning:true, readiness:true, evening:true, weekly:true }, hours:{ morning:7, readiness:16, evening:20, weekly:19 } }; }
 function pushNormalize(p){ const d=pushDefaults(); p=(p&&typeof p==='object')?p:{};
   return { subs:Array.isArray(p.subs)?p.subs.filter(x=>x&&x.endpoint&&x.keys):[], on:Object.assign(d.on, p.on||{}), hours:Object.assign(d.hours, p.hours||{}) }; }
-/* Wochenrückblick (Backlog U8): wird mit der Vorschau gespeichert, der Versand am Sonntag liest ihn (push/erinnerungen.mjs im Datenrepo) */
+/* Wochenrückblick: wird mit der Vorschau gespeichert, der Versand am Sonntag liest ihn (push/erinnerungen.mjs im Datenrepo) */
 function weekReview(mon){ const sun=addDays(mon,6), today=todayISO();
   const inW=d=>d>=mon && d<=sun;
   const done=loggedSessions().filter(s=>inW(sessionDate(s)));
@@ -3895,14 +3876,13 @@ function pushAgendaUpdate(){
   S.pushAgenda=a; return true;
 }
 function pushSupported(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
-function pushIsIOS(){ return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
 function pushMine(){ const id=S.sync&&S.sync.deviceId; return (S.push.subs||[]).find(x=>x.id===id) || null; }
 function pushActiveHere(){ return !!pushMine() && pushSupported() && Notification.permission==='granted'; }
 function pushKey(){ const s=PUSH_VAPID_PUBLIC.replace(/-/g,'+').replace(/_/g,'/'); const b=atob(s+'='.repeat((4-s.length%4)%4)); return Uint8Array.from(b, c=>c.charCodeAt(0)); }
 function pushSection(){
   const P=S.push, here=pushActiveHere(), n=(P.subs||[]).length;
   let b='';
-  if(!pushSupported()) b+='<div class="note">'+(pushIsIOS()&&!isStandalone()?'<strong>Erst zum Home-Bildschirm hinzufügen.</strong> Am iPhone gehen Push-Nachrichten nur, wenn AOS über Safari → Teilen → „Zum Home-Bildschirm“ installiert ist und von dort geöffnet wird (ab iOS 16.4).':'Dieser Browser unterstützt keine Push-Nachrichten.')+'</div>';
+  if(!pushSupported()) b+='<div class="note">'+(isIOS()&&!isStandalone()?'<strong>Erst zum Home-Bildschirm hinzufügen.</strong> Am iPhone gehen Push-Nachrichten nur, wenn AOS über Safari → Teilen → „Zum Home-Bildschirm“ installiert ist und von dort geöffnet wird (ab iOS 16.4).':'Dieser Browser unterstützt keine Push-Nachrichten.')+'</div>';
   else if(!sbReady()) b+='<div class="note">Erst im AOS-Konto anmelden – die Erinnerungen werden über dein Konto verschickt.</div>';
   else if(here) b+='<p class="small">Auf diesem Gerät <strong>aktiv</strong>.'+(n>1?' Insgesamt '+n+' Geräte.':'')+' <button class="link" data-act="pushOff">Auf diesem Gerät ausschalten</button></p>';
   else b+=(Notification.permission==='denied'?'<div class="note warn">Mitteilungen für AOS sind in den Einstellungen blockiert. iPhone: Einstellungen → Mitteilungen → AOS → Mitteilungen erlauben.</div>':'')+
@@ -3923,7 +3903,7 @@ ACT.pushOn = async ()=>{
     if(sub && sub.options && sub.options.applicationServerKey){ const k=new Uint8Array(sub.options.applicationServerKey), mine=pushKey(); if(k.length!==mine.length || k.some((v,i)=>v!==mine[i])){ await sub.unsubscribe(); sub=null; } }
     if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:pushKey() });
     const j=sub.toJSON(); const id=S.sync.deviceId;
-    const rec={ id, endpoint:j.endpoint, keys:j.keys, device:pushIsIOS()?'iPhone':'Browser', at:new Date().toISOString() };
+    const rec={ id, endpoint:j.endpoint, keys:j.keys, device:isIOS()?'iPhone':'Browser', at:new Date().toISOString() };
     S.push.subs=(S.push.subs||[]).filter(x=>x.id!==id && x.endpoint!==j.endpoint).concat([rec]);
     save(); render(); toast('Erinnerungen aktiv. Die Bestätigung kommt innerhalb einer Stunde.');
   }catch(e){ console.warn(e); toast('Aktivieren fehlgeschlagen: '+(e.message||e)); }
@@ -4046,9 +4026,7 @@ function plSection(){
   return h+plPreview(plBuild(pin));
 }
 
-'use strict';
-
-/* ===== AOS – Speicherung: Gerät + Supabase (Roadmap M1). Bis 21.11.2026 lag alles im privaten Datenrepo per GitHub-Token. ===== */
+/* ===== AOS – Speicherung: Gerät + Supabase ===== */
 const GH_OLD_KEY = 'aos-github-v1';   // alter GitHub-Token: wird beim Start von jedem Gerät entfernt
 /* Vergleichbarer Fingerabdruck des synchronisierten Inhalts (unabhängig von Reihenfolge und Gerät) */
 function canon(v){ if(Array.isArray(v)) return '['+v.map(canon).join(',')+']'; if(v&&typeof v==='object') return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canon(v[k])).join(',')+'}'; return JSON.stringify(v===undefined?null:v); }
@@ -4062,8 +4040,8 @@ function applyMerged(d){
   else { render(); }
 }
 
-/* ===== AOS – Supabase: Login und Abgleich (Roadmap M1.3–M1.5) =====
-   Abgleich pro Datensatz mit Zeitstempeln (seit 21.11.2026 einziger Speicherort neben dem Gerät), jüngste Änderung gewinnt (zusätzlich in der Datenbank erzwungen). Login per Code aus der E-Mail – funktioniert auch in der
+/* ===== AOS – Supabase: Login und Abgleich =====
+   Abgleich pro Datensatz mit Zeitstempeln jüngste Änderung gewinnt (zusätzlich in der Datenbank erzwungen). Login per Code aus der E-Mail – funktioniert auch in der
    Home-Bildschirm-App am iPhone (ein Link aus der Mail würde in Safari statt in der App landen). */
 const SB_URL='https://sraocwhvkisomjjoqznr.supabase.co', SB_KEY='sb_publishable_Cvqcna518s5NdlUahoIHcw_TRPfBMXZ', SB_STORE='aos-sb-v1';
 const sb={ sess:null, email:'', state:'aus', syncing:false, again:false, timer:null, lastOk:null, lastError:'', codeSent:false, team:null, dirty:false, renderPending:false };
@@ -4213,8 +4191,7 @@ function sbSection(){
   return pdet('sb','AOS-Konto', sbReady()?(sb.email||'angemeldet'):'nicht angemeldet', '<span id="sb-sec"></span>'+b);
 }
 
-
-/* ===== AOS – Team: Rollen, Admin, Coach-Übersicht, Ranglisten (Roadmap M4.1, M4.4, M4.6, M5, M6) =====
+/* ===== AOS – Team: Rollen, Admin, Coach-Übersicht, Ranglisten =====
    Rollen kommen aus profiles.roles (Datenbank erzwingt die Rechte). Coach und Admin lesen fremde Daten nur zur Anzeige,
    nie in den eigenen Datenbestand. Ranglisten nur mit Zustimmung, nie mit Körpergewicht. */
 const TEAM={ roles:[], name:'', loaded:false, users:null, athletes:null, docs:{}, rank:null, loading:'', detail:null, err:'' };
@@ -4329,7 +4306,7 @@ async function adminFn(body){ return sbApi('POST','/functions/v1/admin', body); 
 function adminSection(){
   let b='<h3>Spieler einladen</h3><div class="fields">'+inp('ad-name','Name','', 'autocomplete="off"')+inp('ad-mail','E-Mail-Adresse','','type="email" inputmode="email" autocomplete="off"')+'</div>'+
     '<div class="row"><button class="primary" data-act="adInvite">Einladen</button></div>'+
-    '<p class="small muted">Der Spieler bekommt eine Mail mit Anmeldelink. Solange kein eigener E-Mail-Versand eingerichtet ist (Roadmap M4.12), stellt Supabase nur an Mitglieder der Supabase-Organisation zu, höchstens 2 Mails pro Stunde.</p>';
+    '<p class="small muted">Der Spieler bekommt eine Mail mit Anmeldelink. Solange kein eigener E-Mail-Versand eingerichtet ist, stellt Supabase nur an Mitglieder der Supabase-Organisation zu, höchstens 2 Mails pro Stunde.</p>';
   b+='<h3>Konten</h3>';
   if(!TEAM.users) b+='<p class="small muted">'+(TEAM.loading==='admin'?'Lädt …':'<button data-act="adLoad">Konten laden</button>')+'</p>';
   else b+='<table><thead><tr><th>Name</th><th>E-Mail</th><th>Rollen</th><th>Zuletzt angemeldet</th><th></th></tr></thead><tbody>'+TEAM.users.map(u=>{ const me=u.id===sbUid();

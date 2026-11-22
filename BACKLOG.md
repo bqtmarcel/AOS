@@ -96,6 +96,7 @@ Aufwand: **S** = unter 1 Stunde · **M** = einige Stunden · **L** = mehr als ei
 | W6 | **Token-Ablauf**: rechtzeitig vor Ablauf des GitHub-Tokens warnen | Kein plötzlicher Ausfall der Speicherung | ✅ erledigt – entfällt seit 21.11.2026 (Speicherung über Supabase statt GitHub-Token) | S |
 | W7 | **Barrierefreiheit** prüfen (Kontraste der grauen Texte, Fokus-Rahmen, Beschriftungen der Icon-Buttons) | Bessere Lesbarkeit im Gym-Licht | ✅ erledigt | S |
 | W8 | **Klicktest prüft den Abgleich** mit einem nachgebauten Datenrepo: lokale Eingabe übersteht einen älteren Stand mit Altfeldern, neuere Änderung eines anderen Geräts kommt an. Dabei behoben: neue Installation hatte keine Standard-Trainingsorte | Fehler wie der Ausstattungs-Verlust fallen vor dem Hochladen auf | ✅ erledigt | S |
+| W10 | **Code bereinigt**: überzählige `'use strict'`, unbenutzte Konstanten und CSS, doppelte Hilfsfunktionen (Wochentage, iOS-Erkennung, Zahlenformat, Positionsliste) zusammengeführt, Aufgaben-Nummern und Versionsgeschichte aus Kommentaren entfernt, veraltete Verweise aufs Datenrepo korrigiert. Dabei behoben: Peak-Phase (P5) der bisherigen Vorlagen plante keine Hauptübungen; das Geschlecht für den DOTS-Score wurde bei jedem Start gelöscht | Schlanker, verständlicher Code | ✅ erledigt 22.11.2026 | S |
 
 ## 6. Später (ganz hinten)
 
