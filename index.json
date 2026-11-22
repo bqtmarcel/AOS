@@ -1,0 +1,32 @@
+{
+ "updated": "2026-11-22T12:34:05Z",
+ "sources": {
+  "ch": {
+   "file": "ch.json.gz",
+   "count": 1206,
+   "updated": "2026-11-22T12:34:05Z",
+   "sha": "6ad0df959edc8c8b",
+   "bytes": 22710
+  },
+  "off": {
+   "file": "off.json.gz",
+   "count": 250572,
+   "updated": "2026-11-22T12:34:05Z",
+   "sha": "467b3475357444f9",
+   "bytes": 8139762
+  },
+  "bls": {
+   "file": "bls.json.gz",
+   "count": 7117,
+   "updated": "2026-11-22T12:34:05Z",
+   "sha": "fd9bb0cb4af6b0db",
+   "bytes": 143971
+  }
+ },
+ "errors": {},
+ "licenses": {
+  "off": "Open Food Facts – Open Database License (ODbL), openfoodfacts.org",
+  "bls": "Max Rubner-Institut (2025): Bundeslebensmittelschlüssel (BLS), Version 4.0 – Deutsche Nährstoffdatenbank. CC BY 4.0",
+  "ch": "Schweizer Nährwertdatenbank, Bundesamt für Lebensmittelsicherheit und Veterinärwesen BLV, naehrwertdaten.ch"
+ }
+}
