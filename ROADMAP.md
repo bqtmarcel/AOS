@@ -1,7 +1,7 @@
 # AOS – Roadmap: Mehrbenutzer, Positionsgruppen, Coach, Ranglisten
 
 Stand: 22.11.2026 · Version 1
-Fachliche Details: Mehrbenutzer-Spezifikation v1 (Rollen, Datenmodell, Positionsgruppen, Coach-Übersicht, Ranglisten mit DOTS, Datenschutz).
+Fachliche Details: Mehrbenutzer-Spezifikation v1.5 in `AOS_DATA/docs` (Rollen, Datenmodell, Positionsgruppen, Onboarding und Einstieg, Coach-Übersicht, Ranglisten mit DOTS, Datenschutz).
 Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persönlichen Werte.
 
 **Leitbild:** AOS ist eine footballspezifische S&C-Coaching-KI für die Spieler der Red Tigers. Eine regelbasierte Engine plant für jeden Athleten vollautomatisch, abgestimmt auf seine Position und seine Daten. Kein Sprachmodell, die App bleibt kompakt. Der Coach sieht alles, greift aber nicht in die Planung ein.

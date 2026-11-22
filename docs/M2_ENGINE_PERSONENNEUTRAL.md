@@ -1,6 +1,6 @@
 # M2 · Engine personenneutral – Bestandsaufnahme und Umsetzung
 
-Stand 21.11.2026. Ziel: Alles, was nur für einen bestimmten Athleten gilt, kommt aus dessen Profil bzw. Protokollen. Im Code stehen nur allgemeine Standards. Keine persönlichen Werte in diesem Dokument.
+Stand 21.11.2026, Nachträge 22.11.2026. Ziel: Alles, was nur für einen bestimmten Athleten gilt, kommt aus dessen Profil bzw. Protokollen. Im Code stehen nur allgemeine Standards. Keine persönlichen Werte in diesem Dokument.
 
 ## Bestandsaufnahme (M2.1)
 
@@ -10,12 +10,12 @@ Stand 21.11.2026. Ziel: Alles, was nur für einen bestimmten Athleten gilt, komm
 | 2 | Langfristziele | eigene Ziele im Datenbereich `goals`; ohne Ziele kein Schwerpunkt | eigene Ziele haben Vorrang; sonst **Richtwerte der Positionsgruppe** relativ zum Körpergewicht (`GOAL_STD`, Trainingspfade 2.0), gemischt nach Anteil. Sie steuern den Schwerpunkt-Satz und stehen im Verlauf unter *Ziele* (übernehmbar) (M2.3) |
 | 3 | Trainingstage | fester Wochenplan Mo/Mi/Do/Fr im Code | Profilfeld `trainingDays`; D1–D4 der Reihe nach auf die Tage. Bei weniger Tagen verteilt AOS den Wochenumfang (Sessionplaner 3.10). Bestehende Profile ohne Angabe behalten den bisherigen Plan (M2.4) |
 | 4 | Trainingsorte und Ausstattung | Profil (`locations`, Freitext, Standardtage) | unverändert aus dem Profil (M2.4) |
-| 5 | Startlasten | `start_loads` nur in früheren festen Blöcken; automatische Blöcke leer | Lasten nur aus Protokollen und Tests (e1RM, Ableitung über allgemeine Verhältnisse `START_EST`). Ohne Daten: keine Lastvorgabe → Kalibrierung beim Onboarding (M4, Mehrbenutzer 6.2) (M2.4) |
+| 5 | Startlasten | `start_loads` nur in früheren festen Blöcken; automatische Blöcke leer | Lasten nur aus Protokollen und Tests (e1RM, Ableitung über allgemeine Verhältnisse `START_EST`). Ohne Daten: keine Lastvorgabe → Kalibrierung in den ersten Einheiten; Arbeitsgewichte aus dem Onboarding gehen mit 95 % als Startwert ein (M2.4, seit 22.11.2026 mit M4.2) |
 | 6 | Spiele | nur eigener Kalender | Teamkalender (`team_season.games`) plus eigener Kalender (`apGames`) |
 | 7 | Planerregeln | eine persönliche Plandatei | allgemeine Regeln als Referenzdokument `planer` (ohne persönliche Tage), persönliche Planerdaten im Profil, Teamdaten aus `team_season`; zusammengeführt in `sbRefLoad` (M2.5) |
-| 8 | Ernährungsregeln | persönliche Datei | bleibt persönlich im Profil (`profiles.nutrition`); neue Athleten bekommen sie im Onboarding (M4) |
-| 9 | Übungsauswahl je Position | Pools D1–D4 im Code (`AP_SLOTS`) auf eine Positionsmischung zugeschnitten | **M3**: Kandidatenlisten je Positionsgruppe aus `AOS_Trainingspfade.json`, Mischung nach `groupMix()` |
-| 10 | Erfahrung, Umsetz-Technik, Alter, Verletzungen | nicht vorhanden | **M3/M4** (Modifikatoren der Trainingspfade, Onboarding) |
+| 8 | Ernährungsregeln | persönliche Datei | bleibt persönlich im Profil (`profiles.nutrition`); neue Athleten starten mit den allgemeinen Regeln |
+| 9 | Übungsauswahl je Position | Pools D1–D4 im Code (`AP_SLOTS`) auf eine Positionsmischung zugeschnitten | umgesetzt (M3): Kandidatenlisten je Positionsgruppe aus `AOS_Trainingspfade.json`, Mischung nach `groupMix()` |
+| 10 | Erfahrung, Umsetz-Technik, Alter, Verletzungen | nicht vorhanden | umgesetzt: Modifikatoren der Trainingspfade (M3.7, M4.2a), Abfrage im Onboarding und Einstiegsstufe (M4.2, M4.5) |
 
 ## Neutrales Standardprofil (M2.5)
 
