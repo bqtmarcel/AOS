@@ -92,6 +92,41 @@ FLOW = """(async()=>{
     if(!qb) return 'Gruppenregeln QB falsch (Ausschlüsse/Pflicht)'; if(!rb) return 'Gruppenregeln RB 70 / DE 30 falsch '+rbInfo;
     if(!wr) return 'WR: Sätze-Delta der Hauptübungen falsch'; if(!mix) return 'Mischung Sätze-Delta (OL 60 / WR 40) falsch';
     if(!ein) return 'Einsteiger/Umsetzen/DT: Ausschlüsse oder Kontaktfaktor falsch'; if(!off||!since) return 'Umstellung auf Positionsgruppen greift nicht wie vorgesehen'; }
+  // M4.5: Einstiegsstufe aus der Standortbestimmung und Einstiegswochen parallel zum Teamkalender
+  { const f='fortgeschritten';
+    const st=[entryStage({w8:'6-8',last:'kurz',lifts:'ja'},f,false), entryStage({w8:'6-8',last:'kurz',lifts:'ja'},f,true), entryStage({w8:'3-5',last:'kurz',lifts:'ja'},f,false),
+              entryStage({w8:'6-8',last:'kurz',lifts:'ja'},'einsteiger',false), entryStage({w8:'0-2',last:'kurz',lifts:'ja'},f,false), entryStage({w8:'3-5',last:'mittel',lifts:'teilweise'},f,true)].join('');
+    if(st!=='322111') return 'Einstiegsstufen falsch ('+st+', erwartet 322111)';
+    const kp=clone(S.profile); const P2=REF.plan.phases.find(p=>p.id==='P2'); const weeks=Math.max(1, Math.round((daysBetween(P2.start,P2.end)+1)/7)); const types=apWeekTypes('P2',P2.start,weeks);
+    const blk=()=>REF.plan.blocks.find(b=>b.id==='AUTO-P2'); const wave=b=>b.templates.flatMap(t=>t.slots).find(s=>s.method==='wave');
+    S.profile.entry={ stage:3, start:P2.start }; apReplan(); let b=blk(); if(!b) return 'Einstieg: Block P2 fehlt';
+    const team1=b.week_wave[1], sets3=wave(b).dose[1][0], tw3=JSON.stringify(b.test_weeks);
+    S.profile.entry={ stage:1, start:P2.start }; apReplan(); b=blk(); const w=wave(b);
+    if(team1!==AP_WAVE_LABEL[types[0]]) return 'Stufe 3: erste Woche weicht vom Teamplan ab ('+team1+')';
+    if(b.week_wave[1]!=='Dein Einstieg 1/2' || b.week_wave[2]!=='Dein Einstieg 2/2') return 'Stufe 1: Einstiegswochen fehlen ('+JSON.stringify(b.week_wave)+')';
+    if(!(w.rpe_wave[1]<=7 && w.rpe_wave[2]<=7) || w.dose[1][0]>sets3) return 'Stufe 1: Dosierung/RPE im Einstieg zu hoch ('+JSON.stringify({rw:w.rpe_wave,d:w.dose[1],sets3})+')';
+    if(!b.test_weeks.includes(2) || b.week_wave[3]!==AP_WAVE_LABEL[types[2]]) return 'Stufe 1: Eingangstests oder Rückkehr in den Teamplan falsch ('+JSON.stringify(b.test_weeks)+' / '+tw3+')';
+    const di=types.findIndex(t=>t==='D'||t==='DT');
+    if(di>=0){ S.profile.entry={ stage:2, start:addDays(P2.start,di*7) }; apReplan(); b=blk(); if(!/zählt als dein Einstieg/.test(b.week_wave[di+1])) return 'Stufe 2: Team-Entlastung zählt nicht als Einstieg'; }
+    S.profile=kp; apReplan(); }
+  // M4.2: Onboarding für neue Athleten
+  { const kp=clone(S.profile), kt=clone(S.tests), kb=clone(S.bodyweight), kv=ui.view;
+    S.profile.positions=[]; delete S.profile.onboarded; delete S.profile.entry; ACT.obOpen(); if(!document.getElementById('onboarding')) return 'Onboarding erscheint nicht';
+    const setv=(id,v)=>{ const e=document.getElementById(id); if(!e) throw new Error('Feld '+id+' fehlt'); e.value=v; };
+    ACT.obNext(); if(ui.ob.step!==1) return 'Onboarding: Willkommen → Position klappt nicht';
+    ACT.obNext(); if(ui.ob.step!==1) return 'Onboarding: ohne Position weiter möglich';
+    setv('ob-main','RB'); CHG.obPos(); setv('ob-sec','DE'); CHG.obPos(); ACT.obNext();
+    setv('ob-h','180'); setv('ob-kg','90'); setv('ob-by','2000'); ACT.obSet({dataset:{v:'sex:m'}}); ACT.obNext(); if(ui.ob.step!==3) return 'Onboarding: Körperdaten nicht übernommen';
+    ACT.obSet({dataset:{v:'clean:1'}}); ACT.obNext();
+    ['w8:6-8','last:kurz','lifts:ja'].forEach(v=>ACT.obSet({dataset:{v}})); setv('ob-sq-kg','100'); setv('ob-sq-r','5'); setv('ob-sq-rpe','8'); ACT.obNext(); if(ui.ob.step!==5) return 'Onboarding: Trainingsstand nicht übernommen';
+    ACT.obSet({dataset:{v:'loc:home'}}); setv('ob-loctext','Langhantel, Rack, Kurzhanteln, Bank'); ACT.obNext(); ACT.obNext(); ACT.obPain({dataset:{v:'knie'}}); ACT.obNext();
+    if(ui.ob.step!==8 || !document.getElementById('onboarding').textContent.includes('Kurzer Einstieg')) return 'Onboarding: Zusammenfassung/Einstiegsstufe falsch';
+    ACT.obFinish(); const p=S.profile; const tst=S.tests.find(t=>t.source==='selbstangabe');
+    const ok=!ui.ob && p.onboarded && p.positions.map(x=>x.code+x.weight).join()==='RB70,DE30' && p.entry.stage===2 && p.heightCm===180 && p.planEngine==='gruppen'
+      && tst && tst.value===95 && (p.locations.find(l=>l.id==='loc-own')||{}).text.includes('Rack') && S.bodyweight.some(x=>x.kg===90) && !document.getElementById('onboarding');
+    const info=JSON.stringify({ ob:!!ui.ob, pos:p.positions, entry:p.entry, tst });
+    S.profile=kp; S.tests=kt; S.bodyweight=kb; ui.view=kv; apReplan(); render();
+    if(!ok) return 'Onboarding: Profil nicht vollständig übernommen '+info; }
   // Zeitbudget: zu volle Einheit wird auf höchstens 70 min gebracht, Grundübungen bleiben
   { const mk=(role,prio,method,sets,id)=>({ role, prio, method, sets, reps:'5', rest:[150,180], ex:REF.exMap[id], slot:{id}, slotId:id, reasons:[] });
     const it=[mk('power',1,'quality',4,'broad_jump'), mk('main',1,'wave',5,'high_bar_squat'), mk('main',1,'wave',5,'bench_press'), mk('main',1,'bodyweight_reps',5,'pull_up')]
@@ -235,6 +270,9 @@ async def supabase_test(browser):
     if await page.evaluate("sbReady()"): errors.append('Supabase: falscher Code wurde angenommen')
     await page.fill('#sb-otp', '123456'); await page.click('[data-act="sbVerify"]'); await page.wait_for_timeout(300)
     if not await page.evaluate("sbReady()"): errors.append('Supabase: Anmeldung mit richtigem Code klappt nicht'); await ctx.close(); return errors
+    # Neues Konto ohne Position: Onboarding erscheint nach dem Login (M4.2), „Später einrichten“ führt zurück
+    if not await page.evaluate("!!document.getElementById('onboarding')"): errors.append('Supabase: Onboarding erscheint nach dem ersten Login nicht')
+    await page.evaluate("()=>{ ACT.obLater(); ui.view='profil'; render(); }")
     # Alles Lokale ist oben
     n_local = await page.evaluate("syncRecords(S).size")
     if len([k for k, v in db.items() if not v['deleted']]) < n_local: errors.append(f'Supabase: nicht alle Datensätze hochgeladen ({len(db)} von {n_local})')

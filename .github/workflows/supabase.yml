@@ -30,14 +30,37 @@ jobs:
       - name: Mit dem Projekt verbinden
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF" -p "$SUPABASE_DB_PASSWORD"
       - name: Login einstellen
-        # Adresse der App und keine Selbstregistrierung. Die E-Mail-Vorlage (Code statt Link) lässt Supabase im Free-Plan
-        # erst mit eigenem E-Mail-Versand ändern (Roadmap M4.12) – supabase/auth/magic_link.html liegt dafür bereit.
+        # Adresse der App und keine Selbstregistrierung. Die E-Mail-Vorlagen setzt der nächste Schritt, sobald ein eigener
+        # E-Mail-Versand eingerichtet ist (Roadmap M4.12).
         run: |
           body='{"site_url":"https://bqtmarcel.github.io/AOS/","uri_allow_list":"https://bqtmarcel.github.io/AOS/**","disable_signup":true,"external_email_enabled":true}'
           code=$(curl -s -o /tmp/auth.json -w '%{http_code}' -X PATCH "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" -d "$body")
           if [ "$code" != "200" ]; then echo "::error::Login-Einstellungen nicht gespeichert (HTTP $code)"; jq -r '.message? // empty' /tmp/auth.json; exit 1; fi
           jq '{site_url, uri_allow_list, disable_signup, external_email_enabled, smtp_host: (.smtp_host != null and .smtp_host != "")}' /tmp/auth.json
+      - name: E-Mail-Versand einstellen (Roadmap M4.12)
+        # Nur wenn die SMTP-Secrets gesetzt sind (Anleitung docs/EMAIL_VERSAND.md). Setzt eigenen Versand,
+        # Absender, Mail-Vorlagen (Code statt nur Link) und ein höheres Mail-Limit. Passwort nie im Log.
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+        run: |
+          if [ -z "$SMTP_PASS" ]; then echo "::notice::Kein eigener E-Mail-Versand eingerichtet (Secrets SMTP_* fehlen) – Supabase-Standardversand bleibt."; exit 0; fi
+          for v in SMTP_HOST SMTP_USER; do if [ -z "${!v}" ]; then echo "::error::GitHub-Secret $v fehlt"; exit 1; fi; done
+          echo "::add-mask::$SMTP_PASS"
+          body=$(jq -n --arg host "$SMTP_HOST" --arg port "${SMTP_PORT:-465}" --arg user "$SMTP_USER" --arg pass "$SMTP_PASS" \
+            --arg from "${SMTP_FROM:-$SMTP_USER}" --rawfile ml supabase/auth/magic_link.html --rawfile inv supabase/auth/invite.html \
+            '{smtp_host:$host, smtp_port:$port, smtp_user:$user, smtp_pass:$pass, smtp_admin_email:$from, smtp_sender_name:"AOS Red Tigers",
+              smtp_max_frequency:30, rate_limit_email_sent:60,
+              mailer_subjects_magic_link:"Dein AOS-Code", mailer_templates_magic_link_content:$ml,
+              mailer_subjects_invite:"Einladung zu AOS", mailer_templates_invite_content:$inv}')
+          code=$(curl -s -o /tmp/smtp.json -w '%{http_code}' -X PATCH "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" -d "$body")
+          if [ "$code" != "200" ]; then echo "::error::E-Mail-Versand nicht gespeichert (HTTP $code)"; jq -r '.message? // empty' /tmp/smtp.json; exit 1; fi
+          jq '{smtp_host, smtp_port, smtp_admin_email, rate_limit_email_sent}' /tmp/smtp.json
       - name: Datenbankstruktur aktualisieren
         run: supabase db push --remote --yes -p "$SUPABASE_DB_PASSWORD"
       - name: Zugriffsregeln prüfen

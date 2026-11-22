@@ -900,7 +900,7 @@ function render(){
   if(window.__aosUpdate && typeof aosApplyUpdate==='function'){ aosApplyUpdate(); }
   renderShell();
   const m=document.getElementById('main');
-  const fn = {uebersicht:viewOverview, plan:viewPlan, training:viewTraining, tests:viewTests, profil:viewProfile, ernaehrung:viewNutrition, team:viewTeam}[ui.view] || viewOverview;
+  const fn = obActive() ? viewOnboarding : ({uebersicht:viewOverview, plan:viewPlan, training:viewTraining, tests:viewTests, profil:viewProfile, ernaehrung:viewNutrition, team:viewTeam}[ui.view] || viewOverview);   // Onboarding (M4.2) beim ersten Login
   m.innerHTML = (isLive() && !logVisible() ? liveBar() : '') + (storageOK?'':'<div class="note bad"><strong>Lokaler Speicher nicht verfügbar.</strong> Der Browser erlaubt für diese Datei keine dauerhafte Speicherung (z. B. privater Modus oder blockierte Website-Daten). Eingaben gehen beim Schließen verloren – exportiere eine JSON-Sicherung oder öffne die Datei in einem normalen Browserfenster.</div>') + fn();
   stackTables(m);
   if(!isLive() && REST.iv) restStop();
@@ -1283,6 +1283,7 @@ ACT.saveLog = el=>{
     if(wu.length) e.warmup=wu; else delete e.warmup; });
   log.loggedAt=new Date().toISOString();
   s.log=log; s.status=el.dataset.st; delete s.draft; const nt=autoTests(s); save();
+  { const ei=S.profile.entry; if(ei && ei.start && sessionDate(s)>=ei.start && sessionDate(s)<=addDays(ei.start,13)) apReplan(); }   // Einstieg: Nachsteuerung nach Woche 1
   logClear(); wakeOff(); render();
   if(first) finShow(s); else toast('Einheit gespeichert ('+STATUS_LABEL[s.status]+').');
   if(nt) setTimeout(()=>toast('Standortbestimmung: '+nt+' Testergebnis'+(nt===1?'':'se')+' im Verlauf gespeichert.'), first?2500:1200);
@@ -1616,6 +1617,8 @@ function athleteSection(){ const mix=posMix(); const main=mix[0]||null, sec=mix[
   let b='<label for="ap-main">Hauptposition</label><select id="ap-main" data-chg="apPos">'+(main?'':'<option value="" selected>— bitte wählen —</option>')+opt(main&&main.code,false)+'</select>'+
     '<label for="ap-sec">Nebenposition (optional)</label><select id="ap-sec" data-chg="apPos">'+opt(sec&&sec.code,true)+'</select>';
   if(sec) b+='<label>Anteil Nebenposition</label><div>'+[10,20,30,40,50].map(v=>'<button class="chip" data-act="apShare" data-v="'+v+'" aria-pressed="'+(sec.share===v)+'">'+v+' %</button>').join('')+'</div>';
+  const EI=entryInfo(); if(EI){ const t=todayISO(); b+='<p class="small">Einstieg: '+esc(ENTRY_NAME[EI.stage])+(EI.end?(t<=EI.end?' · bis '+fmtDate(EI.end):' · abgeschlossen'):'')+'</p>'+(EI.adj?'<p class="small muted">'+esc(EI.adj)+'</p>':''); }
+  if(!(S.profile.positions||[]).length && !S.profile.onboarded) b='<p class="small">Noch nicht eingerichtet. <button class="link" data-act="obOpen">Einrichtung starten</button> (ca. 5 Minuten)</p>'+b;
   const gm=groupMix(); if(gm.length) b+='<p class="small muted">Positionsgruppe: '+esc(gm.map(g=>GROUP_NAME[g.group]+(gm.length>1?' '+g.share+' %':'')).join(' · '))+'</p>';
   const exp=S.profile.experience||'fortgeschritten';
   b+='<label>Trainingserfahrung</label><div>'+EXP_LIST.map(([k,n])=>'<button class="chip" data-act="apExp" data-v="'+k+'" aria-pressed="'+(exp===k)+'">'+n+'</button>').join('')+'</div>'+
@@ -1666,6 +1669,115 @@ ACT.apDay = el=>{ const d=el.dataset.v; let days=trainingDays(); days=days.inclu
   if(!days.length){ toast('Mindestens ein Trainingstag.'); return; }
   S.profile.trainingDays=DAY_KEYS.filter(k=>days.includes(k)); save(); apReplan(); render();
   if(days.length>4) toast('AOS plant höchstens 4 Einheiten – die ersten 4 Tage zählen.'); };
+
+/* ===== Onboarding für neue Athleten (Mehrbenutzer-Spezifikation 6, Roadmap M4.2) =====
+   Einmalig beim ersten Login, ca. 5 Minuten. Danach plant AOS sofort. Alles bleibt im Profil änderbar.
+   Erscheint nur für angemeldete Athleten ohne Position und ohne abgeschlossenes Onboarding (Bestand gilt als eingerichtet). */
+const OB_STEPS=['Willkommen','Position','Körperdaten','Erfahrung','Trainingsstand','Trainingsort','Trainingstage','Einschränkungen','Fertig'];
+const OB_LOC=[['public','Public Gym','Fitnessstudio mit üblicher Ausstattung'],['verein','Vereinskraftraum','Kraftraum der Red Tigers'],['home','Home Gym','eigene Geräte zuhause'],['minimal','Minimal','nur Kurzhanteln, Kettlebells, Bänder']];
+const OB_PAIN=[['knie','Knie'],['huefte','Hüfte'],['ruecken','Rücken'],['schulter','Schulter']];
+const OB_LIFTS=[['sq','Kniebeuge','High-Bar Squat'],['bp','Bankdrücken','Bankdrücken'],['dl','Trap-Bar-Kreuzheben','Trap-Bar-Kreuzheben']];
+function obNeeded(){ if(typeof S==='undefined'||!S||!S.profile||ui.obSkip) return false; const p=S.profile;
+  if(p.onboarded || (p.positions||[]).length) return false;
+  if(!sbReady()) return false; const r=sbRoles(); if(TEAM.loaded && r.length && !r.includes('athlete')) return false;   // reine Coach-Konten trainieren nicht
+  return true; }
+function obActive(){ return !!(ui.ob || obNeeded()); }
+function obState(){ if(!ui.ob){ const p=S.profile;
+    ui.ob={ step:0, d:{ main:'', sec:'', share:30, h:p.heightCm||'', kg:'', by:p.birthYear||'', sex:p.sex||'', exp:'fortgeschritten', clean:null, w8:'', last:'', lifts:'', wl:{},
+      loc:'public', locText:'', days:['MON','TUE','THU','FRI'], min:60, inj:[], pain:[], wg:'halten', ext:false } }; }
+  return ui.ob; }
+function obChips(act, list, on){ return '<div>'+list.map(([v,n])=>'<button class="chip" data-act="'+act+'" data-v="'+esc(String(v))+'" aria-pressed="'+!!on(String(v))+'">'+esc(n)+'</button>').join('')+'</div>'; }
+function viewOnboarding(){ const O=obState(), d=O.d, st=O.step; const dn={MON:'Mo',TUE:'Di',WED:'Mi',THU:'Do',FRI:'Fr',SAT:'Sa',SUN:'So'};
+  const opt=(sel,none)=>(none?'<option value="">— keine —</option>':'<option value=""'+(sel?'':' selected')+'>— bitte wählen —</option>')+POS_LIST.map(([c,n])=>'<option value="'+c+'"'+(sel===c?' selected':'')+'>'+c+' – '+n+'</option>').join('');
+  let b='';
+  if(st===0) b='<p>Willkommen bei AOS, dem Trainingssystem der Red Tigers.</p><p>AOS plant dein Krafttraining vollautomatisch: Übungen, Sätze, Wiederholungen und Gewichte, passend zu deiner Position, deiner Ausstattung und deinem Trainingsstand. Du trainierst und trägst ein, was du geschafft hast.</p><p class="small muted">Die Einrichtung dauert ca. 5 Minuten. Alles kannst du später im Profil ändern.</p>';
+  if(st===1){ b='<label for="ob-main">Hauptposition</label><select id="ob-main" data-chg="obPos">'+opt(d.main,false)+'</select>'+
+      '<label for="ob-sec">Nebenposition (optional)</label><select id="ob-sec" data-chg="obPos">'+opt(d.sec,true)+'</select>';
+    if(d.sec) b+='<label>Anteil Nebenposition</label>'+obChips('obSet',[10,20,30,40,50].map(v=>['share:'+v,v+' %']),v=>v==='share:'+d.share);
+    if(d.main) b+='<p class="small muted">Positionsgruppe: '+esc(GROUP_NAME[POS_GROUP[d.main]]||'')+(d.sec&&POS_GROUP[d.sec]!==POS_GROUP[d.main]?' · '+esc(GROUP_NAME[POS_GROUP[d.sec]]||''):'')+'</p>'; }
+  if(st===2) b='<div class="fields">'+inp('ob-h','Größe (cm)',d.h,'inputmode="numeric"')+inp('ob-kg','Körpergewicht (kg)',d.kg,'inputmode="decimal"')+'</div>'+
+      '<div class="fields">'+inp('ob-by','Geburtsjahr',d.by,'inputmode="numeric" placeholder="z. B. 2000"')+'</div>'+
+      '<label>Geschlecht</label>'+obChips('obSet',[['sex:m','männlich'],['sex:w','weiblich']],v=>v==='sex:'+d.sex)+
+      '<p class="small muted">Das Geschlecht braucht AOS nur für den DOTS-Score der Rangliste. Dein Körpergewicht sehen andere Spieler nie.</p>';
+  if(st===3) b='<label>Trainingserfahrung im Krafttraining</label>'+obChips('obSet',[['exp:einsteiger','Einsteiger (< 1 Jahr)'],['exp:fortgeschritten','Fortgeschritten (1–3 Jahre)'],['exp:erfahren','Erfahren (> 3 Jahre)']],v=>v==='exp:'+d.exp)+
+      '<label>Umsetzen (Power Clean) technisch sicher?</label>'+obChips('obSet',[['clean:1','Ja'],['clean:0','Nein / weiß nicht']],v=>d.clean!=null && v==='clean:'+(d.clean?1:0))+
+      '<p class="small muted">Ohne sichere Technik plant AOS statt Umsetzen Trap-Bar-Sprünge, Speed Pulls oder KB Swings.</p>';
+  if(st===4){ b='<label>In wie vielen der letzten 8 Wochen hattest du mindestens 2 Krafteinheiten?</label>'+obChips('obSet',[['w8:0-2','0–2'],['w8:3-5','3–5'],['w8:6-8','6–8']],v=>v==='w8:'+d.w8)+
+      '<label>Wann war deine letzte Krafteinheit?</label>'+obChips('obSet',[['last:kurz','diese oder letzte Woche'],['last:mittel','vor 2–4 Wochen'],['last:lang','länger her']],v=>v==='last:'+d.last)+
+      '<label>Waren Kniebeuge, Bankdrücken und Kreuzheben (oder Trap Bar) regelmäßig dabei?</label>'+obChips('obSet',[['lifts:ja','ja'],['lifts:teilweise','teilweise'],['lifts:nein','nein']],v=>v==='lifts:'+d.lifts)+
+      '<label>Optional: deine Arbeitsgewichte der letzten 4 Wochen</label><p class="small muted">Gewicht × Wiederholungen und ungefähr, wie schwer es war (RPE 1–10). Leer lassen ist in Ordnung – dann tastet sich AOS in den ersten Einheiten heran.</p>'+
+      OB_LIFTS.map(([k,n])=>{ const w=d.wl[k]||{}; return '<p class="small" style="margin:8px 0 0">'+n+'</p><div class="fields" style="grid-template-columns:repeat(3,minmax(0,1fr))">'+inp('ob-'+k+'-kg','kg',w.kg||'','inputmode="decimal"')+inp('ob-'+k+'-r','Wdh',w.r||'','inputmode="numeric"')+inp('ob-'+k+'-rpe','RPE',w.rpe||'','inputmode="decimal" placeholder="z. B. 8"')+'</div>'; }).join(''); }
+  if(st===5){ b='<label>Wo trainierst du hauptsächlich?</label>'+OB_LOC.map(([k,n,t])=>'<button class="chip" data-act="obSet" data-v="loc:'+k+'" aria-pressed="'+(d.loc===k)+'">'+esc(n)+'</button>').join('')+
+      '<p class="small muted">'+esc((OB_LOC.find(x=>x[0]===d.loc)||['','',''])[2])+'</p>';
+    if(d.loc==='home'||d.loc==='minimal') b+='<label for="ob-loctext">Vorhandene Geräte</label><textarea id="ob-loctext" rows="3" placeholder="z. B. Langhantel, Rack, Kurzhanteln, Bank, Klimmzugstange">'+esc(d.locText||(d.loc==='minimal'?'Kurzhanteln, Kettlebells, Widerstandsbänder, Klimmzugstange':''))+'</textarea><p class="small muted">AOS plant nur Übungen mit diesen Geräten. „kein …“ schließt etwas aus, z. B. „keine Sprünge“.</p>';
+    else b+='<p class="small muted">AOS nimmt die übliche Ausstattung an. Einzelne Geräte kannst du später im Profil unter Trainingsorte ändern.</p>'; }
+  if(st===6) b='<label>An welchen Tagen machst du Krafttraining?</label><div class="chips7">'+DAY_KEYS.map(k=>'<button class="chip" data-act="obDay" data-v="'+k+'" aria-pressed="'+d.days.includes(k)+'">'+dn[k]+'</button>').join('')+'</div>'+
+      '<p class="small muted">2–4 Tage. Bei weniger Tagen verteilt AOS den Wochenumfang auf diese Tage.</p>'+
+      '<label>Zeit pro Einheit (inkl. Aufwärmen)</label>'+obChips('obSet',[45,60,75,90].map(m=>['min:'+m,m+' min']),v=>v==='min:'+d.min);
+  if(st===7) b='<label>Verletzungen der letzten 12 Monate</label>'+obChips('obInj',Object.entries(INJ_NAME),v=>d.inj.includes(v))+
+      '<label>Aktuelle Beschwerden</label>'+obChips('obPain',OB_PAIN,v=>d.pain.includes(v))+
+      '<p class="small muted">AOS plant dafür Schutzübungen ein und lässt riskante Übungen weg. AOS stellt keine Diagnose – bei anhaltenden Beschwerden bitte ärztlich abklären.</p>'+
+      '<label>Dein Körpergewicht soll …</label>'+obChips('obSet',[['wg:aufbauen','aufbauen'],['wg:halten','halten'],['wg:reduzieren','reduzieren']],v=>v==='wg:'+d.wg)+
+      '<label>Körperlich harter Beruf oder Schichtarbeit?</label>'+obChips('obSet',[['ext:1','ja'],['ext:0','nein']],v=>v==='ext:'+(d.ext?1:0));
+  if(st===8){ const s=entryStage(d, d.exp, d.pain.length>0); const st0=obStart();
+    b='<p><strong>'+esc(ENTRY_NAME[s])+'</strong></p><p>'+(s===3?'Du steigst ab '+fmtDate(st0)+' direkt in die laufende Phase des Teams ein. In der ersten Woche tastet sich AOS bei den schweren Sätzen an deine Gewichte heran.'
+        : s===2?'Ab '+fmtDate(st0)+' trainierst du eine Woche mit etwas weniger Umfang und moderater Intensität. Danach bist du in derselben Phase und Woche wie das Team.'
+        : 'Ab '+fmtDate(st0)+' trainierst du zwei Wochen zum Eingewöhnen: weniger Umfang, leichtere Gewichte, Technik zuerst. Danach bist du in derselben Phase und Woche wie das Team.')+'</p>'+
+      '<p class="small muted">Läuft die erste Woche deutlich leichter oder schwerer als geplant, passt AOS den Einstieg automatisch an.</p>'+
+      '<p class="small muted">In Woche 1 machst du beim Aufwärmen drei kurze Mobilitäts-Checks (Überkopf, Sprunggelenk, Front-Rack). Das Ergebnis trägst du im Profil unter „Belastbarkeit &amp; Rahmen“ ein.</p>'; }
+  const foot='<div class="row" style="justify-content:space-between;margin-top:16px">'+(st>0?'<button data-act="obBack">Zurück</button>':'<span></span>')+
+    (st<OB_STEPS.length-1?'<button class="primary" data-act="obNext">Weiter</button>':'<button class="primary" data-act="obFinish">Los geht’s</button>')+'</div>';
+  return '<section class="card" id="onboarding"><p class="small muted">Einrichtung · Schritt '+(st+1)+' von '+OB_STEPS.length+'</p><h2>'+esc(OB_STEPS[st])+'</h2>'+b+foot+
+    (st===0?'<p class="small" style="margin-top:12px"><button class="link" data-act="obLater">Später einrichten</button></p>':'')+'</section>'; }
+/* Startwoche des Einstiegs: Montag dieser Woche, am Wochenende der nächste Montag */
+function obStart(){ const t=todayISO(); const wd=weekdayOf(t); return (wd===0||wd===6) ? addDays(mondayOf(t),7) : mondayOf(t); }
+function obCollect(){ const O=ui.ob; if(!O) return; const d=O.d; const g=id=>document.getElementById(id)?val(id):null;
+  if(O.step===2){ if(g('ob-h')!==null) d.h=g('ob-h'); if(g('ob-kg')!==null) d.kg=g('ob-kg'); if(g('ob-by')!==null) d.by=g('ob-by'); }
+  if(O.step===4) OB_LIFTS.forEach(([k])=>{ if(g('ob-'+k+'-kg')!==null) d.wl[k]={ kg:g('ob-'+k+'-kg'), r:g('ob-'+k+'-r'), rpe:g('ob-'+k+'-rpe') }; });
+  if(O.step===5 && g('ob-loctext')!==null) d.locText=g('ob-loctext'); }
+function obCheck(){ const d=ui.ob.d, st=ui.ob.step;
+  if(st===1 && !d.main) return 'Bitte eine Hauptposition wählen.';
+  if(st===2){ const h=num(d.h), kg=num(d.kg), by=num(d.by), y=new Date().getFullYear();
+    if(h==null||h<140||h>230) return 'Bitte die Größe in cm eingeben.'; if(kg==null||kg<40||kg>250) return 'Bitte das Körpergewicht in kg eingeben.';
+    if(by==null||by<y-70||by>y-12) return 'Bitte das Geburtsjahr eingeben.'; }
+  if(st===3 && d.clean==null) return 'Bitte angeben, ob du das Umsetzen technisch sicher beherrschst.';
+  if(st===4){ if(!d.w8||!d.last||!d.lifts) return 'Bitte die drei Fragen beantworten.';
+    for(const [k,n] of OB_LIFTS){ const w=d.wl[k]||{}; const kg=num(w.kg), r=num(w.r), rpe=num(w.rpe);
+      if(w.kg||w.r||w.rpe){ if(kg==null||kg<=0||kg>500||r==null||r<1||r>12) return n+': bitte Gewicht und 1–12 Wiederholungen eintragen oder alles leer lassen.'; if(rpe!=null&&(rpe<5||rpe>10)) return n+': RPE zwischen 5 und 10.'; } } }
+  if(st===6 && (d.days.length<2||d.days.length>4)) return 'Bitte 2 bis 4 Trainingstage wählen.';
+  return ''; }
+ACT.obNext = ()=>{ obCollect(); const e=obCheck(); if(e){ toast(e); return; } ui.ob.step=Math.min(OB_STEPS.length-1, ui.ob.step+1); render(); window.scrollTo(0,0); };
+ACT.obBack = ()=>{ obCollect(); ui.ob.step=Math.max(0, ui.ob.step-1); render(); window.scrollTo(0,0); };
+ACT.obLater = ()=>{ ui.obSkip=true; ui.ob=null; render(); toast('Du kannst die Einrichtung im Profil jederzeit starten.'); };
+ACT.obOpen = ()=>{ ui.obSkip=false; obState(); ui.view='profil'; render(); window.scrollTo(0,0); };
+ACT.obSet = el=>{ obCollect(); const [k,v]=el.dataset.v.split(':'); const d=ui.ob.d;
+  if(k==='share'||k==='min') d[k]=+v; else if(k==='clean'||k==='ext') d[k]=v==='1'; else { d[k]=v; if(k==='loc') d.locText=''; } render(); };
+CHG.obPos = ()=>{ const d=ui.ob.d; d.main=val('ob-main'); d.sec=val('ob-sec'); if(d.sec===d.main) d.sec=''; render(); };
+ACT.obDay = el=>{ const d=ui.ob.d, k=el.dataset.v; d.days=d.days.includes(k)?d.days.filter(x=>x!==k):DAY_KEYS.filter(x=>d.days.concat([k]).includes(x)); render(); };
+ACT.obInj = el=>{ const d=ui.ob.d, k=el.dataset.v; d.inj=d.inj.includes(k)?d.inj.filter(x=>x!==k):d.inj.concat([k]); render(); };
+ACT.obPain = el=>{ const d=ui.ob.d, k=el.dataset.v; d.pain=d.pain.includes(k)?d.pain.filter(x=>x!==k):d.pain.concat([k]); render(); };
+ACT.obFinish = ()=>{ const d=ui.ob.d, p=S.profile, t=todayISO(); const name=c=>(POS_LIST.find(x=>x[0]===c)||[c,c])[1];
+  const share=d.sec?d.share:0;
+  p.positions=[{ id:uid('pos'), code:d.main, name:name(d.main), weight:100-share }].concat(share?[{ id:uid('pos'), code:d.sec, name:name(d.sec), weight:share }]:[]);
+  p.heightCm=num(d.h); p.birthYear=num(d.by); if(d.sex) p.sex=d.sex;
+  p.experience=d.exp; p.cleanSafe=!!d.clean; p.trainingDays=DAY_KEYS.filter(k=>d.days.includes(k)); p.sessionMin=d.min;
+  p.injuries=d.inj.slice(); p.weightGoal=d.wg; p.extLoad=!!d.ext; p.planEngine='gruppen'; p.planEngineSince='';
+  // Trainingsort: gewähltes Profil bekommt die Trainingstage (ein Wochentag gehört höchstens zu einem Ort)
+  const L=p.locations=Array.isArray(p.locations)?p.locations:[]; L.forEach(l=>{ l.days=[]; });
+  let loc=null;
+  if(d.loc==='public') loc=L.find(l=>l.id==='loc-public');
+  else if(d.loc==='home'||d.loc==='minimal'){ loc=L.find(l=>l.id==='loc-own'); if(loc){ loc.name=d.loc==='minimal'?'Minimal':'Home Gym'; loc.text=d.locText||(d.loc==='minimal'?'Kurzhanteln, Kettlebells, Widerstandsbänder, Klimmzugstange':''); } }
+  else if(d.loc==='verein'){ loc=L.find(l=>l.name==='Vereinskraftraum'); if(!loc){ loc={ id:uid('loc'), name:'Vereinskraftraum', note:'', source:'eingabe', text:'', days:[] }; L.unshift(loc); } }
+  if(loc) loc.days=p.trainingDays.map(k=>(DAY_KEYS.indexOf(k)+1)%7);
+  // Körpergewicht als erste Messung
+  const kg=num(d.kg); if(kg) S.bodyweight.push({ id:uid('bw'), source:'eingabe', createdAt:new Date().toISOString(), date:t, kg, approx:false, note:'Einrichtung' });
+  // Arbeitsgewichte (Selbstangabe): 95 % als Startwert über die Tests, nach der ersten Einheit zählen nur noch die eigenen Protokolle (6.2)
+  OB_LIFTS.forEach(([k,,tn])=>{ const w=d.wl[k]||{}; const v=num(w.kg), r=num(w.r); if(v==null||r==null) return; const rpe=num(w.rpe);
+    S.tests.push({ id:uid('test'), source:'selbstangabe', createdAt:new Date().toISOString(), name:tn, category:'Kraft', date:t, value:Math.round(v*0.95*2)/2, unit:'kg', reps:r, rpe:rpe!=null?rpe:9, detail:'', conditions:'Selbstangabe bei der Einrichtung (95 % von '+fmtNum(v)+' kg)', note:'zählt nicht für Ranglisten' }); });
+  const stage=entryStage(d, d.exp, d.pain.length>0);
+  p.entry={ stage, start:obStart(), w8:d.w8, last:d.last, lifts:d.lifts, pain:d.pain.slice(), at:t };
+  p.onboarded=t;
+  ui.ob=null; ui.view='uebersicht'; save(); apReplan(); render(); window.scrollTo(0,0); toast('Eingerichtet – AOS hat deinen Plan erstellt.'); };
 
 /* ===== AOS – Automatische Blockplanung (interner Strength Coach) =====
    Für jede Phase ohne eigenen Block in plan.json stellt AOS den Block selbst zusammen – ohne Entscheidung des Athleten:
@@ -1801,18 +1913,58 @@ function apEmphasis(start){ if(typeof S==='undefined'||!S) return null;
     const p=goalVal(L[L.length-1])/g.target; if(!best||p<best.p) best={ key, p, name:g.name }; });
   return best;
 }
+/* ===== Einstieg für spätere Starter (Mehrbenutzer-Spezifikation 6.1, Roadmap M4.5) =====
+   AOS bestimmt aus der Standortbestimmung im Onboarding eine Einstiegsstufe (der Athlet sieht nur das Ergebnis):
+   3 = direkt in die laufende Teamphase · 2 = 1 Woche Einstieg · 1 = 2 Wochen Eingewöhnung. Die Einstiegswochen laufen parallel
+   zum Teamkalender und ersetzen dort die ersten Wochen (Dosierung wie P1-Einstieg); danach ist der Athlet in derselben Phase und Woche wie alle.
+   Nach der ersten Woche steuert AOS automatisch nach (Einstiegswoche nachsetzen bzw. Einstieg vorzeitig beenden). */
+const ENTRY_NAME={ 1:'Eingewöhnung: 2 Wochen Einstieg', 2:'Kurzer Einstieg: 1 Woche', 3:'Direkt in die laufende Teamphase' };
+const ENTRY_PAIN=['knie','huefte','ruecken','schulter'];
+function entryStage(a, exp, painMain){ a=a||{}; let s;
+  if(a.w8==='0-2' || a.last==='lang' || a.lifts==='nein' || exp==='einsteiger') s=1;
+  else if(a.w8==='6-8' && a.last==='kurz' && a.lifts==='ja') s=3;
+  else s=2;
+  if(painMain && s>1) s--;   // Beschwerden in einer Region der Hauptübungen: eine Stufe tiefer
+  return s; }
+/* Erste Woche auswerten: RPE der Hauptübungssätze gegenüber dem Ziel */
+function entryWeek1(start){ if(typeof S==='undefined'||!S||todayISO()<addDays(start,7)) return null;
+  const end=addDays(start,6); let n=0, high=0, tops=[];
+  loggedSessions().filter(s=>s.planner && sessionDate(s)>=start && sessionDate(s)<=end).forEach(s=>s.log.exercises.forEach(e=>{
+    const pe=(s.plan||[]).find(p=>p.id===e.planExId); if(!pe||!pe.planner||pe.planner.role!=='main'||typeof pe.rpeTarget!=='number') return;
+    const ws=workSets(e).filter(x=>typeof x.rpe==='number'); if(!ws.length) return;
+    ws.forEach(x=>{ n++; if(x.rpe>=pe.rpeTarget+1) high++; });
+    const top=ws.filter(x=>x.kg!=null).reduce((a,b)=>(!a||b.kg>a.kg)?b:a, null); if(top) tops.push(top.rpe-pe.rpeTarget); }));
+  if(!n) return null;
+  return { n, highShare:high/n, allLow:tops.length>0 && tops.every(d=>d<=-1.5) }; }
+function entryInfo(){ const e=typeof S!=='undefined'&&S&&S.profile&&S.profile.entry; if(!e || !e.start || !e.stage) return null;
+  let weeks=e.stage===1?[0,1]:e.stage===2?[0]:[]; let adj='';
+  const w1=entryWeek1(e.start);
+  if(w1 && e.stage===3 && (w1.highShare>=0.5 || deloadSignals().length>=2)){ weeks=[1]; adj='Woche 1 war deutlich schwerer als geplant: AOS setzt eine Einstiegswoche nach und rechnet die Lasten aus deinen Sätzen neu.'; }
+  else if(w1 && e.stage===1 && w1.allLow){ weeks=[0]; adj='Alle Top-Sets klar unter dem Ziel-RPE: Der Einstieg endet nach der ersten Woche.'; }
+  return { start:e.start, stage:e.stage, weeks, test:(e.stage<3 && weeks.length)?weeks[weeks.length-1]:null, adj, end:weeks.length?addDays(e.start, weeks[weeks.length-1]*7+6):null }; }
+/* Einstieg je Blockwoche: { wt } = eigene Einstiegsdosierung · { team } = Team-Entlastung/Testwoche zählt als Einstieg · { cap } = nur RPE-Grenze */
+function entryWeeksIn(phase, types, weeks){ const I=entryInfo(); const out=Array(weeks).fill(null); if(!I) return out;
+  for(let w=0; w<weeks; w++){ const k=Math.round(daysBetween(I.start, addDays(phase.start,w*7))/7); const i=I.weeks.indexOf(k); if(i<0) continue;
+    const base={ k, i, n:I.weeks.length, test:k===I.test };
+    if(phase.id==='P5'||phase.id==='IN'){ if(I.stage===1) out[w]=Object.assign(base,{ cap:7 }); continue; }   // Peak/Saison: keine Einstiegswoche, Stufe 1 RPE ≤ 7
+    if(I.stage>=2 && (types[w]==='D'||types[w]==='DT')){ out[w]=Object.assign(base,{ team:true }); continue; }
+    out[w]=Object.assign(base,{ wt:(i===0?'E':'A'), cap:I.stage===1?7:7.5 }); }
+  return out; }
 function apBuildBlock(phase, prev, prev2){
   const P=AP_PROFILE[phase.id]; if(!P || !REF.exMap) return null;
   const weeks=Math.max(1, Math.round((daysBetween(phase.start, phase.end)+1)/7));
   const types=apWeekTypes(phase.id, phase.start, weeks); const prevUsed=apUsedIn(prev); const taken=new Set(); const emph=(phase.id==='IN'||phase.id==='P1')?null:apEmphasis(phase.start);   // Wiedereinstieg und Saison: kein Zusatzsatz
+  const EN=entryWeeksIn(phase, types, weeks);   // Einstieg für spätere Starter (M4.5)
   const C=apUseGroups(phase) ? tpContext() : null;   // Positionsgruppen (M3) oder bisherige Vorlagen
   const TPL=C ? tpTemplates(phase, C) : Object.entries(phase.id==='IN'?AP_SLOTS_IN:AP_SLOTS).map(([tid,T])=>({ tid, name:T.name, group:T.group, time:T.time, slots:T.slots }));
   const tids=TPL.map(t=>t.tid); const firstLower=(TPL.find(t=>t.group!=='upper')||TPL[0]||{}).tid;
   const prevCtx={ b1:prev, b2:prev2, used:prevUsed };
   const buildSlot=(tid, spec, id, c)=>{
     const ex=REF.exMap[c[0]]; const dose={}, rw={}; let rng=null, rpe=null;
-    types.forEach((wt,w)=>{ let d=spec.field ? tpFieldDose(phase.id, wt) : apSlotDose(spec, ex, P, wt, emph && ((emph.key==='squat'&&spec.k==='squat')||(emph.key==='bench'&&spec.k==='bench')||(emph.key==='hinge'&&spec.k==='hinge')));
-      if(C && !spec.field) d=tpDose(d, spec, ex, C, phase.id, wt);
+    types.forEach((wt,w)=>{ const en=EN[w]; const ew=en&&en.wt;
+      let d=spec.field ? tpFieldDose(phase.id, wt) : ew ? apSlotDose(spec, ex, AP_PROFILE.P1, ew, null) : apSlotDose(spec, ex, P, wt, emph && ((emph.key==='squat'&&spec.k==='squat')||(emph.key==='bench'&&spec.k==='bench')||(emph.key==='hinge'&&spec.k==='hinge')));
+      if(C && !spec.field) d=tpDose(d, spec, ex, C, ew?'P1':phase.id, ew||wt);
+      if(en && en.cap && typeof d.rpe==='number') d.rpe=Math.min(d.rpe, en.cap);
       dose[w+1]=d.dose; if(typeof d.rpe==='number' && spec.main && spec.main!=='pull') rw[w+1]=d.rpe; else if(d.rpe!=null) rpe=String(d.rpe); if(d.range) rng=d.range; });
     const method = spec.field ? 'quality' : (spec.main==='main'||spec.main==='hinge') ? 'wave' : spec.main==='pull' ? 'bodyweight_reps' : spec.second ? ((ex.progression||[]).includes('wave') ? 'rpe_linear' : 'double') : ((ex.progression||[])[0]||'quality');
     const sl={ id, role:spec.role, prio:spec.prio, method, candidates:c, dose, rest:spec.role==='main'?[150,180]:spec.role==='power'?[75,90]:[60,75] };
@@ -1831,17 +1983,26 @@ function apBuildBlock(phase, prev, prev2){
   });
   if(C && phase.id!=='IN') tpPflicht(templates, TPL, C, phase, buildSlot);
   // Standortbestimmung: Broad Jump in der Testwoche (erste Unterkörper-Einheit), wenn er nicht ohnehin geplant ist
-  templates.forEach(t=>{ const slots=t.slots; if(t.id===firstLower && types.some(x=>x==='H'||x==='DT') && !slots.some(s=>s.candidates[0]==='broad_jump') && REF.exMap.broad_jump){
-      const tw=types.findIndex(x=>x==='H'||x==='DT')+1; slots.unshift({ id:t.id+'-0', role:'power', prio:1, method:'quality', candidates:['broad_jump'], dose:{[tw]:[1,'3']}, rest:[60,90], note:'Standortbestimmung: 3 Versuche nach dem Aufwärmen, beste Weite notieren.' }); } });
+  const testW=types.map((t,i)=>(t==='H'||t==='DT'||(EN[i]&&EN[i].test))?i+1:0).filter(Boolean);   // inkl. Eingangstests am Ende des Einstiegs
+  templates.forEach(t=>{ const slots=t.slots; if(t.id===firstLower && testW.length && REF.exMap.broad_jump){
+      const bj=slots.find(s=>s.candidates[0]==='broad_jump'); const miss=testW.filter(w=>!bj||!bj.dose[w]); if(!miss.length) return;
+      if(bj) miss.forEach(w=>{ bj.dose[w]=[1,'3']; });
+      else slots.unshift({ id:t.id+'-0', role:'power', prio:1, method:'quality', candidates:['broad_jump'], dose:Object.fromEntries(testW.map(w=>[w,[1,'3']])), rest:[60,90], note:'Standortbestimmung: 3 Versuche nach dem Aufwärmen, beste Weite notieren.' }); } });
   const ps=prev&&prev.week_schedule; const sched=phase.id==='IN' ? { TUE:'IN1', THU:'IN2' } : schedFromDays(tids);   // Trainingstage aus dem Profil
   const week_wave={}, week_notes={}, week_overrides={};
-  types.forEach((t,w)=>{ week_wave[w+1]=AP_WAVE_LABEL[t]; });
+  types.forEach((t,w)=>{ const en=EN[w]; week_wave[w+1]=en&&en.wt ? 'Dein Einstieg '+(en.i+1)+'/'+en.n : AP_WAVE_LABEL[t]+(en&&en.team?' · zählt als dein Einstieg':''); });
   week_notes[1]=[P.goal+'. Hauptübungen fix, Rest wechselt.'];
   (P.notes||[]).forEach(n=>week_notes[1].push(n));
   if(emph) week_notes[1].push('Schwerpunkt: '+emph.name+' +1 Satz (erst '+Math.round(emph.p*100)+' % vom Ziel).');
   if(C){ week_notes[1].push('Positionsgruppe: '+C.label+(C.exp!=='fortgeschritten'?' · '+(EXP_LIST.find(e=>e[0]===C.exp)||['',''])[1]:'')+(C.clean?'':' · Umsetzen ersetzt durch Trap-Bar-Sprung/Speed Pull')+'.');
     if(phase.id!=='IN' && phase.id!=='P1' && phase.id!=='P2' && !templates.some(t=>t.slots.some(s=>s.tp==='field'))) week_notes[1].push('Sprints und Positionsarbeit über das Teamtraining (kein Feldtag im Profil).');
     C.notes.forEach(n=>week_notes[1].push(n)); }
+  const EI=entryInfo(); EN.forEach((en,w)=>{ if(!en) return; const nn=(week_notes[w+1]=week_notes[w+1]||[]);
+    if(en.wt) nn.push('Dein Einstieg ('+ENTRY_NAME[EI.stage]+'): weniger Sätze, RPE höchstens '+fmtNum(en.cap)+'. Danach trainierst du in derselben Phase und Woche wie das Team.');
+    else if(en.team) nn.push('Team-Entlastung bzw. Testwoche: zählt als dein Einstieg.');
+    else if(en.cap) nn.push('Einstieg in der '+(phase.id==='IN'?'Saison':'Peak-Phase')+': keine eigene Einstiegswoche, RPE höchstens '+fmtNum(en.cap)+'.');
+    if(en.test) nn.push('Eingangstests: Top-Sets Kniebeuge, Bank, Trap Bar und Broad Jump gehen automatisch in den Verlauf.');
+    if(en.i===en.n-1 && EI.adj) nn.push(EI.adj); });
   types.forEach((t,w)=>{ if(t==='D') week_overrides[w+1]={ note:'Entlastung: weniger Sätze, gleiche Last'+(addDays(phase.start,w*7).slice(5)<='12-31'&&addDays(phase.start,w*7).slice(5)>='12-18'?' · Feiertage: Tage frei setzen':'') };
     if(t==='H'||t==='DT') (week_notes[w+1]=week_notes[w+1]||[]).push('Standortbestimmung: Broad Jump (D1), Top-Sets Kniebeuge, Kreuzheben, Bank bis RPE '+fmtNum(P.cap)+', kein Maxtest. Ergebnisse gehen automatisch in den Verlauf.'); });
   // Nicht verfügbare Tage (plan.json „unavailable“): Einheiten der Woche rücken in Reihenfolge auf die übrigen Trainingstage, was nicht passt, entfällt (kein Nachholen)
@@ -1868,7 +2029,7 @@ function apBuildBlock(phase, prev, prev2){
     } }
   const cap=C&&C.E ? P.cap+C.E.cap : P.cap; const kf=C?C.kf:1;
   return { id:'AUTO-'+phase.id, auto:true, name:'Block '+phase.id.slice(1)+' – '+P.name, phase:phase.id, start:phase.start, weeks, rpe_cap:[cap,cap], status:'automatisch',
-    week_wave, test_weeks:types.map((t,i)=>(t==='H'||t==='DT')?i+1:0).filter(Boolean), week_schedule:sched, week_overrides, session_order:tids, limits:{ contacts_per_session:P.contacts.map(x=>Math.round(x*kf)), sprint_m_per_session:[0,0] }, week_notes, start_loads:{}, templates,
+    week_wave, test_weeks:testW, week_schedule:sched, week_overrides, session_order:tids, limits:{ contacts_per_session:P.contacts.map(x=>Math.round(x*kf)), sprint_m_per_session:[0,0] }, week_notes, start_loads:{}, templates,
     groups:C?C.label:null, warmup_min:(C&&C.warm)||undefined };
 }
 function apGames(){ const own=(typeof S!=='undefined'&&S ? (S.calendar||[]) : []).filter(e=>e.kind==='game'&&e.date).map(e=>e.date);
@@ -4074,7 +4235,7 @@ function rkBest(){ const from=addDays(todayISO(),-56); const out={};
   RK_DISC.forEach(([k,,ids,rx])=>{ let best=null; const take=(v,d)=>{ if(v>0 && (!best||v>best.value)) best={ value:Math.round(v*10)/10, date:d }; };
     if(k==='broad'){ (S.tests||[]).filter(t=>t.unit==='cm' && t.value!=null && t.date>=from && rx.test(t.name)).forEach(t=>take(t.value,t.date)); }
     else { ids.forEach(id=>plHistory(id).filter(h=>h.date>=from).forEach(h=>workSets(h.le).forEach(x=>{ if(x.kg>0 && x.reps>=1 && x.reps<=5 && x.rpe>=7) take(x.kg/pctRM(x.reps,x.rpe), h.date); })));
-      (S.tests||[]).filter(t=>t.unit==='kg' && t.value!=null && t.date>=from && t.reps>=1 && t.reps<=5 && rx.test(t.name) && !/front|ssb|box|pause|sumo|rumän|romanian/i.test(t.name))
+      (S.tests||[]).filter(t=>t.unit==='kg' && t.value!=null && t.source!=='selbstangabe' && t.date>=from && t.reps>=1 && t.reps<=5 && rx.test(t.name) && !/front|ssb|box|pause|sumo|rumän|romanian/i.test(t.name))
         .forEach(t=>take(t.value/pctRM(t.reps, t.rpe!=null?t.rpe:9), t.date)); }
     if(best) out[k]=best; });
   if(out.squat&&out.bench&&out.hinge) out.total={ value:Math.round((out.squat.value+out.bench.value+out.hinge.value)*10)/10 };

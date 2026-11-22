@@ -105,4 +105,4 @@ Mehr braucht Claude nicht. Damit ist Roadmap-Task 0.2 erledigt und M1 kann start
 ## Gut zu wissen
 
 - **Pausieren:** Im Free-Plan pausiert Supabase ein Projekt nach 7 Tagen ohne Nutzung. Durch das tägliche Training und das wöchentliche Backup (Roadmap M1.8) passiert das nicht. Falls doch: im Dashboard **Resume project** – die Daten bleiben erhalten.
-- **E-Mails für Einladungen:** Der eingebaute E-Mail-Versand von Supabase schickt Login-Links nur an Mitglieder deiner Supabase-Organisation (also nur an dich) und höchstens 2 pro Stunde. Für dich allein reicht das. Bevor Teamkollegen eingeladen werden, kommt ein eigener E-Mail-Anbieter dazu (Roadmap M4.12) – dafür gibt es dann eine eigene Anleitung.
+- **E-Mails für Einladungen:** Der eingebaute E-Mail-Versand von Supabase schickt Login-Links nur an Mitglieder deiner Supabase-Organisation (also nur an dich) und höchstens 2 pro Stunde. Für dich allein reicht das. Bevor Teamkollegen eingeladen werden, kommt ein eigener E-Mail-Anbieter dazu (Roadmap M4.12): Anleitung in [`EMAIL_VERSAND.md`](EMAIL_VERSAND.md).
