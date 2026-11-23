@@ -56,6 +56,7 @@ header.top{position:sticky;top:0;z-index:20;background:var(--bg-deep);border-bot
 .brand small{margin-left:12px;padding-left:12px;border-left:1px solid var(--line2);font-size:.7rem;color:var(--muted);font-weight:400;line-height:1.3;text-align:left}
 .brand small span{display:block;white-space:nowrap}
 @keyframes bcur{50%{opacity:.25}}
+@media (min-width:761px){.brand{cursor:pointer;border-radius:8px}.brand:hover .b-word{color:var(--text2)}.brand:focus-visible{outline:2px solid var(--text2);outline-offset:4px}}
 #topinfo{margin-left:auto}
 @media (min-width:761px){#topinfo{order:3;margin-left:0}}
 .sysbar{display:flex;gap:10px;font-size:.75rem;color:var(--muted);white-space:nowrap}
@@ -402,7 +403,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 <a href="#main" class="sr-only">Zum Inhalt springen</a>
 <header class="top">
   <div class="top-inner">
-    <div class="brand" aria-label="AOS – Athlete Operating System"><span class="b-word">AOS</span><span class="b-cur" aria-hidden="true"></span><small><span>Athlete</span><span>Operating System</span></small></div>
+    <div class="brand" id="brand" data-act="home" aria-label="AOS – Athlete Operating System"><span class="b-word">AOS</span><span class="b-cur" aria-hidden="true"></span><small><span>Athlete</span><span>Operating System</span></small></div>
     <div id="topinfo"></div>
     <nav class="tabs" id="nav" aria-label="Hauptbereiche"></nav>
   </div>
@@ -905,6 +906,14 @@ function render(){
   if(isLive()) wakeOn(); else wakeOff();
   liveSave(); logFormAfter();
 }
+/* Laptop: AOS im Kopf führt zur Startansicht (am Handy ohne Funktion, dort gibt es die Navigation unten) */
+const DESKTOP_MQ = window.matchMedia('(min-width:761px)');
+function brandMode(){ const b=document.getElementById('brand'); if(!b) return; if(DESKTOP_MQ.matches){ b.setAttribute('role','button'); b.tabIndex=0; b.title='Zur Übersicht'; } else { b.removeAttribute('role'); b.removeAttribute('tabindex'); b.removeAttribute('title'); } }
+try{ DESKTOP_MQ.addEventListener('change', brandMode); }catch(e){}
+ACT.home = ()=>{ if(!DESKTOP_MQ.matches) return; const v=teamViews()[0][0];
+  if(ui.view===v && !TEAM.detail){ window.scrollTo(0,0); return; }
+  TEAM.detail=null; ACT.go({ dataset:{ view:v } }); };
+document.addEventListener('keydown', e=>{ if((e.key==='Enter'||e.key===' ') && e.target && e.target.id==='brand'){ e.preventDefault(); ACT.home(); } });
 ACT.go = el=>{ ui.view=el.dataset.view;
   if(ui.view==='training') ui.logHidden=false;
   else if(!isLive()){ ui.sessionId=null; ui.draft=null; }   // eine laufende Einheit bleibt offen
@@ -4514,7 +4523,7 @@ function aosApplyUpdate(){
   if(sbReady() && sb.dirty) sbSync('update').finally(go); else go();
 }
 (function init(){
-  sbLoad(); load(); ensureProfileDefaults(); refInit(); sbFromHash();
+  brandMode(); sbLoad(); load(); ensureProfileDefaults(); refInit(); sbFromHash();
   const h=location.hash.slice(1); if(teamViews().some(v=>v[0]===h)) ui.view=h;
   if(liveRestore()) ui.view='training';   // laufende Einheit nach Neustart der App fortsetzen
   render();

@@ -212,6 +212,10 @@ async def run(browser, width):
         ui.ob=null; ui.cob=null; ui.sessionId=null; ui.draft=null; ui.view='plan'; ui.planBlock=b.id; render(); const ok=!!document.querySelector('#main [data-act="startLog"][data-id="free-t"]');
         S.sessions=S.sessions.filter(s=>s.id!=='free-t'); render(); return ok?'ok':'als verpasst angezeigt'; }""")
     if fr != 'ok': errors.append('Plan: freie Einheit ' + fr)
+    # AOS im Kopf: am Laptop zur Übersicht, am Handy ohne Funktion
+    hm = await page.evaluate("()=>{ ui.ob=null; ui.cob=null; ui.sessionId=null; ui.draft=null; ui.view='plan'; render(); document.getElementById('brand').click(); return ui.view; }")
+    if width >= 761 and hm != 'uebersicht': errors.append('Kopf: AOS führt nicht zur Übersicht')
+    if width < 761 and hm != 'plan': errors.append('Kopf: AOS reagiert am Handy')
     r = await page.evaluate(FLOW)
     if r != 'ok':
         errors.append('Ablauf Training: ' + str(r))
