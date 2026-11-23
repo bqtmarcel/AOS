@@ -2273,10 +2273,16 @@ function plWeekPlan(b, week){
   const done=mine.filter(isDone).map(s=>s.planner.templateId); const doneDates=new Set(mine.filter(isDone).map(s=>sessionDate(s)));
   // Übungen, die diese Woche schon gemacht wurden (egal in welcher Einheit)
   const doneSlots=new Set(mine.filter(isDone).flatMap(s=>(s.plan||[]).map(p=>p.planner&&p.planner.slotId).filter(Boolean)));
-  const upcoming=[];
-  for(let i=0;i<7;i++){ const d=addDays(mon,i); if(d<today || doneDates.has(d)) continue; const t=plScheduledAt(b,d).tpl;
-    if(t && !done.includes(t) && !upcoming.some(u=>u.tpl===t)) upcoming.push({ date:d, tpl:t }); }
   const ovw=(b.week_overrides||{})[week]; const fixedOut=(ovw&&!ovw.wander&&ovw.skipped)||[];   // Spielwoche: gestrichene Einheiten wandern nicht
+  // Offene Einheiten rücken der Reihe nach auf: Fällt Mo (D1) aus, ist Mi D1 statt D2. Selbst gewählte oder schon gespeicherte Einheiten bleiben.
+  const slots=[];
+  for(let i=0;i<7;i++){ const d=addDays(mon,i); if(d<today || doneDates.has(d)) continue; const sc=plScheduledAt(b,d);
+    const saved=mine.find(s=>s.status==='geplant' && s.plannedDate===d);
+    if(saved) slots.push({ date:d, tpl:saved.planner.templateId, fixed:true }); else if(sc.tpl) slots.push({ date:d, tpl:sc.tpl, fixed:sc.changed }); }
+  const fixedT=slots.filter(x=>x.fixed).map(x=>x.tpl);
+  const queue=(b.session_order||[]).filter(t=>!done.includes(t) && !((ovw&&ovw.skipped)||[]).includes(t) && !fixedT.includes(t));
+  const upcoming=[];
+  slots.forEach(x=>{ const t=x.fixed?x.tpl:queue.shift(); if(t && !done.includes(t) && !upcoming.some(u=>u.tpl===t)) upcoming.push({ date:x.date, tpl:t, was:x.tpl }); });
   const present=new Set(done.concat(upcoming.map(u=>u.tpl), fixedOut));
   const full=(b.session_order||[]).filter(t=>!fixedOut.includes(t)).length;
   const missing=(b.session_order||[]).filter(t=>!present.has(t) && (plTemplate(b,t)||{slots:[]}).slots.some(sl=>(sl.dose||{})[week] && !doneSlots.has(sl.id)));
@@ -2449,7 +2455,9 @@ function plDue(date){
   const done=mine.filter(s=>isDone(s) && s.planner.week===r.week).map(s=>s.planner.templateId);
   r.remaining=(b.session_order||[]).filter(t=>!skipped.includes(t) && !done.includes(t));
   const sc=plScheduledAt(b,date); const scheduled=sc.tpl; r.changed=sc.changed;
-  if(scheduled && (r.remaining.includes(scheduled) || (sc.changed && !done.includes(scheduled)))){ r.tpl=scheduled; r.why=sc.changed?'von dir für diesen Tag geändert':'laut Wochenplan ('+WD_LONG[weekdayOf(date)]+(ov?', '+ov.note:'')+')'; }
+  const up=date>=todayISO() && scheduled && !sc.changed && !r.doneToday ? plWeekPlan(b,r.week).upcoming.find(u=>u.date===date) : null;
+  if(up && up.tpl!==scheduled){ r.tpl=up.tpl; r.why=up.tpl+' statt '+scheduled+': Ausgefallenes wird nicht nachgeholt, die offenen Einheiten rücken der Reihe nach auf.'; }
+  else if(scheduled && (r.remaining.includes(scheduled) || (sc.changed && !done.includes(scheduled)))){ r.tpl=scheduled; r.why=sc.changed?'von dir für diesen Tag geändert':'laut Wochenplan ('+WD_LONG[weekdayOf(date)]+(ov?', '+ov.note:'')+')'; }
   else if(scheduled){ r.tpl=r.remaining[0]||null; r.why=scheduled+' ist diese Woche schon erledigt'+(r.tpl?' → nächste offene Einheit '+r.tpl:'')+'. Verpasstes wird nicht nachgeholt.'; }
   else { r.offday=true; r.tpl=r.remaining[0]||null; r.why=(sc.changed?'Diesen Tag hast du trainingsfrei gesetzt.':'Heute ist laut Wochenplan kein Trainingstag.')+(r.tpl?' Du kannst die nächste offene Einheit ('+r.tpl+') trotzdem starten.':''); }
   if(skipped.length) r.warnings.push('Diese Woche entfällt '+skipped.join(', ')+' (kein Nachholen).');
@@ -3657,7 +3665,8 @@ function ovWeekStrip(today, mon){
   const cells=dn.map((d,i)=>{ const date=addDays(mon,i); const b=plBlockAt(date); let txt='', act='';
     const s=plSessions().find(x=>(sessionDate(x)===date) && x.status!=='ausgelassen');
     let done=false; if(s){ done=isDone(s); txt=s.planner.templateId; act=' data-act="startLog" data-id="'+s.id+'"'; any=true; }
-    else if(b){ const sc=plScheduledAt(b,date); const t=sc.tpl; if(t){ txt=t+(date<today?' ✗':''); any=true; }
+    else if(b){ const sc=plScheduledAt(b,date); const up=date>=today?plWeekPlan(b,plWeek(b,date)).upcoming.find(u=>u.date===date):null;
+      const t=date<today?sc.tpl:up?up.tpl:null; if(t){ txt=t+(date<today?' ✗':''); any=true; }
       if(date>=today) act=' data-act="dayEdit" data-d="'+date+'"'; }
     if(isFieldDay(date)){ const fl=fieldLog(date); txt=(txt?txt+'+':'')+(fl&&fl.status==='ausgefallen'?'F✗':'F'); any=true; }
     return '<div class="day'+(date===today?' today':'')+'"'+act+(act&&!s?'':'')+'><span class="wd">'+d+'</span><span class="dn">'+parseISO(date).getDate()+'</span>'+(done?'<span class="tp done claw-tp">'+CLAW+'<span class="sr-only">'+esc(txt)+' erledigt</span>'+(isFieldDay(date)?esc(txt.slice(txt.indexOf('+')))+'':'')+'</span>':'<span class="tp">'+esc(txt||'')+'</span>')+'</div>'; });

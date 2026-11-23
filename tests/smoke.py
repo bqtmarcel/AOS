@@ -109,6 +109,14 @@ FLOW = """(async()=>{
     const di=types.findIndex(t=>t==='D'||t==='DT');
     if(di>=0){ S.profile.entry={ stage:2, start:addDays(P2.start,di*7) }; apReplan(); b=blk(); if(!/zählt als dein Einstieg/.test(b.week_wave[di+1])) return 'Stufe 2: Team-Entlastung zählt nicht als Einstieg'; }
     S.profile=kp; apReplan(); }
+  // Ausgefallene Einheit: die offenen rücken der Reihe nach auf (Mo frei → Mi D1, Do D2, Fr D3)
+  { const mon=addDays(mondayOf(todayISO()),7); const kd=clone(S.suggestionDecisions||{});
+    const b={ id:'AUFR', start:mon, weeks:1, session_order:['D1','D2','D3','D4'], week_schedule:{MON:'D1',WED:'D2',THU:'D3',FRI:'D4'}, templates:['D1','D2','D3','D4'].map(id=>({ id, group:'full', slots:[] })) };
+    const lbl=()=>plWeekPlan(b,1).upcoming.map(u=>WD_LONG[weekdayOf(u.date)].slice(0,2)+u.tpl).join(' ');
+    if(lbl()!=='MoD1 MiD2 DoD3 FrD4') return 'Aufrücken: Normalwoche falsch ('+lbl()+')';
+    S.suggestionDecisions=Object.assign({}, kd, { ['sched|'+mon]:{ status:'geändert', tpl:null } });
+    const got=lbl(); S.suggestionDecisions=kd;
+    if(got!=='MiD1 DoD2 FrD3') return 'Aufrücken: nach abgesagtem Montag falsch ('+got+')'; }
   // M4.2: Onboarding für neue Athleten
   { const kp=clone(S.profile), kt=clone(S.tests), kb=clone(S.bodyweight), kv=ui.view;
     S.profile.positions=[]; delete S.profile.onboarded; delete S.profile.entry; ACT.obOpen(); if(!document.getElementById('onboarding')) return 'Onboarding erscheint nicht';
