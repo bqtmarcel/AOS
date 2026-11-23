@@ -198,6 +198,20 @@ async def run(browser, width):
             clicks += 1
             await page.wait_for_timeout(20)
             await page.evaluate("()=>{const d=document.getElementById('dlg'); if(d&&d.open) d.close(); document.querySelectorAll('.fin').forEach(x=>x.remove());}")
+    # Vorschau der kommenden Einheiten: rechnet ohne Fehler und speichert nichts
+    pv = await page.evaluate("""()=>{ const n=S.sessions.length; const W=weekUpcoming(todayISO()); const h=weekPreview(todayISO());
+        return { has:!!W, n:W?W.L.length:0, err:h.includes('Vorschau nicht möglich'), rows:(h.match(/<tr>/g)||[]).length, same:S.sessions.length===n }; }""")
+    if not pv['has']: errors.append('Vorschau: keine kommenden Einheiten gefunden')
+    elif pv['err'] or pv['rows'] == 0: errors.append('Vorschau: Einheiten ohne Übungen')
+    if not pv['same']: errors.append('Vorschau: hat Einheiten gespeichert')
+    # Freie, erledigte Einheit an einem geplanten Tag zählt als erledigt, nicht als verpasst
+    fr = await page.evaluate("""()=>{ const t=todayISO(); const b=plBlockAt(t); if(!b) return 'kein Block';
+        let d=null; for(let i=-13;i<14;i++){ const x=addDays(t,i); if(x<b.start||x>addDays(b.start,b.weeks*7-1)||x===t) continue; if(plScheduledAt(b,x).tpl && !plSessions().some(s=>sessionDate(s)===x)){ d=x; break; } }
+        if(!d) return 'ohne geplanten Tag nicht prüfbar';
+        S.sessions.push({ id:'free-t', name:'Freie Einheit Test', status:'absolviert', plannedDate:d, createdAt:new Date().toISOString(), plan:[], log:{ exercises:[] } });
+        ui.ob=null; ui.cob=null; ui.sessionId=null; ui.draft=null; ui.view='plan'; ui.planBlock=b.id; render(); const ok=!!document.querySelector('#main [data-act="startLog"][data-id="free-t"]');
+        S.sessions=S.sessions.filter(s=>s.id!=='free-t'); render(); return ok?'ok':'als verpasst angezeigt'; }""")
+    if fr != 'ok': errors.append('Plan: freie Einheit ' + fr)
     r = await page.evaluate(FLOW)
     if r != 'ok':
         errors.append('Ablauf Training: ' + str(r))

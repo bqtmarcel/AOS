@@ -2474,6 +2474,8 @@ function plWeek(b, date){ return Math.floor(daysBetween(b.start, date)/7)+1; }
 function plTemplate(b, id){ return (b.templates||[]).find(t=>t.id===id) || null; }
 function plCap(b){ const c=b.rpe_cap||[]; return c.length?c[c.length-1]:null; }
 function plSessions(){ return S.sessions.filter(s=>s.planner); }
+/* Erledigte Einheit ohne Planbezug (freie bzw. übernommene Einheit) an diesem Tag: zählt in Wochenraster und Übersicht als erledigt, nicht als verpasst */
+function freeDoneAt(date){ return (S.sessions||[]).find(x=>!x.planner && isDone(x) && sessionDate(x)===date) || null; }
 
 /* ---------- Erholungssignale (Spezifikation 3.7): ab zwei Signalen plant AOS automatisch leichter ---------- */
 function deloadSignals(){
@@ -3627,9 +3629,11 @@ function viewPlan(){
     days.forEach((k,i)=>{ const d=addDays(mon,i); const sc=plScheduledAt(b,d); const t=sc.tpl;
       const s=mine.find(x=>sessionDate(x)===d && x.status!=='ausgelassen') || mine.find(x=>x.plannedDate===d);
       let cell='';
+      const fr=s?null:freeDoneAt(d);
       if(s){ const st=isDone(s)?'✓':(s.status==='ausgelassen'?'–':'○'); cell='<button class="link" data-act="startLog" data-id="'+s.id+'">'+st+' '+esc(s.planner.templateId)+'</button>'; }
+      else if(fr){ cell='<button class="link" data-act="startLog" data-id="'+fr.id+'" title="'+esc(fr.name||'Freie Einheit')+'">✓ '+esc(t||'frei')+'</button>'; }
       else if(t){ cell = d<today ? '<span class="muted" title="verpasst">'+t+' ✗</span>' : (d===today?'<strong>'+t+'</strong>':t); }
-      const tap = !s && d>=today ? ' data-act="dayEdit" data-d="'+d+'" style="cursor:pointer'+(d===today?';background:var(--accent-soft)':'')+'"' : (d===today?' style="background:var(--accent-soft)"':'');
+      const tap = !s && !fr && d>=today ? ' data-act="dayEdit" data-d="'+d+'" style="cursor:pointer'+(d===today?';background:var(--accent-soft)':'')+'"' : (d===today?' style="background:var(--accent-soft)"':'');
       h+='<td'+tap+'>'+cell+'</td>'; });
     h+='</tr>';
     const wsub=(b.week_wave||{})[w]||'';
@@ -3728,7 +3732,9 @@ function ovWeekStrip(today, mon){
   const dn=['Mo','Di','Mi','Do','Fr','Sa','So']; let any=false;
   const cells=dn.map((d,i)=>{ const date=addDays(mon,i); const b=plBlockAt(date); let txt='', act='';
     const s=plSessions().find(x=>(sessionDate(x)===date) && x.status!=='ausgelassen');
+    const fr=s?null:freeDoneAt(date);
     let done=false; if(s){ done=isDone(s); txt=s.planner.templateId; act=' data-act="startLog" data-id="'+s.id+'"'; any=true; }
+    else if(fr){ done=true; txt=fr.name||'Freie Einheit'; act=' data-act="startLog" data-id="'+fr.id+'"'; any=true; }
     else if(b){ const sc=plScheduledAt(b,date); const up=date>=today?plWeekPlan(b,plWeek(b,date)).upcoming.find(u=>u.date===date):null;
       const t=date<today?sc.tpl:up?up.tpl:null; if(t){ txt=t+(date<today?' ✗':''); any=true; }
       if(date>=today) act=' data-act="dayEdit" data-d="'+date+'"'; }
@@ -3888,6 +3894,7 @@ function viewTraining(){
   const saved=S.sessions.filter(s=>s.status==='geplant' && (s.plan||[]).length && s.plannedDate && s.plannedDate<today).sort(bySessionDate);
   if(saved.length){ h+='<h2>Nicht erfasst</h2><div class="section sv-list">'+saved.map(s=>{ const ov=s.plannedDate&&s.plannedDate<today; const id=(s.planner&&s.planner.templateId)||s.name;
       return '<div class="sv-row"><button class="link sv-name" data-act="openSession" data-id="'+s.id+'" title="'+esc(s.name)+'">'+esc(id)+' <span class="small muted">'+(s.plannedDate?fmtDateShort(s.plannedDate):'ohne Termin')+(ov?' · nicht erfasst':'')+'</span></button><button class="small primary" data-act="startLog" data-id="'+s.id+'">Erfassen</button></div>'; }).join('')+'</div>'; }
+  h+=weekPreview(today);
   h+='<div class="row" style="margin-top:16px"><button data-act="logFree">+ Freie Einheit</button></div>';
   const done=S.sessions.filter(s=>s.log && isDone(s)).sort((a,c)=>sessionDate(a)<sessionDate(c)?1:-1).slice(0,5);
   if(done.length) h+='<h2>Zuletzt</h2><div class="section">'+done.map(s=>'<p style="margin:6px 0"><button class="link" data-act="startLog" data-id="'+s.id+'">'+esc(s.name)+'</button> <span class="small muted">'+fmtDateShort(sessionDate(s))+(s.status==='teilweise'?' · teilweise':'')+'</span></p>').join('')+'</div>';
@@ -4062,6 +4069,26 @@ function goalsSection(){
   else if(!posMix().length) h+='<p class="small muted" style="margin-top:12px">Mit deiner Position im Profil schlägt AOS Richtwerte für deine Positionsgruppe vor.</p>';
   return pdet('v-goals','Ziele',gl.length===1?'1 aktiv':gl.length+' aktiv',h+'<div class="add-row"><button class="small" data-act="editGoal">+ Ziel</button></div>');
 }
+
+/* Vorschau: die kommenden Einheiten dieser Woche (ab Sonntag bzw. nach der letzten Einheit: nächste Woche), so wie AOS sie heute plant.
+   Gerechnet mit Readiness 3 und ohne Beschwerden; vor der Einheit passt AOS nach dem Check-in an. Nur Anzeige, nichts wird gespeichert. */
+function weekUpcoming(today){ if(typeof REF==='undefined'||!REF.plan) return null;
+  const pick=d=>{ const b=plBlockAt(d); if(!b) return []; return (plWeekPlan(b, plWeek(b,d)).upcoming||[]).filter(u=>u.date>today && u.tpl && plTemplate(b,u.tpl)).map(u=>Object.assign({ b }, u)); };
+  let L=weekdayOf(today)===0?[]:pick(today), next=false;
+  if(!L.length){ L=pick(addDays(mondayOf(today),7)); next=true; }
+  return L.length ? { L, next } : null; }
+function weekPreview(today){ const W=weekUpcoming(today); if(!W) return '';
+  const rows=W.L.map(u=>{ const t=plTemplate(u.b,u.tpl); let P=null;
+    try{ P=plBuild(Object.assign(plDefaults(), { date:u.date, tpl:u.tpl, readiness:3, loc:locDefault(u.date) })); }catch(e){ P={ error:'Vorschau nicht möglich.' }; }
+    const head=WD[weekdayOf(u.date)]+' '+fmtDate(u.date).slice(0,6)+' · '+t.id+' – '+t.name;
+    let body='';
+    if(P.error) body='<p class="small muted">'+esc(P.error)+'</p>';
+    else body='<p class="small muted">inkl. Aufwärmen · RPE ≤ '+fmtNum(P.cap)+'</p>'+
+      '<table class="small nostack"><tbody>'+P.items.map((x,i)=>{ const load=x.loadKg!=null?fmtNum(x.loadKg)+' kg'+(x.perHand?' je Hand':''):(x.load.calibrate?'kalibrieren':(x.load.text||''));
+        return '<tr><td>'+(i+1)+'. '+esc(x.ex.name_de)+'</td><td style="white-space:nowrap">'+x.sets+' × '+esc(x.reps)+'</td><td style="white-space:nowrap">'+esc(load||'—')+'</td></tr>'; }).join('')+'</tbody></table>';
+    return pdet('wkprev-'+u.date, head, P.error?'':'ca. '+P.estMin+' min', body); }).join('');
+  return '<h2>'+(W.next?'Nächste Woche':'Kommende Einheiten')+'</h2>'+rows+
+    '<p class="small muted">So plant AOS heute. Vor der Einheit passt AOS nach Readiness, Beschwerden und deinen letzten Sätzen an.</p>'; }
 
 function plSection(){
   if(!REF.plan){
