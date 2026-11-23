@@ -210,7 +210,7 @@ async def supabase_test(browser):
     uid = '00000000-0000-4000-a000-0000000000aa'
     db = {}   # key -> {data, updated_at, deleted}
     other = '00000000-0000-4000-a000-0000000000bb'
-    team = {'patched': [], 'invites': [], 'rank': {}, 'season': {'games': []}}
+    team = {'patched': [], 'invites': [], 'rank': {}, 'season': {'games': []}, 'roles': ['athlete', 'admin']}
     sent = {'otp': 0}
     async def sbr(route):
         req = route.request; url = req.url; path = url.split('.supabase.co')[1]
@@ -242,7 +242,7 @@ async def supabase_test(browser):
                 return await route.fulfill(status=201, body='')
         # Team: Rollen (Admin), Admin-Übersicht, Einladung, Rangliste, Teamkalender, Coach-Übersicht
         if path.startswith('/rest/v1/profiles') and 'select=roles' in path:
-            return await route.fulfill(status=200, json=[{'roles': ['athlete', 'admin'], 'name': 'Admin', 'active': True}])
+            return await route.fulfill(status=200, json=[{'roles': team['roles'], 'name': 'Admin', 'active': True}])
         if path.startswith('/rest/v1/profiles') and req.method == 'PATCH':
             team['patched'].append(json.loads(req.post_data)); return await route.fulfill(status=204, body='')
         if path.startswith('/rest/v1/profiles') and 'select=id,name' in path:
@@ -350,6 +350,32 @@ async def supabase_test(browser):
     await page.fill('#sb-otp', '123456'); await page.click('[data-act="sbVerify"]'); await page.wait_for_timeout(500)
     if await page.evaluate("!!document.getElementById('onboarding') || !!ui.ob"): errors.append('Zweites Gerät: Onboarding erscheint trotz eingerichtetem Konto')
     if await page.evaluate("S.profile.name") != 'Eingerichtet': errors.append('Zweites Gerät: Profil kam nicht aus Supabase')
+    await ctx.close()
+    # Reines Coach-Konto: Coach-Onboarding, nur Team und Profil, Athletenliste nach eigenen Gruppen
+    team['roles'] = ['coach']
+    db['profile:_'] = {'data': {'name': 'Coach', 'positions': []}, 'updated_at': '2026-01-03T00:00:00.000Z', 'deleted': False}
+    ctx = await browser.new_context(viewport={'width': 1280, 'height': 900})
+    await ctx.route('**/*', lambda r: r.continue_() if r.request.url.startswith('file:') else r.abort())
+    await ctx.route('https://*.supabase.co/**', sbr)
+    page = await ctx.new_page(); page.on('pageerror', lambda e: errors.append(str(e)))
+    await page.goto(ROOT.as_uri()); await page.wait_for_timeout(600)
+    await page.evaluate("()=>{ ui.view='profil'; ui.profOpen={sb:true}; render(); }")
+    await page.fill('#sb-email', 'athlet@test.invalid'); await page.click('[data-act="sbCode"]'); await page.wait_for_timeout(100)
+    await page.fill('#sb-otp', '123456'); await page.click('[data-act="sbVerify"]'); await page.wait_for_timeout(500)
+    if await page.evaluate("!!document.getElementById('onboarding')"): errors.append('Coach: Athleten-Onboarding erscheint bei reinem Coach-Konto')
+    if not await page.evaluate("!!document.getElementById('coach-onboarding')"): errors.append('Coach: Coach-Onboarding erscheint nicht')
+    if await page.evaluate("[...document.querySelectorAll('#nav [data-view]')].map(b=>b.dataset.view).join()") != 'team,profil': errors.append('Coach: Navigation zeigt nicht nur Team und Profil')
+    await page.click('[data-act="cobNext"]'); await page.click('[data-act="cobNext"]')
+    if await page.evaluate("ui.cob.step") != 1: errors.append('Coach: Funktion ist nicht Pflicht')
+    await page.click('[data-act="cobFn"][data-v="sc"]'); await page.click('[data-act="cobGrp"][data-v="WR"]'); await page.click('[data-act="cobNext"]')
+    await page.click('[data-act="cobNext"]')
+    if await page.evaluate("ui.cob.step") != 2: errors.append('Coach: Vertraulichkeit ist nicht Pflicht')
+    await page.click('[data-act="cobOk"]'); await page.click('[data-act="cobNext"]'); await page.click('[data-act="cobNext"]')
+    await page.click('[data-act="cobFinish"]'); await page.wait_for_timeout(400)
+    if not await page.evaluate("S.profile.coach && S.profile.coach.onboarded && S.profile.coach.groups.join()==='WR' && ui.view==='team' && !ui.cob"): errors.append('Coach: Einrichtung wird nicht gespeichert')
+    if not await page.evaluate("document.getElementById('main').textContent.includes('Meine Gruppen (WR)') && document.getElementById('main').textContent.includes('Spieler B')"): errors.append('Coach: Athletenliste filtert nicht nach den eigenen Gruppen')
+    await page.evaluate("async()=>{ await sbSync('test'); }")
+    if not (db.get('profile:_') or {}).get('data', {}).get('coach'): errors.append('Coach: Einstellungen kamen nicht in Supabase an')
     await ctx.close()
     return errors
 

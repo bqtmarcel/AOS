@@ -897,7 +897,8 @@ function render(){
   if(window.__aosUpdate && typeof aosApplyUpdate==='function'){ aosApplyUpdate(); }
   renderShell();
   const m=document.getElementById('main');
-  const fn = obActive() ? viewOnboarding : ({uebersicht:viewOverview, plan:viewPlan, training:viewTraining, tests:viewTests, profil:viewProfile, ernaehrung:viewNutrition, team:viewTeam}[ui.view] || viewOverview);   // Onboarding (M4.2) beim ersten Login
+  if(pureCoach() && !teamViews().some(v=>v[0]===ui.view)) ui.view='team';   // reine Coach-Konten: nur Team und Profil
+  const fn = obActive() ? viewOnboarding : cobActive() ? viewCoachOnboarding : ({uebersicht:viewOverview, plan:viewPlan, training:viewTraining, tests:viewTests, profil:viewProfile, ernaehrung:viewNutrition, team:viewTeam}[ui.view] || viewOverview);   // Onboarding (M4.2) beim ersten Login
   m.innerHTML = (isLive() && !logVisible() ? liveBar() : '') + (storageOK?'':'<div class="note bad"><strong>Lokaler Speicher nicht verfügbar.</strong> Der Browser erlaubt für diese Datei keine dauerhafte Speicherung (z. B. privater Modus oder blockierte Website-Daten). Eingaben gehen beim Schließen verloren – exportiere eine JSON-Sicherung oder öffne die Datei in einem normalen Browserfenster.</div>') + fn();
   stackTables(m);
   if(!isLive() && REST.iv) restStop();
@@ -1771,6 +1772,64 @@ ACT.obFinish = ()=>{ const d=ui.ob.d, p=S.profile, t=todayISO(); const name=c=>(
   p.entry={ stage, start:obStart(), w8:d.w8, last:d.last, lifts:d.lifts, pain:d.pain.slice(), at:t };
   p.onboarded=t;
   ui.ob=null; ui.view='uebersicht'; save(); apReplan(); render(); window.scrollTo(0,0); toast('Eingerichtet – AOS hat deinen Plan erstellt.'); };
+
+/* ===== Onboarding für Coaches (Mehrbenutzer-Spezifikation 6.3) =====
+   Einmalig beim ersten Login eines Kontos mit der Rolle Coach, ca. 2 Minuten. Bei Spieler + Coach erst nach dem Athleten-Onboarding.
+   Gespeichert im eigenen Profil (S.profile.coach); ändert nichts an den Daten der Athleten. */
+const COB_STEPS=['Willkommen','Deine Funktion','Vertraulichkeit','So liest du die Übersicht','Fertig'];
+const COB_FN=[['head','Head Coach'],['sc','Athletik / S&C'],['oc','Offense Coordinator'],['dc','Defense Coordinator'],['pos','Positions-Coach'],['staff','Betreuung (z. B. Physio)']];
+const COB_GROUPS=['OL','TE','WR','QB','RB','DL','LB','DB'];
+function pureCoach(){ const r=sbRoles(); return sbReady() && r.length>0 && !r.includes('athlete') && (r.includes('coach')||r.includes('admin')); }
+function cobNeeded(){ if(typeof S==='undefined'||!S||!S.profile||ui.cobSkip||ui.ob) return false;
+  if(!sbReady() || !TEAM.loaded || sb.pulled!==sbUid() || !sbRoles().includes('coach')) return false;
+  if(S.profile.coach && S.profile.coach.onboarded) return false;
+  if(sbRoles().includes('athlete') && obNeeded()) return false;   // erst das Athleten-Onboarding
+  return true; }
+function cobActive(){ if(ui.cob && !ui.cob.manual && !cobNeeded()) ui.cob=null; return !!(ui.cob || cobNeeded()); }
+function cobState(){ if(!ui.cob){ const c=S.profile.coach||{};
+    ui.cob={ step:0, d:{ fn:c.fn||'', groups:(c.groups||[]).slice(), ok:!!c.confidential } }; }
+  return ui.cob; }
+function viewCoachOnboarding(){ const O=cobState(), d=O.d, st=O.step; let b='';
+  if(st===0) b='<p>Willkommen bei AOS, dem Trainingssystem der Red Tigers.</p><p>AOS plant das Krafttraining jedes Spielers vollautomatisch – passend zu Position, Ausstattung und Trainingsstand. Die Spieler trainieren und tragen ein, was sie geschafft haben.</p>'+
+      '<p><strong>Deine Rolle als Coach:</strong> Du siehst, wer wie trainiert – Einheiten, Verläufe, Readiness, Körpergewicht und Tests. Du <strong>liest nur</strong>: Pläne und Daten der Spieler kannst du nicht ändern. Rückmeldungen gibst du wie gewohnt direkt beim Training.</p>'+
+      '<p class="small muted">Die Einrichtung dauert ca. 2 Minuten. Alles kannst du später unter Team ändern.</p>';
+  if(st===1){ b='<label>Deine Funktion im Team</label>'+obChips('cobFn',COB_FN,v=>v===d.fn)+
+      '<label>Welche Positionsgruppen betreust du?</label><p class="small muted">Die Athletenliste zeigt zuerst diese Gruppen. Alle anderen bleiben mit einem Tipp sichtbar.</p>'+
+      '<div><button class="chip" data-act="cobGrp" data-v="alle" aria-pressed="'+(!d.groups.length)+'">Alle</button>'+COB_GROUPS.map(g=>'<button class="chip" data-act="cobGrp" data-v="'+g+'" aria-pressed="'+d.groups.includes(g)+'" title="'+esc(GROUP_NAME[g])+'">'+g+'</button>').join('')+'</div>'+
+      (d.groups.length?'<p class="small muted">'+esc(d.groups.map(g=>GROUP_NAME[g]).join(' · '))+'</p>':''); }
+  if(st===2) b='<p>Körpergewicht, Readiness, Beschwerden und Verletzungen sind <strong>Gesundheitsdaten</strong>. Du siehst sie, damit du die Spieler gut betreuen kannst.</p>'+
+      '<ul><li>Nur für die Betreuung im Team verwenden.</li><li>Nicht weitergeben, nicht abfotografieren, nicht in Gruppen-Chats posten.</li><li>Ranglisten zeigen nur Spieler, die selbst mitmachen – nie das Körpergewicht.</li></ul>'+
+      '<button class="chip" data-act="cobOk" aria-pressed="'+d.ok+'">Verstanden – ich gehe vertraulich damit um</button>';
+  if(st===3) b='<p>Unter <strong>Team → Athleten</strong> siehst du alle aktiven Spieler auf einen Blick:</p>'+
+      '<ul><li><strong>Phase · Woche:</strong> wo der Spieler im Teamplan steht (bei Neuen: Einstieg).</li><li><strong>Woche x / y:</strong> erledigte von geplanten Einheiten diese Woche.</li>'+
+      '<li><strong>Readiness:</strong> Schnitt der letzten Einheiten (1–5) mit Trend ↑ → ↓.</li><li><strong>Gewicht:</strong> aktuell und Veränderung in 4 Wochen.</li></ul>'+
+      '<p><strong>Hinweise</strong> zeigen, wo ein Gespräch sinnvoll sein kann:</p><p>'+badge('seit 7 Tagen kein Training','warn')+' '+badge('Beschwerden gemeldet','bad')+' '+badge('Gewicht ±3 kg in 4 Wochen','warn')+' '+badge('Entlastung','info')+'</p>'+
+      '<p class="small muted">Tipp auf einen Namen: letzte Einheiten mit Sätzen, Gewichtsverlauf, Tests und Ziele. AOS reagiert selbst auf Readiness und Beschwerden (z. B. Entlastung) – du musst nichts umstellen.</p>';
+  if(st===4){ const fn=(COB_FN.find(x=>x[0]===d.fn)||['',''])[1];
+    b='<p><strong>'+esc(fn||'Coach')+'</strong> · '+esc(d.groups.length?d.groups.join(', '):'alle Positionsgruppen')+'</p>'+
+      '<p>Als Nächstes öffnet AOS die Athletenliste'+(d.groups.length?' mit deinen Gruppen zuerst':'')+'.</p>'+
+      '<p class="small muted">Funktion und Gruppen änderst du jederzeit unter Team → Athleten → „Coach-Einstellungen“.</p>'; }
+  const foot='<div class="row" style="justify-content:space-between;margin-top:16px">'+(st>0?'<button data-act="cobBack">Zurück</button>':'<span></span>')+
+    (st<COB_STEPS.length-1?'<button class="primary" data-act="cobNext">Weiter</button>':'<button class="primary" data-act="cobFinish">Zur Athletenliste</button>')+'</div>';
+  return '<section class="card" id="coach-onboarding"><p class="small muted">Einrichtung Coach · Schritt '+(st+1)+' von '+COB_STEPS.length+'</p><h2>'+esc(COB_STEPS[st])+'</h2>'+b+foot+
+    (st===0&&!O.manual?'<p class="small" style="margin-top:12px"><button class="link" data-act="cobLater">Später einrichten</button></p>':'')+
+    (O.manual?'<p class="small" style="margin-top:12px"><button class="link" data-act="cobCancel">Abbrechen</button></p>':'')+'</section>'; }
+function cobCheck(){ const d=ui.cob.d, st=ui.cob.step;
+  if(st===1 && !d.fn) return 'Bitte deine Funktion wählen.';
+  if(st===2 && !d.ok) return 'Bitte die Vertraulichkeit bestätigen.';
+  return ''; }
+ACT.cobNext = ()=>{ const e=cobCheck(); if(e){ toast(e); return; } ui.cob.step=Math.min(COB_STEPS.length-1, ui.cob.step+1); render(); window.scrollTo(0,0); };
+ACT.cobBack = ()=>{ ui.cob.step=Math.max(0, ui.cob.step-1); render(); window.scrollTo(0,0); };
+ACT.cobLater = ()=>{ ui.cobSkip=true; ui.cob=null; ui.view='team'; render(); toast('Du kannst die Einrichtung unter Team jederzeit starten.'); };
+ACT.cobCancel = ()=>{ ui.cob=null; render(); };
+ACT.cobOpen = ()=>{ ui.cobSkip=false; ui.cob=null; cobState().manual=true; if(S.profile.coach&&S.profile.coach.confidential) ui.cob.step=1; render(); window.scrollTo(0,0); };
+ACT.cobFn = el=>{ ui.cob.d.fn=el.dataset.v; render(); };
+ACT.cobGrp = el=>{ const d=ui.cob.d, g=el.dataset.v; if(g==='alle') d.groups=[]; else d.groups=COB_GROUPS.filter(x=>x===g?!d.groups.includes(g):d.groups.includes(x)); render(); };
+ACT.cobOk = ()=>{ ui.cob.d.ok=!ui.cob.d.ok; render(); };
+ACT.cobFinish = ()=>{ const d=ui.cob.d, t=todayISO(), c=S.profile.coach||{};
+  S.profile.coach={ fn:d.fn, groups:d.groups.slice(), confidential:c.confidential||t, onboarded:c.onboarded||t };
+  ui.cob=null; ui.teamGrp=d.groups.length?'meine':'alle'; ui.view='team'; location.hash='team'; save(); render(); window.scrollTo(0,0);
+  if(!TEAM.athletes) teamLoadAthletes(); toast('Eingerichtet'); };
 
 /* ===== AOS – Automatische Blockplanung (interner Strength Coach) =====
    Für jede Phase ohne eigenen Block in plan.json stellt AOS den Block selbst zusammen – ohne Entscheidung des Athleten:
@@ -4155,7 +4214,7 @@ async function sbSync(reason){
     const uid0=sbUid(); const rows=await sbPullRows(); const remote=new Map(rows.map(r=>[r.key,{ t:sbIso(r.updated_at), del:r.deleted }]));
     const res=mergeData(S, sbDocOf(rows));
     if(syncSig(res.data)!==syncSig(S)) applyMerged(res.data);
-    if(sb.pulled!==uid0){ sb.pulled=uid0; if(obNeeded()) render(); }
+    if(sb.pulled!==uid0){ sb.pulled=uid0; if(obNeeded()||cobNeeded()) render(); }
     const up=[]; const uid=sbUid();
     syncRecords(S).forEach((v,k)=>{ const t=S.sync.stamps[k]||''; const r=remote.get(k); if(!t) return;
       if(!r || r.del || r.t<t) up.push({ athlete_id:uid, key:k, data:v, updated_at:t, deleted:false }); });
@@ -4283,7 +4342,8 @@ function teamDocSummary(D, prof){
   const hints=[]; if(!last || daysBetween(last,t)>=7) hints.push(['warn', last?'seit '+daysBetween(last,t)+' Tagen kein Training':'noch kein Training']);
   if(/Entlastung/.test(wave)) hints.push(['info','Entlastung']); if(pain) hints.push(['bad','Beschwerden gemeldet']);
   if(dBw!=null && Math.abs(dBw)>=3) hints.push(['warn','Gewicht '+(dBw>0?'+':'')+fmtNum(dBw)+' kg in 4 Wochen']);
-  return { id:prof.id, name:prof.name||(D.profile||{}).name||'—', grp, phase:ph?ph.id+(wk?' · W'+wk:''):'—', week, plannedN, last, trend, bw, dBw, hints, logged, D }; }
+  const groups=[...new Set(pos.map(p=>POS_GROUP[p.code]))];
+  return { id:prof.id, name:prof.name||(D.profile||{}).name||'—', grp, groups, phase:ph?ph.id+(wk?' · W'+wk:''):'—', week, plannedN, last, trend, bw, dBw, hints, logged, D }; }
 async function teamLoadAthletes(){ TEAM.loading='team'; render();
   try{ const P=await sbApi('GET','/rest/v1/profiles?select=id,name,roles,active&order=name'); const rows=[];
     for(let start=0;;start+=1000){ const r=await sbApi('GET','/rest/v1/records?select=athlete_id,key,data,updated_at,deleted&or=(key.like.%22sessions:*%22,key.like.%22bodyweight:*%22,key.eq.%22profile:_%22,key.like.%22tests:*%22,key.like.%22goals:*%22)&order=athlete_id,key', null, { 'Range-Unit':'items', Range:start+'-'+(start+999) }); rows.push(...r); if(r.length<1000) break; }
@@ -4295,11 +4355,15 @@ async function teamLoadAthletes(){ TEAM.loading='team'; render();
 function coachSection(){
   let b='';
   if(!TEAM.athletes) b='<p class="small muted">'+(TEAM.loading==='team'?'Lädt …':'<button class="primary" data-act="teamLoad">Athleten laden</button>')+'</p>';
-  else { const sort=ui.teamSort||'hinweise'; const L=TEAM.athletes.slice().sort((a,c)=>sort==='name'?a.name.localeCompare(c.name):(c.hints.length-a.hints.length)||((a.last||'')<(c.last||'')?-1:1));
+  else { const sort=ui.teamSort||'hinweise'; const my=((S.profile.coach||{}).groups)||[]; const gsel=my.length?(ui.teamGrp||'meine'):'alle';
+    const L=TEAM.athletes.filter(a=>gsel==='alle'||a.groups.some(g=>my.includes(g))).sort((a,c)=>sort==='name'?a.name.localeCompare(c.name):(c.hints.length-a.hints.length)||((a.last||'')<(c.last||'')?-1:1));
+    if(my.length) b+='<div>'+[['meine','Meine Gruppen ('+my.join(', ')+')'],['alle','Alle']].map(([k,n])=>'<button class="chip" data-act="teamGrp" data-v="'+k+'" aria-pressed="'+(gsel===k)+'">'+esc(n)+'</button>').join('')+'</div>';
     b+='<div>'+[['hinweise','Hinweise zuerst'],['name','Name']].map(([k,n])=>'<button class="chip" data-act="teamSort" data-v="'+k+'" aria-pressed="'+(sort===k)+'">'+n+'</button>').join('')+' <button class="link" data-act="teamLoad">aktualisieren</button></div>';
     b+='<table><thead><tr><th>Name</th><th>Position</th><th>Phase</th><th>Woche</th><th>Letzte Einheit</th><th>Readiness</th><th>Gewicht (4 Wo.)</th><th>Hinweise</th></tr></thead><tbody>'+
       L.map(a=>'<tr><td><button class="link" data-act="teamDetail" data-id="'+a.id+'">'+esc(a.name)+'</button></td><td>'+esc(a.grp)+'</td><td>'+esc(a.phase)+'</td><td>'+a.week+' / '+a.plannedN+'</td><td>'+(a.last?fmtDateShort(a.last):'—')+'</td><td>'+esc(a.trend)+'</td><td>'+(a.bw?fmtNum(a.bw.kg)+' kg'+(a.dBw!=null?' ('+(a.dBw>0?'+':'')+fmtNum(a.dBw)+')':''):'—')+'</td><td>'+(a.hints.map(([c,t])=>badge(t,c)).join(' ')||'—')+'</td></tr>').join('')+'</tbody></table>';
-    if(!L.length) b+='<p class="small muted">Noch keine aktiven Athleten.</p>'; }
+    if(!L.length) b+='<p class="small muted">'+(gsel==='meine'&&TEAM.athletes.length?'In deinen Gruppen noch keine aktiven Athleten.':'Noch keine aktiven Athleten.')+'</p>'; }
+  if(sbRoles().includes('coach')){ const c=S.profile.coach||{}; const fn=(COB_FN.find(x=>x[0]===c.fn)||['',''])[1];
+    b+='<p class="small muted">'+(c.onboarded?esc(fn||'Coach')+' · '+esc((c.groups||[]).length?c.groups.join(', '):'alle Gruppen')+' · ':'')+'<button class="link" data-act="cobOpen">'+(c.onboarded?'Coach-Einstellungen':'Coach-Einrichtung starten')+'</button></p>'; }
   if(TEAM.err) b+='<p class="small bad">'+esc(TEAM.err)+'</p>';
   return '<section class="card"><h2>Athleten</h2><p class="small muted">Nur lesen. Gewicht und Beschwerden sind vertraulich und nur für Coach und Admin sichtbar.</p>'+b+'</section>'; }
 function coachDetail(){ const a=(TEAM.athletes||[]).find(x=>x.id===TEAM.detail); if(!a) return '';
@@ -4313,6 +4377,7 @@ function coachDetail(){ const a=(TEAM.athletes||[]).find(x=>x.id===TEAM.detail);
   return h; }
 ACT.teamLoad = ()=>teamLoadAthletes();
 ACT.teamSort = el=>{ ui.teamSort=el.dataset.v; render(); };
+ACT.teamGrp = el=>{ ui.teamGrp=el.dataset.v; render(); };
 ACT.teamDetail = el=>{ TEAM.detail=el.dataset.id; render(); window.scrollTo(0,0); };
 ACT.teamBack = ()=>{ TEAM.detail=null; render(); };
 
@@ -4370,7 +4435,7 @@ function viewTeam(){
   if(isStaffUser()) h+=coachSection();
   if(isAdminUser()) h+=adminSection();
   return h; }
-function teamViews(){ return sbReady() ? VIEWS.slice(0,5).concat([['team','Team']], VIEWS.slice(5)) : VIEWS; }
+function teamViews(){ if(pureCoach()) return [['team','Team'],['profil','Profil']]; return sbReady() ? VIEWS.slice(0,5).concat([['team','Team']], VIEWS.slice(5)) : VIEWS; }
 
 /* ---------- Konto (M4.4): Daten exportieren, Konto löschen ---------- */
 ACT.acctDelete = ()=>confirmDlg('Konto löschen','Dein AOS-Konto und alle deine Daten in Supabase werden endgültig gelöscht (Einheiten, Tests, Gewicht, Profil, Ranglisten-Einträge). Lade vorher eine Sicherung herunter, wenn du sie behalten willst. Das kann nicht rückgängig gemacht werden.','Endgültig löschen', async ()=>{
@@ -4427,7 +4492,7 @@ function aosApplyUpdate(){
   if(liveRestore()) ui.view='training';   // laufende Einheit nach Neustart der App fortsetzen
   render();
   setInterval(clockTick, 1000);
-  if(sbReady()){ sbOwnerCheck(); sbSync('start'); refLoad(); teamMe().then(()=>renderShell()); }
+  if(sbReady()){ sbOwnerCheck(); sbSync('start'); refLoad(); teamMe().then(()=>{ if(cobNeeded()||pureCoach()) render(); else renderShell(); }); }
   setTimeout(()=>{ fdbUpdate().catch(()=>{}); }, 4000);
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') && document.querySelector('link[rel=manifest]')){

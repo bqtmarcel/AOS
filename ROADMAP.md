@@ -1,7 +1,7 @@
 # AOS – Roadmap: Mehrbenutzer, Positionsgruppen, Coach, Ranglisten
 
-Stand: 22.11.2026 · Version 1
-Fachliche Details: Mehrbenutzer-Spezifikation v1.5 in `AOS_DATA/docs` (Rollen, Datenmodell, Positionsgruppen, Onboarding und Einstieg, Coach-Übersicht, Ranglisten mit DOTS, Datenschutz).
+Stand: 23.11.2026 · Version 1
+Fachliche Details: Mehrbenutzer-Spezifikation v1.7 in `AOS_DATA/docs` (Rollen, Datenmodell, Positionsgruppen, Onboarding und Einstieg, Coach-Übersicht, Ranglisten mit DOTS, Datenschutz).
 Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persönlichen Werte.
 
 **Leitbild:** AOS ist eine footballspezifische S&C-Coaching-KI für die Spieler der Red Tigers. Eine regelbasierte Engine plant für jeden Athleten vollautomatisch, abgestimmt auf seine Position und seine Daten. Kein Sprachmodell, die App bleibt kompakt. Der Coach sieht alles, greift aber nicht in die Planung ein.
@@ -23,7 +23,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 | **M3** | 21.11.2026 | Positionsgruppen | Planung für alle Positionen | 8 / 9 |
 | **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 9 / 13 |
 | **Start** | ab 11.01.2027 | Teamstart | alle eingeladenen Spieler | 0 / 2 |
-| **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 4 / 5 |
+| **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 6 / 7 |
 | **M6** | 25.01.–07.02.2027 | Ranglisten mit DOTS | erste Ranglisten nach der Testwoche Anfang Februar | 5 / 6 |
 | **Stopp** | 01.03.–21.03.2027 | Funktionsstopp bis zum ersten Spiel | nur Fehlerbehebungen | – |
 | später | ab Saison | Nachrichten Coach → Athlet prüfen; alten GitHub-Token löschen | Entscheidung, ob nötig | 0 / 2 |
@@ -102,6 +102,8 @@ Hinweis: Bestehende Profile planen weiter mit den bisherigen Vorlagen, bis der A
 - [x] **M5.2** Athletenliste: Name, Positionsgruppe, Phase und Woche, Einheiten erledigt / geplant, letzte Einheit, Readiness-Trend, Gewicht und Veränderung 4 Wochen ✅ 21.11.2026
 - [x] **M5.3** Hinweise: 7 Tage kein Training, Entlastung aktiv, Beschwerden gemeldet (plus Gewichtsänderung ≥ 3 kg in 4 Wochen) ✅ 21.11.2026
 - [x] **M5.4** Detailansicht je Athlet mit den Verlaufsansichten, nur lesen (letzte Einheiten, Gewicht, Tests, Ziele; nur lesen, nie im eigenen Datenbestand) ✅ 21.11.2026
+- [x] **M5.6** Coach-Onboarding beim ersten Login (Willkommen und Rolle, Funktion und betreute Positionsgruppen, Vertraulichkeit bestätigen, Übersicht erklärt); bei Spieler + Coach nach dem Athleten-Onboarding; später änderbar unter Team → „Coach-Einstellungen“ ✅ 23.11.2026
+- [x] **M5.7** Athletenliste zuerst nach den eigenen Gruppen („Meine Gruppen“ / „Alle“); reine Coach-Konten sehen nur Team und Profil ✅ 23.11.2026
 - [ ] **M5.5** Prüfung: Der Coach findet in unter einer Minute, wer seit 7 Tagen nicht trainiert hat und wessen Gewicht sich stark verändert
 
 ## M6 · Ranglisten (25.01.–07.02.2027)
