@@ -1666,9 +1666,10 @@ const OB_PAIN=[['knie','Knie'],['huefte','Hüfte'],['ruecken','Rücken'],['schul
 const OB_LIFTS=[['sq','Kniebeuge','High-Bar Squat'],['bp','Bankdrücken','Bankdrücken'],['dl','Trap-Bar-Kreuzheben','Trap-Bar-Kreuzheben']];
 function obNeeded(){ if(typeof S==='undefined'||!S||!S.profile||ui.obSkip) return false; const p=S.profile;
   if(p.onboarded || (p.positions||[]).length) return false;
-  if(!sbReady()) return false; const r=sbRoles(); if(TEAM.loaded && r.length && !r.includes('athlete')) return false;   // reine Coach-Konten trainieren nicht
+  if(!sbReady() || sb.pulled!==sbUid()) return false;   // erst nach dem ersten Abgleich: auf einem neuen Gerät kommt das Profil aus Supabase
+  const r=sbRoles(); if(TEAM.loaded && r.length && !r.includes('athlete')) return false;   // reine Coach-Konten trainieren nicht
   return true; }
-function obActive(){ return !!(ui.ob || obNeeded()); }
+function obActive(){ if(ui.ob && !ui.ob.manual && !obNeeded()) ui.ob=null; return !!(ui.ob || obNeeded()); }
 function obState(){ if(!ui.ob){ const p=S.profile;
     ui.ob={ step:0, d:{ main:'', sec:'', share:30, h:p.heightCm||'', kg:'', by:p.birthYear||'', sex:p.sex||'', exp:'fortgeschritten', clean:null, w8:'', last:'', lifts:'', wl:{},
       loc:'public', locText:'', days:['MON','TUE','THU','FRI'], min:60, inj:[], pain:[], wg:'halten', ext:false } }; }
@@ -1736,7 +1737,7 @@ function obCheck(){ const d=ui.ob.d, st=ui.ob.step;
 ACT.obNext = ()=>{ obCollect(); const e=obCheck(); if(e){ toast(e); return; } ui.ob.step=Math.min(OB_STEPS.length-1, ui.ob.step+1); render(); window.scrollTo(0,0); };
 ACT.obBack = ()=>{ obCollect(); ui.ob.step=Math.max(0, ui.ob.step-1); render(); window.scrollTo(0,0); };
 ACT.obLater = ()=>{ ui.obSkip=true; ui.ob=null; render(); toast('Du kannst die Einrichtung im Profil jederzeit starten.'); };
-ACT.obOpen = ()=>{ ui.obSkip=false; obState(); ui.view='profil'; render(); window.scrollTo(0,0); };
+ACT.obOpen = ()=>{ ui.obSkip=false; obState().manual=true; ui.view='profil'; render(); window.scrollTo(0,0); };
 ACT.obSet = el=>{ obCollect(); const [k,v]=el.dataset.v.split(':'); const d=ui.ob.d;
   if(k==='share'||k==='min') d[k]=+v; else if(k==='clean'||k==='ext') d[k]=v==='1'; else { d[k]=v; if(k==='loc') d.locText=''; } render(); };
 CHG.obPos = ()=>{ const d=ui.ob.d; d.main=val('ob-main'); d.sec=val('ob-sec'); if(d.sec===d.main) d.sec=''; render(); };
@@ -4137,9 +4138,10 @@ async function sbSync(reason){
   if(navigator.onLine===false){ sb.state='offline'; return false; }
   sb.syncing=true; sb.state='laeuft'; sbPaint();
   try{
-    const rows=await sbPullRows(); const remote=new Map(rows.map(r=>[r.key,{ t:sbIso(r.updated_at), del:r.deleted }]));
+    const uid0=sbUid(); const rows=await sbPullRows(); const remote=new Map(rows.map(r=>[r.key,{ t:sbIso(r.updated_at), del:r.deleted }]));
     const res=mergeData(S, sbDocOf(rows));
     if(syncSig(res.data)!==syncSig(S)) applyMerged(res.data);
+    if(sb.pulled!==uid0){ sb.pulled=uid0; if(obNeeded()) render(); }
     const up=[]; const uid=sbUid();
     syncRecords(S).forEach((v,k)=>{ const t=S.sync.stamps[k]||''; const r=remote.get(k); if(!t) return;
       if(!r || r.del || r.t<t) up.push({ athlete_id:uid, key:k, data:v, updated_at:t, deleted:false }); });

@@ -330,6 +330,19 @@ async def supabase_test(browser):
     await page.evaluate("()=>{ sb.sess.user.id='%s'; sbOwnerCheck(); }" % uid)
     if await page.evaluate("S.profile.name") != 'anderes Gerät': errors.append('Gerätewechsel: Stand des ersten Kontos kommt nicht zurück')
     await ctx.close()
+    # Zweites Gerät (Laptop) mit eingerichtetem Konto: kein Onboarding, Profil kommt aus Supabase
+    db['profile:_'] = {'data': dict(db['profile:_']['data'], name='Eingerichtet', positions=[{'id': 'p1', 'code': 'RB', 'name': 'Running Back', 'weight': 100}]), 'updated_at': '2099-01-02T00:00:00.000Z', 'deleted': False}
+    ctx = await browser.new_context(viewport={'width': 1280, 'height': 900})
+    await ctx.route('**/*', lambda r: r.continue_() if r.request.url.startswith('file:') else r.abort())
+    await ctx.route('https://*.supabase.co/**', sbr)
+    page = await ctx.new_page(); page.on('pageerror', lambda e: errors.append(str(e)))
+    await page.goto(ROOT.as_uri()); await page.wait_for_timeout(600)
+    await page.evaluate("()=>{ ui.view='profil'; ui.profOpen={sb:true}; render(); }")
+    await page.fill('#sb-email', 'athlet@test.invalid'); await page.click('[data-act="sbCode"]'); await page.wait_for_timeout(100)
+    await page.fill('#sb-otp', '123456'); await page.click('[data-act="sbVerify"]'); await page.wait_for_timeout(500)
+    if await page.evaluate("!!document.getElementById('onboarding') || !!ui.ob"): errors.append('Zweites Gerät: Onboarding erscheint trotz eingerichtetem Konto')
+    if await page.evaluate("S.profile.name") != 'Eingerichtet': errors.append('Zweites Gerät: Profil kam nicht aus Supabase')
+    await ctx.close()
     return errors
 
 async def main():
