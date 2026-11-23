@@ -61,6 +61,10 @@ header.top{position:sticky;top:0;z-index:20;background:var(--bg-deep);border-bot
 .sysbar{display:flex;gap:10px;font-size:.75rem;color:var(--muted);white-space:nowrap}
 .sysbar .sync-btn{background:none;border:0;box-shadow:none;padding:10px;margin:-10px;min-height:0;min-width:0;color:inherit}
 .sysbar .sd{font-size:.8rem;line-height:1}
+.sysbar .reload-btn{display:flex;align-items:center;background:none;border:0;box-shadow:none;padding:6px;margin:-6px 0;min-height:0;min-width:0;color:var(--muted)}
+.sysbar .reload-btn:hover{color:var(--text)}
+.sysbar .reload-btn svg{width:18px;height:18px}
+@media (max-width:760px){.sysbar .reload-btn{display:none}}
 .sysbar .sd.ok,.sysbar .sd.run{color:var(--text2)} .sysbar .sd.err{color:var(--text)} .sysbar .sd.off{color:var(--faint)}
 
 /* Navigation */
@@ -879,7 +883,8 @@ ACT.confirmOk = ()=>{ const f=ui._confirm; ui._confirm=null; closeDlg(); if(f) f
 function renderShell(){
   const NV=teamViews(); const nav=document.getElementById('nav'); nav.style.gridTemplateColumns='repeat('+NV.length+',1fr)';
   nav.innerHTML = NV.map(([k,t])=>'<button data-act="go" data-view="'+k+'"'+(ui.view===k?' aria-current="page"':'')+' aria-label="'+t+'" title="'+t+'">'+(NAV_ICON[k]||'')+'<span class="sr-only">'+t+'</span></button>').join('');
-  document.getElementById('topinfo').innerHTML = '<div class="sysbar"><button id="hsync" class="sync-btn" data-act="syncInfo" aria-label="Speicherstatus anzeigen">'+syncDot()+'</button></div>';
+  document.getElementById('topinfo').innerHTML = '<div class="sysbar"><button id="hsync" class="sync-btn" data-act="syncInfo" aria-label="Speicherstatus anzeigen">'+syncDot()+'</button>'+
+    '<button class="reload-btn" data-act="reload" aria-label="Neu laden" title="Neu laden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M18 3v4.5h-4.5"/></svg></button></div>';
 }
 /* Tabellen mit 3+ Spalten werden am Handy als Liste untereinander dargestellt (kein Seitwärts-Scrollen) */
 function stackTables(root){
@@ -4397,6 +4402,16 @@ document.addEventListener('visibilitychange', ()=>{
 });
 window.addEventListener('online', ()=>{ if(sbReady()) sbSync('online'); });
 window.addEventListener('offline', ()=>{ if(sbReady()){ sb.state='offline'; sbPaint(); } });
+
+/* Neu laden (Desktop, Kopfzeile): erst offene Änderungen speichern, nach neuer App-Version suchen, dann die Seite neu laden.
+   Eine laufende Einheit bleibt erhalten (liveSave/liveRestore); ein offenes, nicht gespeichertes Protokoll wird vorher bestätigt. */
+async function aosReload(){
+  toast('Wird neu geladen …'); liveSave();
+  try{ if(sbReady() && sb.dirty) await sbSync('reload'); }catch(e){}
+  try{ const r=navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if(r) await r.update(); }catch(e){}
+  location.reload();
+}
+ACT.reload = ()=>{ if(ui.draft && !isLive()) confirmDlg('Neu laden?', 'Das offene Protokoll ist noch nicht gespeichert. Beim Neuladen gehen diese Eingaben verloren.', 'Neu laden', aosReload, true); else aosReload(); };
 
 /* Neue App-Version laden, sobald nichts Ungespeichertes offen ist */
 function aosApplyUpdate(){
