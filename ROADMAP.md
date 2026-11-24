@@ -1,6 +1,6 @@
 # AOS – Roadmap: Mehrbenutzer, Positionsgruppen, Coach, Ranglisten
 
-Stand: 23.11.2026 · Version 1
+Stand: 24.11.2026 · Version 1
 Fachliche Details: Mehrbenutzer-Spezifikation v1.7 in `AOS_DATA/docs` (Rollen, Datenmodell, Positionsgruppen, Onboarding und Einstieg, Coach-Übersicht, Ranglisten mit DOTS, Datenschutz).
 Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persönlichen Werte.
 
@@ -20,7 +20,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 | **0** | 17.–22.11.2026 | Vorbereitung | Zugänge da | 2 / 2 ✅ |
 | **M1** | 21.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 12 / 12 ✅ |
 | **M2** | 21.11.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 6 / 6 ✅ |
-| **M3** | 21.11.2026 | Positionsgruppen | Planung für alle Positionen | 8 / 9 |
+| **M3** | 21.11.2026 | Positionsgruppen | Planung für alle Positionen | 9 / 11 |
 | **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 9 / 13 |
 | **Start** | ab 11.01.2027 | Teamstart | alle eingeladenen Spieler | 0 / 2 |
 | **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 6 / 7 |
@@ -72,6 +72,8 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 - [x] **M3.7** Trainingserfahrung (Einsteiger: Ausschlüsse, Grundübungen, RPE −0,5, weniger Kontakte) und „Umsetzen technisch sicher?“ (sonst Trap-Bar-Sprung, Speed Pull, KB Swing); hohes Körpergewicht ≥ 115 kg ✅ 21.11.2026
 - [x] **M3.8** Testprofil je Gruppe: Action „Gruppentest“ im Datenrepo (echte Übungsdatenbank, 8 Profile, Prüffälle der Trainingspfade); Gruppenregeln zusätzlich im Klicktest ✅ 21.11.2026
 - [ ] **M3.9** 👤 Fachliche Prüfung: Pläne P2–P5 der Testprofile nebeneinander (Vergleichsansicht von Claude). Ein O-Liner trainiert erkennbar anders als ein Cornerback. Danach entscheidet Marcel, ob er seinen eigenen Plan umstellt (Profil → Planung, gilt ab dem nächsten Block)
+- [x] **M3.10** Gelernte Muster aus hochgeladenen Trainingssystemen (Lernbasis `AOS_DATA/docs/AOS_Planungswissen.json`, Regeln in `planner/plan.json → rules.gelernte_muster`): R1 Aufwärmvorlage, R2 Top-Satz + Back-off (Back-off-Prozent lernt aus den eigenen Sätzen), R3 Prehab in Sprung-/Wurfpausen, R4 Kontrastpaare P3, R5 Speed Strength, R6 Teil-ROM, R7 Feld-Drills und Feldtests, R8 EMOM-Timer, R9 Finisher; Übungsdatenbank v2.1, Trainingspfade v2.1. Ohne aktive Regel plant AOS wie bisher (geprüft mit echter Datenbank, beide Planungsarten, alle Phasen; Klicktest grün) ✅ 24.11.2026
+- [ ] **M3.11** 👤 Erste Wochen mit den gelernten Mustern beobachten (Aufwärmen, Back-off-Lasten, Kontrastpaare in P3); Rückmeldung, welche Muster bleiben oder angepasst werden
 
 Hinweis: Bestehende Profile planen weiter mit den bisherigen Vorlagen, bis der Athlet umstellt. Alter, Verletzungen, Mobilitäts-Screen und Zeit pro Einheit aus den Trainingspfaden kommen mit dem Onboarding (M4.2).
 

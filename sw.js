@@ -1,6 +1,6 @@
 /* AOS Service Worker – speichert nur die App-Dateien für den Offline-Start.
    Daten (Supabase, Lebensmitteldatenbanken) laufen nicht über den Service Worker: fremde Adressen werden nicht zwischengespeichert. */
-const CACHE = 'aos-40e053c3214a';
+const CACHE = 'aos-c2cb1abfabba';
 const FILES = ['./', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './img/tiger.png?v=1', './img/t.png?v=1'];
 
 self.addEventListener('install', e => {

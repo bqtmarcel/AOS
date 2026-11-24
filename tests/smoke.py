@@ -26,7 +26,10 @@ DEMO = """(()=>{
     ex('pull_up','Klimmzug','vertical_pull','main',[],['bodyweight_reps'],0),
     ex('broad_jump','Standweitsprung','jump','power',[],['quality'],1) ]};
   const dose={'1':[3,'5'],'2':[3,'5'],'3':[3,'5']};
-  const P={ name:'Demo-Plan', version:'DEMO-1', season:{first_game:[addDays(mon,90)]}, rules:{pain_threshold:3,max_session_min:65,warmup_min:7,leg_regions:['knee'],increments_kg:{high_bar_squat:2.5,bench_press:2.5}},
+  const P={ name:'Demo-Plan', version:'DEMO-1', season:{first_game:[addDays(mon,90)]}, rules:{pain_threshold:3,max_session_min:65,warmup_min:7,leg_regions:['knee'],increments_kg:{high_bar_squat:2.5,bench_press:2.5},
+      gelernte_muster:{R1_aufwaermen:{aktiv:true,allgemein:{uebungen:2,saetze:2,dauer_s:40,pool:['Jumping Jacks','High Knees']},spezifisch:{uebungen:[2,3],saetze:3,wdh:6,pool_unten:['broad_jump'],pool_oben:['pull_up']},sprungkontakte_max:15},
+        R2_topsatz_backoff:{aktiv:true,ab_phase:'P2',wochen:['build_heavy','peak','peak_test'],backoff_prozent_vom_topsatz:[88,95]},R3_pausen_nutzen:{aktiv:true},R4_kontrastpaare:{aktiv:true,phasen:['P1','P2'],readiness_min:3,runden:[3,5],pause_dazwischen_s:[20,60]},
+        R5_speed_strength:{aktiv:true},R6_teil_rom:{aktiv:true},R7_feld_drills:{aktiv:true,testwoche:['10 yd']},R8_emom:{aktiv:true,intervall_s:120},R9_finisher:{aktiv:true,prio:3,durchgaenge:[2,3],strecke_m:20,pause_s:45,pool:['broad_jump']}}},
     phases:[{id:'P1',name:'P1 Demo',start:mon,end,rpe_cap:[7,8]},{id:'P2',name:'P2 Demo (automatisch)',start:addDays(end,1),end:addDays(end,28),rpe_cap:[8,8]}],
     blocks:[{ id:'DEMO-B1', name:'Demo-Block', phase:'P1', start:mon, weeks:3, rpe_cap:[7,8], status:'bestätigt',
       week_wave:{'1':'Einstieg','2':'Aufbau','3':'Test'}, week_schedule:{MON:'A',WED:'B',FRI:'A'}, week_overrides:{}, session_order:['A','B'],
