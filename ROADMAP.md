@@ -20,7 +20,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 | **0** | 17.–22.11.2026 | Vorbereitung | Zugänge da | 2 / 2 ✅ |
 | **M1** | 21.11.–06.12.2026 | Neue Basis: Datenbank, Login, Migration | AOS läuft wie heute, auf Supabase | 12 / 12 ✅ |
 | **M2** | 21.11.2026 | Engine personenneutral | persönliche Vorlieben nur noch im Profil | 6 / 6 ✅ |
-| **M3** | 21.11.2026 | Positionsgruppen | Planung für alle Positionen | 9 / 11 |
+| **M3** | 21.11.2026 | Positionsgruppen | Planung für alle Positionen | 10 / 12 |
 | **M4** | 28.12.2026–10.01.2027 | Einladungen, Onboarding, Datenschutz, Pilot | 3–5 Pilot-Athleten nutzen AOS | 9 / 13 |
 | **Start** | ab 11.01.2027 | Teamstart | alle eingeladenen Spieler | 0 / 2 |
 | **M5** | 11.–24.01.2027 | Coach-Übersicht | Coach sieht alle Athleten | 6 / 7 |
@@ -73,6 +73,7 @@ Dieses Repo ist öffentlich: Hier stehen nur Aufgaben und Termine, keine persön
 - [x] **M3.8** Testprofil je Gruppe: Action „Gruppentest“ im Datenrepo (echte Übungsdatenbank, 8 Profile, Prüffälle der Trainingspfade); Gruppenregeln zusätzlich im Klicktest ✅ 21.11.2026
 - [ ] **M3.9** 👤 Fachliche Prüfung: Pläne P2–P5 der Testprofile nebeneinander (Vergleichsansicht von Claude). Ein O-Liner trainiert erkennbar anders als ein Cornerback. Danach entscheidet Marcel, ob er seinen eigenen Plan umstellt (Profil → Planung, gilt ab dem nächsten Block)
 - [x] **M3.10** Gelernte Muster aus hochgeladenen Trainingssystemen (Lernbasis `AOS_DATA/docs/AOS_Planungswissen.json`, Regeln in `planner/plan.json → rules.gelernte_muster`): R1 Aufwärmvorlage, R2 Top-Satz + Back-off (Back-off-Prozent lernt aus den eigenen Sätzen), R3 Prehab in Sprung-/Wurfpausen, R4 Kontrastpaare P3, R5 Speed Strength, R6 Teil-ROM, R7 Feld-Drills und Feldtests, R8 EMOM-Timer, R9 Finisher; Übungsdatenbank v2.1, Trainingspfade v2.1. Ohne aktive Regel plant AOS wie bisher (geprüft mit echter Datenbank, beide Planungsarten, alle Phasen; Klicktest grün) ✅ 24.11.2026
+- [x] **M3.12** Gelernte Muster sind Optionen mit Abwägung: Einsatz nur bei passender Positionsgruppe (`gruppen_passung`), Erfahrung, Phase, Readiness und Kraftniveau (Kontrastpaare erst ab e1RM/Körpergewicht 1,5 Kniebeuge bzw. 1,0 Bank, wenn bekannt); je Einheit höchstens 2 zusätzliche Belastungsreize (bei niedriger Readiness 1), Rest entfällt mit Begründung; Evidenzstufe je Muster (`rules.gelernte_muster.abwaegung`, Sessionplaner 18.1). Geprüft mit Profilen RB/DE, WR, OL, QB, Einsteiger, Readiness 2 ✅ 24.11.2026
 - [ ] **M3.11** 👤 Erste Wochen mit den gelernten Mustern beobachten (Aufwärmen, Back-off-Lasten, Kontrastpaare in P3); Rückmeldung, welche Muster bleiben oder angepasst werden
 
 Hinweis: Bestehende Profile planen weiter mit den bisherigen Vorlagen, bis der Athlet umstellt. Alter, Verletzungen, Mobilitäts-Screen und Zeit pro Einheit aus den Trainingspfaden kommen mit dem Onboarding (M4.2).

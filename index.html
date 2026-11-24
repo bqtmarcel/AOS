@@ -1561,8 +1561,20 @@ const REF = { plan:null, ex:null, exMap:{}, nut:null, food:null, recipes:null, a
 /* ---------- Gelernte Muster aus Trainingssystemen (AOS_DATA/planner/plan.json → rules.gelernte_muster, Sessionplaner 18) ----------
    Hochgeladene Programme sind Lernmaterial: Die Muster wirken als Spannen und Optionen innerhalb der festen AOS-Regeln; ohne aktive Regel plant AOS wie bisher. */
 function GM(k){ const g=(typeof REF!=='undefined'&&REF.plan&&REF.plan.rules&&REF.plan.rules.gelernte_muster)||{}; const r=g[k]; return r&&r.aktiv?r:null; }
+/* Abwägung (Sessionplaner 18.1): Alle Muster sind optional. Eine Regel greift nur, wenn sie zu Positionsgruppe, Erfahrung, Phase und Tagesform passt;
+   je Einheit begrenzt ein Budget die zusätzlichen Belastungsreize (gmBudget in plBuild). */
+function gmMeta(){ const g=(typeof REF!=='undefined'&&REF.plan&&REF.plan.rules&&REF.plan.rules.gelernte_muster)||{}; return g.abwaegung||{}; }
+function gmFit(r){ const w=r&&r.gruppen_passung; if(!w) return 1; const m=(typeof S!=='undefined'&&S&&S.profile)?groupMix():[]; if(!m.length) return 1;
+  return m.reduce((a,g)=>a+g.share/100*(w[g.group]!=null?w[g.group]:1),0); }
+function gmUse(k, o){ const r=GM(k); if(!r) return null; o=o||{}; const M=gmMeta();
+  const exp=(typeof S!=='undefined'&&S&&S.profile&&S.profile.experience)||'fortgeschritten';
+  if(r.erfahrung && !r.erfahrung.includes(exp)) return null;
+  if(gmFit(r) < (r.passung_min!=null?r.passung_min:(M.passung_min!=null?M.passung_min:0.5))) return null;
+  if(o.phase && r.phasen && !r.phasen.includes(o.phase)) return null;
+  if(o.readiness!=null && r.readiness_min!=null && o.readiness<r.readiness_min) return null;
+  return r; }
 const GM_SPEED=['speed_box_squat','speed_bench_band'], GM_ROM=['board_press','block_pull','box_front_squat'];
-function gmOff(id){ return (GM_SPEED.includes(id)&&!GM('R5_speed_strength')) || (GM_ROM.includes(id)&&!GM('R6_teil_rom')); }
+function gmOff(id){ return (GM_SPEED.includes(id)&&!gmUse('R5_speed_strength')) || (GM_ROM.includes(id)&&!gmUse('R6_teil_rom')); }
 const GM_BACKOFF_WT={ build_heavy:'A2', peak:'H', peak_test:'DT' };
 function refSet(plan, ex, at, more){ REF.plan=plan; REF.ex=ex; REF.at=at; REF.exMap={}; ((ex&&ex.exercises)||[]).forEach(e=>{ REF.exMap[e.id]=e; });
   try{ apGenerate(REF.plan); }catch(e){ console.warn('Automatische Blockplanung fehlgeschlagen', e); }
@@ -2045,7 +2057,7 @@ function apBuildBlock(phase, prev, prev2){
     if(spec.tp) sl.tp=spec.tp; if(spec.grp) sl.grp=spec.grp; if(spec.pflicht) sl.pflicht=true;
     if(GM_SPEED.includes(c[0])){ const G=GM('R5_speed_strength')||{}; sl.rest=(G.pause_s||[45,60]).slice(); }
     // Top-Satz + Back-off (R2): Hauptübungen ab P2 in Aufbau-schwer-, Belastungs- und Testwochen
-    const BO=GM('R2_topsatz_backoff'); if(BO && (spec.main==='main'||spec.main==='hinge') && PH_ORD.indexOf(phase.id)>=PH_ORD.indexOf(BO.ab_phase||'P2') && ['P2','P3','P4'].includes(phase.id)){
+    const BO=gmUse('R2_topsatz_backoff'); if(BO && (spec.main==='main'||spec.main==='hinge') && PH_ORD.indexOf(phase.id)>=PH_ORD.indexOf(BO.ab_phase||'P2') && ['P2','P3','P4'].includes(phase.id)){
       const wts=(BO.wochen||['build_heavy','peak','peak_test']).map(k=>GM_BACKOFF_WT[k]).filter(Boolean); const bw={};
       types.forEach((wt,w)=>{ if(wts.includes(wt) && !(EN[w]&&EN[w].wt) && dose[w+1] && dose[w+1][0]>=2) bw[w+1]=true; }); if(Object.keys(bw).length) sl.backoff=bw; }
     if(Object.keys(rw).length) sl.rpe_wave=rw; if(rpe) sl.rpe=rpe; if(rng && method==='double') sl.range=rng; if(spec.grip) sl.grip=true;
@@ -2062,7 +2074,7 @@ function apBuildBlock(phase, prev, prev2){
   });
   if(C && phase.id!=='IN') tpPflicht(templates, TPL, C, phase, buildSlot);
   // Finisher (R9): kurzer Abschluss mit Carry/Schlitten in der letzten Einheit der Woche, nur bei Restzeit (optional) und nicht an Feldtagen
-  const FI=GM('R9_finisher'); const fT=templates[templates.length-1];
+  const FI=gmUse('R9_finisher'); const fT=templates[templates.length-1];
   if(FI && fT && ['P1','P2','P3','P4'].includes(phase.id)){ const used=new Set(templates.flatMap(t=>t.slots.map(x=>x.candidates[0])));
     const okF=id=>{ const e=REF.exMap[id]; return e && (!e.phases||e.phases.includes(phase.id)) && !(e.equipment_check||[]).length && !gmOff(id) && !(C&&C.excl.has(id)); };
     const pool=(FI.pool||[]).filter(okF); const pick=pool.find(id=>!used.has(id)) || pool[0];
@@ -2093,7 +2105,7 @@ function apBuildBlock(phase, prev, prev2){
     if(en.i===en.n-1 && EI.adj) nn.push(EI.adj); });
   types.forEach((t,w)=>{ if(t==='D') week_overrides[w+1]={ note:'Entlastung: weniger Sätze, gleiche Last'+(addDays(phase.start,w*7).slice(5)<='12-31'&&addDays(phase.start,w*7).slice(5)>='12-18'?' · Feiertage: Tage frei setzen':'') };
     if(t==='H'||t==='DT') (week_notes[w+1]=week_notes[w+1]||[]).push('Standortbestimmung: Broad Jump (D1), Top-Sets Kniebeuge, Kreuzheben, Bank bis RPE '+fmtNum(P.cap)+', kein Maxtest. Ergebnisse gehen automatisch in den Verlauf.');
-    const F7=GM('R7_feld_drills'); if((t==='H'||t==='DT') && F7 && ['P3','P4','P5'].includes(phase.id)) week_notes[w+1].push('Feldtests (mit Feldzugang, wenn das Team sie nicht macht): '+(F7.testwoche||[]).map(x=>x==='pro_agility'?'Pro Agility':x==='broad_jump'?'Broad Jump':x).join(', ')+' – gestoppt bzw. gemessen.'); });
+    const F7=gmUse('R7_feld_drills'); if((t==='H'||t==='DT') && F7 && ['P3','P4','P5'].includes(phase.id)) week_notes[w+1].push('Feldtests (mit Feldzugang, wenn das Team sie nicht macht): '+(F7.testwoche||[]).map(x=>x==='pro_agility'?'Pro Agility':x==='broad_jump'?'Broad Jump':x).join(', ')+' – gestoppt bzw. gemessen.'); });
   // Nicht verfügbare Tage (plan.json „unavailable“): Einheiten der Woche rücken in Reihenfolge auf die übrigen Trainingstage, was nicht passt, entfällt (kein Nachholen)
   const una=(REF.plan.unavailable||[]); const ORD=DAY_KEYS;
   if(phase.id!=='IN' && una.length) for(let w=1; w<=weeks; w++){ const mon=addDays(phase.start,(w-1)*7); const hit=ORD.filter((d,i)=>una.includes(addDays(mon,i))); if(!hit.length) continue;
@@ -2250,7 +2262,7 @@ function tpPick(spec, phaseId, prev, taken, C){
   const good=free.filter(id=>!(REF.exMap[id].selection_penalty>0) && wrel(id)>=1); if(good.length) free=good.concat(free.filter(id=>!good.includes(id)));   // Maschinen und für die Gruppe kaum relevante Übungen nur als letzte Wahl
   // Gelernte Muster: P3 Teil-ROM als ergänzendes Drücken (R6), P4 Speed-Bankdrücken als Power Oberkörper (R5) – wenn für die Gruppe vorgesehen
   const gmList=(phaseId==='P3'&&spec.tp==='push_2') ? ['board_press','floor_press'] : (phaseId==='P4'&&spec.tp==='power_upper') ? ['speed_bench_band'] : [];   // Board Press nur mit bestätigtem Brett, sonst Floor Press
-  const gmFirst=(GM('R5_speed_strength')||GM('R6_teil_rom')) ? gmList.find(id=>good.includes(id) && !gmOff(id) && (id!=='floor_press'||GM('R6_teil_rom'))) : null;
+  const gmFirst=(gmUse('R5_speed_strength')||gmUse('R6_teil_rom')) ? gmList.find(id=>good.includes(id) && !gmOff(id) && (id!=='floor_press'||gmUse('R6_teil_rom'))) : null;
   if(gmFirst){ return [gmFirst].concat(free.filter(id=>id!==gmFirst).slice(0,1)); }
   const rot=!['power_lower','power_upper','field'].includes(spec.tp);   // Gewichtheben und Drücken folgen der Phase (3.9), Feld der Gruppe
   const pick=(rot && good.find(id=>!prev.used.has(id))) || good[0] || free[0];
@@ -2461,7 +2473,7 @@ function plPair(items){
   // Klimmzug (Haupt, Körpergewicht) bevorzugt mit Bankdrücken bzw. einer anderen Hauptübung ohne Zug kombinieren
   c.filter(x=>x.role==='main').forEach(a=>{ const b=items.find(y=>y!==a && !y.pair && y.role==='main' && y.method==='wave' && plGroup(y.ex)==='push'); if(b){ const id='S'+(++n); a.pair=id; b.pair=id; } });
   // Pausen nutzen (R3): Prehab mit wenig Ermüdung (Oberkörper) in die Pausen von Sprüngen und Würfen
-  if(GM('R3_pausen_nutzen')) items.filter(x=>x.role==='power' && !x.pair && /jump|throw/.test((x.ex&&x.ex.pattern)||'')).forEach(a=>{
+  if(gmUse('R3_pausen_nutzen')) items.filter(x=>x.role==='power' && !x.pair && /jump|throw/.test((x.ex&&x.ex.pattern)||'')).forEach(a=>{
     const b=c.find(y=>!y.pair && y.role!=='main' && (y.role==='optional' || (y.ex&&y.ex.role==='prehab')) && plGroup(y.ex)!=='legs' && (y.ex&&y.ex.fatigue)!=='H'); if(b){ const id='S'+(++n); a.pair=id; b.pair=id; } });
   c.forEach((a,i)=>{ if(a.pair || a.role==='main') return; const b=c.find((y,j)=>j>i && !y.pair && y.role!=='main' && plGroup(y.ex)!==plGroup(a.ex)); if(b){ const id='S'+(++n); a.pair=id; b.pair=id; } });
   // Partner hintereinander stellen
@@ -2847,7 +2859,7 @@ function plBuild(inp){
   if(gameEve) while(items.length>2){ const x=items.pop(); dropped.push({ slot:x.slot, why:'Vortag Spiel – höchstens 2 Aktivierungsübungen' }); }
   if(deload) items.forEach(x=>{ const n=Math.max(1, Math.round(x.sets*0.6)); if(n<x.sets){ x.reasons.push('Automatische Entlastung → '+x.sets+' → '+n+' Sätze.'); x.sets=n; } });
   // Aufwärmen (R1): Vorlage passend zur Einheit, Sprungkontakte zählen mit
-  const W1=GM('R1_aufwaermen'); let warmup=null;
+  const W1=gmUse('R1_aufwaermen'); let warmup=null;
   if(W1 && items.length && !gameDay){ warmup=plWarmup(W1, t, inp.date); notes.unshift(warmup.text); }
   const wuC=warmup?warmup.contacts:0;
   // Kontakte gegen Blocklimit (6.5) – autonom kürzen
@@ -2856,10 +2868,27 @@ function plBuild(inp){
   if(lim){ for(let i=items.length-1; i>=0 && cSum()>lim; i--){ const x=items[i]; while(contactsOf(x)>0 && x.sets>1 && cSum()>lim){ x.sets--; x.reasons.push('Bodenkontakte über dem Blocklimit '+lim+' → 1 Satz weniger.'); } } }
 
   // Kontrastpaare (R4): schwere Hauptübung, direkt danach Sprung/Wurf mit gleichem Muster
-  const K4=GM('R4_kontrastpaare'); const phId=due.phase&&due.phase.id;
-  if(K4 && (K4.phasen||[]).includes(phId) && (rd==null || rd>=(K4.readiness_min||3)) && !deload && !gameEve && !gameNext && !painOn){ let kn=0;
+  // Abwägung (18.1): belastende Muster (Back-off, Kontrast, Finisher) nach Priorität bis zum Budget der Einheit; Rest entfällt heute mit Begründung
+  const GMM=gmMeta(); const lowRd=rd!=null && rd<=(GMM.readiness_niedrig!=null?GMM.readiness_niedrig:2);
+  const gmMax=lowRd ? (GMM.max_bei_niedriger_readiness!=null?GMM.max_bei_niedriger_readiness:1) : (GMM.max_belastende_muster_pro_einheit!=null?GMM.max_belastende_muster_pro_einheit:2);
+  const phId=due.phase&&due.phase.id; const bwK=bwNow();
+  const K4=gmUse('R4_kontrastpaare', { phase:phId, readiness:rd }); const kStrong=x=>{ const m=(K4&&K4.kraft_min_bw||{})[x.ex.pattern]; if(!m || !bwK) return true;
+    const e=plE1RM(x.dbId, inp.date)||plTestE1RM(x.dbId, inp.date); return !e || e.kg/bwK>=m; };
+  const gmOn=[]; const gmSkip=[]; const pr=k=>(GM(k)||{}).prio||9;
+  if(items.some(x=>x.backoffKg!=null)) gmOn.push('R2_topsatz_backoff');
+  const kOk=K4 && !deload && !gameEve && !gameNext && !painOn;
+  if(kOk) gmOn.push('R4_kontrastpaare');
+  const fin=items.find(x=>x.slot&&x.slot.finisher);
+  if(fin){ if(lowRd || painOn || deload){ items.splice(items.indexOf(fin),1); dropped.push({ slot:fin.slot, why:'Finisher entfällt: '+(lowRd?'niedrige Readiness':painOn?'Beschwerden':'Entlastung') }); } else gmOn.push('R9_finisher'); }
+  gmOn.sort((a,z)=>pr(a)-pr(z)); const gmKeep=new Set(gmOn.slice(0,gmMax));
+  gmOn.filter(k=>!gmKeep.has(k)).forEach(k=>{ gmSkip.push(k);
+    if(k==='R2_topsatz_backoff') items.forEach(x=>{ if(x.backoffKg!=null){ delete x.backoffKg; delete x.backoffPct; x.reasons=x.reasons.filter(r=>!/^Top-Satz \+ Back-off/.test(r)); } });
+    if(k==='R9_finisher' && fin && items.includes(fin)){ items.splice(items.indexOf(fin),1); dropped.push({ slot:fin.slot, why:'Abwägung: höchstens '+gmMax+' zusätzliche Reize je Einheit' }); } });
+  const GM_NAME={ R2_topsatz_backoff:'Back-off-Sätze', R4_kontrastpaare:'Kontrastpaare', R9_finisher:'Finisher' };
+  if(gmSkip.length) notes.push('Abwägung: heute '+gmSkip.map(k=>GM_NAME[k]).join(' und ')+' weggelassen – höchstens '+gmMax+' zusätzliche Reize je Einheit'+(lowRd?' bei niedriger Readiness':'')+'.');
+  if(kOk && gmKeep.has('R4_kontrastpaare')){ let kn=0;
     [['squat',['jump']],['horizontal_push',['throw','horizontal_push']]].forEach(([mp,pp])=>{
-      const a=items.find(x=>x.role==='main' && x.method==='wave' && x.ex.pattern===mp && !x.pair); if(!a) return;
+      const a=items.find(x=>x.role==='main' && x.method==='wave' && x.ex.pattern===mp && !x.pair); if(!a || !kStrong(a)) return;
       const bb=items.find(x=>x!==a && x.role==='power' && !x.pair && pp.includes(x.ex.pattern) && x.ex.pattern!=='jump_loaded'); if(!bb) return;
       const id='K'+(++kn); a.pair=id; bb.pair=id; a.kontrast=true; bb.kontrast=true; const [r0,r1]=K4.runden||[3,5];
       const n=Math.max(r0, Math.min(r1, a.sets)); if(bb.sets!==n){ bb.reasons.push('Kontrastpaar: '+n+' Runden wie '+a.ex.name_de+'.'); bb.sets=n; }
@@ -2872,7 +2901,7 @@ function plBuild(inp){
   if(redist){ const ext=items.filter(x=>x.from); const src=[...new Set(ext.map(x=>x.from))];
     notes[redist.at]='Diese Woche '+wp.count+' statt '+wp.full+' Einheiten: AOS verteilt den ganzen Wochenumfang neu auf die verbleibenden Einheiten, jede höchstens '+sessionMax()+' min.'+
       (ext.length?' Hier dazu aus '+src.join(', ')+': '+ext.map(x=>x.ex.name_de).join(', ')+'.':''); }
-  const E8=GM('R8_emom');
+  const E8=gmUse('R8_emom');
   items.forEach(x=>{ if(!x.pair) return; const y=items.find(z=>z!==x && z.pair===x.pair); if(!y) return; const first=items.indexOf(x)<items.indexOf(y);
     if(x.kontrast){ const pz=(K4&&K4.pause_dazwischen_s)||[20,60];
       x.reasons.unshift(first ? 'Kontrastpaar mit '+y.ex.name_de+': nach jedem Satz '+pz[0]+'–'+pz[1]+' s, dann '+y.ex.name_de+' maximal explosiv, danach volle Pause.' : 'Kontrastpaar: direkt nach '+y.ex.name_de+', jede Wdh maximal explosiv, danach volle Pause.');
